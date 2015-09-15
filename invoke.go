@@ -26,11 +26,7 @@ func (vk *_invoker) convert2slice(v, r reflect.Value, rt reflect.Type) (err erro
 
 	r.Set(reflect.MakeSlice(rt, 0, v.Len()))
 	for i := 0; i < v.Len(); i++ {
-		e := v.Index(i)
-		if !e.CanInterface() {
-			continue
-		}
-		converted, err_ := vk.convert(e.Interface(), rt.Elem())
+		converted, err_ := vk.convert(v.Index(i), rt.Elem())
 		if err_ != nil {
 			err = err_
 			break
@@ -53,11 +49,7 @@ func (vk *_invoker) convert2map(v, r reflect.Value, rt reflect.Type) (err error)
 
 	keys := v.MapKeys()
 	for _, k := range keys {
-		e := v.MapIndex(k)
-		if !e.CanInterface() {
-			continue
-		}
-		converted, err_ := vk.convert(e.Interface(), rt.Elem())
+		converted, err_ := vk.convert(v.MapIndex(k), rt.Elem())
 		if err_ != nil {
 			// propagate error
 			err = err_
@@ -69,7 +61,7 @@ func (vk *_invoker) convert2map(v, r reflect.Value, rt reflect.Type) (err error)
 
 	return
 }
-func (vk *_invoker) convert2struct(val interface{}, v, r reflect.Value, rt reflect.Type) (err error) {
+func (vk *_invoker) convert2struct(v, r reflect.Value, rt reflect.Type) (err error) {
 	if v.Kind() != reflect.Map {
 		err = errors.New(fmt.Sprintf("Only Map not %v convertible to struct", v.Kind().String()))
 		return
@@ -84,7 +76,7 @@ func (vk *_invoker) convert2struct(val interface{}, v, r reflect.Value, rt refle
 
 		ft := rt.Field(i)
 		if ft.Anonymous {
-			converted, err = vk.convert(val, ft.Type)
+			converted, err = vk.convert(v, ft.Type)
 		} else {
 			// json tags
 			// TODO: move this to a private function
@@ -106,10 +98,7 @@ func (vk *_invoker) convert2struct(val interface{}, v, r reflect.Value, rt refle
 				break
 			}
 
-			if !mv.CanInterface() {
-				continue
-			}
-			converted, err = vk.convert(mv.Interface(), fv.Type())
+			converted, err = vk.convert(mv, fv.Type())
 		}
 
 		if err != nil {
@@ -122,23 +111,27 @@ func (vk *_invoker) convert2struct(val interface{}, v, r reflect.Value, rt refle
 	return err
 }
 
-//
-// helper function for converting a value based on a type
-//
-func (vk *_invoker) convert(val interface{}, t reflect.Type) (reflect.Value, error) {
+func (vk *_invoker) convert(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 	var err error
 
-	if val == nil {
-		if t.Kind() != reflect.Ptr {
-			err = errors.New("Can't pass nil for non-ptr parameter")
-		}
-		// for pointer type, reflect.Zero create a nil pointer
-		return reflect.Zero(t), err
-	}
+	if v.IsValid() {
+		if v.Type().Kind() == reflect.Interface {
+			// type assertion
+			// by convert to interface{} and reflect it
+			val := v.Interface()
+			if val == nil {
+				if t.Kind() != reflect.Ptr {
+					err = errors.New("Can't pass nil for non-ptr parameter")
+				}
+				// for pointer type, reflect.Zero create a nil pointer
+				return reflect.Zero(t), err
+			}
 
-	v := reflect.ValueOf(val)
-	if v.Type().ConvertibleTo(t) {
-		return v.Convert(t), nil
+			v = reflect.ValueOf(val)
+		}
+		if v.Type().ConvertibleTo(t) {
+			return v.Convert(t), nil
+		}
 	}
 
 	deref := 0
@@ -154,13 +147,13 @@ func (vk *_invoker) convert(val interface{}, t reflect.Type) (reflect.Value, err
 
 	switch elm.Kind() {
 	case reflect.Struct:
-		err = vk.convert2struct(val, v, elm, t)
+		err = vk.convert2struct(v, elm, t)
 	case reflect.Map:
 		err = vk.convert2map(v, elm, t)
 	case reflect.Slice:
 		err = vk.convert2slice(v, elm, t)
 	default:
-		_ = "breakpoint"
+		err = errors.New(fmt.Sprintf("Unsupported Element Type: %v", elm.Kind().String()))
 	}
 
 	if deref == 0 {
@@ -172,7 +165,24 @@ func (vk *_invoker) convert(val interface{}, t reflect.Type) (reflect.Value, err
 		}
 	}
 
-	return ret, nil
+	return ret, err
+}
+
+//
+// helper function for converting a value based on a type
+//
+func (vk *_invoker) from_val(val interface{}, t reflect.Type) (reflect.Value, error) {
+	if val == nil {
+		var err error
+
+		if t.Kind() != reflect.Ptr {
+			err = errors.New("Can't pass nil for non-ptr parameter")
+		}
+		// for pointer type, reflect.Zero create a nil pointer
+		return reflect.Zero(t), err
+	}
+
+	return vk.convert(reflect.ValueOf(val), t)
 }
 
 //
@@ -192,7 +202,7 @@ func (vk *_invoker) Invoke(f interface{}, param []interface{}) ([]interface{}, e
 	// convert param into []reflect.Value
 	var in = make([]reflect.Value, funcT.NumIn())
 	for i := 0; i < funcT.NumIn(); i++ {
-		in[i], err = vk.convert(param[i], funcT.In(i))
+		in[i], err = vk.from_val(param[i], funcT.In(i))
 		if err != nil {
 			return nil, err
 		}
