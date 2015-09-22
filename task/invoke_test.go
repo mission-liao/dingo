@@ -1,4 +1,4 @@
-package dingo
+package task
 
 import (
 	"encoding/json"

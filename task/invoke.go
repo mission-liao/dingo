@@ -1,10 +1,12 @@
-package dingo
+package task
 
 import (
 	"errors"
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/satori/go.uuid"
 )
 
 //
@@ -13,10 +15,22 @@ import (
 
 type Invoker interface {
 	Invoke(f interface{}, param []interface{}) ([]interface{}, error)
+	ComposeTask(name string, args ...interface{}) (Task, error)
 }
 
 type _invoker struct {
 }
+
+//
+// factory
+//
+func NewDefaultInvoker() Invoker {
+	return &_invoker{}
+}
+
+//
+// private function
+//
 
 func (vk *_invoker) convert2slice(v, r reflect.Value, rt reflect.Type) (err error) {
 	if v.Kind() != reflect.Slice {
@@ -61,6 +75,7 @@ func (vk *_invoker) convert2map(v, r reflect.Value, rt reflect.Type) (err error)
 
 	return
 }
+
 func (vk *_invoker) convert2struct(v, r reflect.Value, rt reflect.Type) (err error) {
 	if v.Kind() != reflect.Map {
 		err = errors.New(fmt.Sprintf("Only Map not %v convertible to struct", v.Kind().String()))
@@ -171,7 +186,7 @@ func (vk *_invoker) convert(v reflect.Value, t reflect.Type) (reflect.Value, err
 //
 // helper function for converting a value based on a type
 //
-func (vk *_invoker) from_val(val interface{}, t reflect.Type) (reflect.Value, error) {
+func (vk *_invoker) from(val interface{}, t reflect.Type) (reflect.Value, error) {
 	if val == nil {
 		var err error
 
@@ -184,6 +199,10 @@ func (vk *_invoker) from_val(val interface{}, t reflect.Type) (reflect.Value, er
 
 	return vk.convert(reflect.ValueOf(val), t)
 }
+
+//
+// Invoker interface
+//
 
 //
 // reference implementation
@@ -202,7 +221,7 @@ func (vk *_invoker) Invoke(f interface{}, param []interface{}) ([]interface{}, e
 	// convert param into []reflect.Value
 	var in = make([]reflect.Value, funcT.NumIn())
 	for i := 0; i < funcT.NumIn(); i++ {
-		in[i], err = vk.from_val(param[i], funcT.In(i))
+		in[i], err = vk.from(param[i], funcT.In(i))
 		if err != nil {
 			return nil, err
 		}
@@ -224,6 +243,10 @@ func (vk *_invoker) Invoke(f interface{}, param []interface{}) ([]interface{}, e
 	return out, nil
 }
 
-func NewInvoker() Invoker {
-	return &_invoker{}
+func (vk *_invoker) ComposeTask(name string, args ...interface{}) (Task, error) {
+	return &_task{
+		Id:   uuid.NewV4().String(),
+		Name: name,
+		Args: args,
+	}, nil
 }

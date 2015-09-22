@@ -1,0 +1,15 @@
+language: go
+
+go:
+    - 1.4
+    - tip
+
+services:
+    - rabbitmq
+
+env:
+     - AMQP_URL=amqp://guest:guest@127.0.0.1:5672/ GOMAXPROCS=2
+
+script:
+    go test -v ./...
+
