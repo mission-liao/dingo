@@ -4,21 +4,21 @@ import (
 	"github.com/streadway/amqp"
 )
 
-type _channelInfo struct {
+type AmqpChannel struct {
 	Channel *amqp.Channel
 	Confirm chan amqp.Confirmation
 }
 
-type AmqpHelper struct {
+type AmqpConn struct {
 	Conn     *amqp.Connection
-	Channels chan *_channelInfo // channel pool
+	Channels chan *AmqpChannel // channel pool
 }
 
 //
 // Broker interface
 //
 
-func (me *AmqpHelper) Init() (err error) {
+func (me *AmqpConn) Init() (err error) {
 	maxChannel := 16 // TODO: configurable
 
 	// connect to AMQP
@@ -33,67 +33,10 @@ func (me *AmqpHelper) Init() (err error) {
 		return
 	}
 
-	// get a free channel
-	var ci *_channelInfo
-	select {
-	case ci <- me.channels:
-	default:
-		err = errors.New("No channel available")
-		return
-	}
-
-	defer func() {
-		// remember to return channel to pool
-		me.channels <- ci
-	}()
-
-	// init exchange
-	err = ci.channel.ExchangeDeclare(
-		"dingo.ex.default", // name of exchange
-		"direct",           // kind
-		true,               // durable
-		false,              // auto-delete
-		false,              // internal
-		false,              // noWait
-		nil,                // args
-	)
-	if err != nil {
-		return
-	}
-
-	// init queue
-	err = ci.channel.QueueDeclare(
-		"dingo.q.default", // name of queue
-		true,              // durable
-		false,             // auto-delete
-		false,             // exclusive
-		false,             // noWait
-		nil,               // args
-	)
-	if err != nil {
-		return
-	}
-
-	// bind queue to exchange
-	// TODO: configurable name?
-	err = ci.channel.QueueBind(
-		"dingo.q.default",
-		"",
-		"dingo.ex.default",
-		false, // noWait
-		nil,   // args
-	)
-
-	// init qos
-	err = ci.channel.Qos(3, 0, true)
-	if err != nil {
-		return
-	}
-
 	return
 }
 
-func (me *AmqpHelper) Uninit() error {
+func (me *AmqpConn) Close() error {
 	var err error
 
 	for releaseCount := 0; releaseCount < cap(me.channels); releaseCount++ {
@@ -129,12 +72,12 @@ func (me *AmqpHelper) Uninit() error {
 // private function
 //
 
-func (me *AmqpHelper) prepareChannels(maxChannel uint) error {
+func (me *AmqpConn) prepareChannels(maxChannel uint) error {
 	if me.conn == nil {
 		return errors.New("Connection to AMQP is not made")
 	}
 
-	me.channels = make(chan *_channelInfo, maxChannel)
+	me.channels = make(chan *AmqpChannel, maxChannel)
 
 	for ; maxChannel > 0; maxChannel-- {
 		ch, err = me.conn.Channel()
@@ -145,9 +88,10 @@ func (me *AmqpHelper) prepareChannels(maxChannel uint) error {
 			return err
 		}
 
-		me.channels <- &_channelInfo{
+		me.channels <- &AmqpChannel{
 			channel: ch,
-			confirm: ch.NotifyPublish(make(chan amqp.Confirmation)),
+			confirm: ch.NotifyPublish(make(chan amqp.Confirmation, 1)),
+			cancel:  ch.NotifyCancel(make(chan string, 1)),
 		}
 	}
 	return

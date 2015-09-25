@@ -22,7 +22,7 @@ type _invoker struct {
 }
 
 //
-// factory
+// factory function
 //
 func NewDefaultInvoker() Invoker {
 	return &_invoker{}
