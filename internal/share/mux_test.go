@@ -34,21 +34,25 @@ func TestDifferentType(t *testing.T) {
 
 	// send a string
 	cStr <- "test string"
-	v := <-o
-	_ = "breakpoint"
-	s, ok := v.(string)
-	ass.True(ok)
+	v, ok := <-o
 	if ok {
-		ass.Equal("test string", s)
+		s, ok := v.(string)
+		ass.True(ok)
+		if ok {
+			ass.Equal("test string", s)
+		}
 	}
 
 	// send an integer
 	cInt <- 55
-	v = <-o
-	i, ok := v.(int)
+	v, ok = <-o
 	ass.True(ok)
 	if ok {
-		ass.Equal(55, i)
+		i, ok := v.(int)
+		ass.True(ok)
+		if ok {
+			ass.Equal(55, i)
+		}
 	}
 
 	close(cStr)
@@ -73,17 +77,57 @@ func TestChannelClose(t *testing.T) {
 	o, err := m.Out()
 	ass.Nil(err)
 
-	v := <-o
-	s, ok := v.(string)
+	v, ok := <-o
 	ass.True(ok)
 	if ok {
-		ass.Equal("test string 1", s)
+		s, ok := v.(string)
+		ass.True(ok)
+		if ok {
+			ass.Equal("test string 1", s)
+		}
 	}
 
-	v = <-o
-	s, ok = v.(string)
+	v, ok = <-o
 	ass.True(ok)
 	if ok {
-		ass.Equal("test string 2", s)
+		s, ok := v.(string)
+		ass.True(ok)
+		if ok {
+			ass.Equal("test string 2", s)
+		}
 	}
+}
+
+func TestOutputClose(t *testing.T) {
+	ass := assert.New(t)
+
+	m := &Mux{}
+	m.Init()
+
+	ch := make(chan int, 1)
+	_, err := m.Register(ch)
+	ass.Nil(err)
+
+	ch <- 66
+	o, err := m.Out()
+	ass.Nil(err)
+
+	// close now, output channel is closed
+	m.Close()
+
+	v, ok := <-o
+	ass.True(ok)
+	if ok {
+		i, ok := v.(int)
+		ass.True(ok)
+		if ok {
+			ass.Equal(66, i)
+		}
+	}
+
+	// the second time should be failed
+	v, ok = <-o
+	ass.False(ok)
+
+	close(ch)
 }

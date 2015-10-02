@@ -7,6 +7,16 @@ package share
 // the original use case in 'dingo' is muxing from chan<-task.TaskInfo from
 // brokers and chan<-task.Report from backends.
 //
+// 'Mux' won't close those registered channels,  but it would take care of
+// its output channel, callers should check channel validity when receiving
+// from 'Mux''s output channel like:
+//
+//     m := &Mux{}
+//     m.Init()
+//       ...
+//     out, err := m.Out()
+//     v, ok := <-out
+//
 
 import (
 	"errors"
