@@ -73,7 +73,7 @@ type InvokeTestSuite struct {
 
 func (s *InvokeTestSuite) SetupSuite() {
 	// prepare invoker
-	s.ivk = NewInvoker()
+	s.ivk = NewDefaultInvoker()
 
 	// TODO: map
 	// TODO: slice
