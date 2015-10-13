@@ -250,8 +250,27 @@ func (m *Mux) Unregister(id int) (ch interface{}, err error) {
 
 		_, ok := m.cases[id]
 		if !ok {
-			err = errors.New(fmt.Sprintf("Mux: '%q' not found", id))
-			return
+			// look for that id in _2add
+			found := false
+			func() {
+				m.lck.Lock()
+				defer m.lck.Unlock()
+
+				for k, v := range m._2add {
+					if v.id == id {
+						// remove that element
+						m._2add = append(m._2add[:k], m._2add[k+1:]...)
+
+						found = true
+						break
+					}
+				}
+			}()
+
+			if !found {
+				err = errors.New(fmt.Sprintf("Mux: '%q' not found", id))
+				return
+			}
 		}
 	}()
 
