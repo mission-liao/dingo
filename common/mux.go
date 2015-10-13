@@ -1,15 +1,15 @@
-package share
+package common
 
 //
-// 'mux' is a n-to-1 multiplexer for a slice of 'receiving' channles.
+// 'mux' is a n-to-1 multiplexer for a slice of 'receiving' channels.
 // output is a "chan<- interface{}".
 //
 // the original use case in 'dingo' is muxing from chan<-task.TaskInfo from
 // brokers and chan<-task.Report from backends.
 //
-// 'Mux' won't close those registered channels,  but it would take care of
+// 'Mux' won't close those registered channels, but it would take care of
 // its output channel, callers should check channel validity when receiving
-// from 'Mux''s output channel like:
+// from 'Mux''s output channel:
 //
 //     m := &Mux{}
 //     m.Init()
@@ -33,6 +33,13 @@ type _newChannel struct {
 	v  interface{}
 }
 
+// output of mux
+type _muxOut struct {
+	// the 'id' returned from Mux.Register
+	Id    int
+	Value interface{}
+}
+
 type Mux struct {
 	ctrl *RtControl
 
@@ -46,7 +53,7 @@ type Mux struct {
 	_2delete []int
 	_2add    []*_newChannel
 	// output channel
-	_out chan interface{}
+	_out chan *_muxOut
 }
 
 //
@@ -62,7 +69,7 @@ func (m *Mux) Init() {
 		m.touched = time.Now()
 	}()
 
-	m._out = make(chan interface{}, 10)
+	m._out = make(chan *_muxOut, 10)
 
 	// mux routine
 	go func() {
@@ -74,9 +81,7 @@ func (m *Mux) Init() {
 				func() {
 					// writer lock
 					m.rw.Lock()
-					defer func() {
-						m.rw.Unlock()
-					}()
+					defer m.rw.Unlock()
 
 					// locking
 					m.lck.Lock()
@@ -121,9 +126,10 @@ func (m *Mux) Init() {
 			}
 
 			// add a time.After channel
+			// TODO: configuration for timeout
 			cond = append(cond, reflect.SelectCase{
 				Dir:  reflect.SelectRecv,
-				Chan: reflect.ValueOf(time.After(3 * time.Second)),
+				Chan: reflect.ValueOf(time.After(1 * time.Second)),
 			})
 
 			// select...
@@ -157,7 +163,10 @@ func (m *Mux) Init() {
 				} else {
 					// send to output channel
 					if value.CanInterface() {
-						m._out <- value.Interface()
+						m._out <- &_muxOut{
+							Id:    keys[chosen],
+							Value: value.Interface(),
+						}
 					}
 				}
 			}
@@ -193,7 +202,7 @@ func (m *Mux) Register(ch interface{}) (id int, err error) {
 	defer m.rw.RUnlock()
 
 	if m.cases == nil {
-		err = errors.New("Not Initialized")
+		err = errors.New("Mux: Not Initialized")
 		return
 	}
 
@@ -231,7 +240,7 @@ func (m *Mux) Register(ch interface{}) (id int, err error) {
 //
 func (m *Mux) Unregister(id int) (ch interface{}, err error) {
 	if id == 0 {
-		err = errors.New("Unable to unregister quit channel")
+		err = errors.New("Mux: Unable to unregister quit channel")
 		return
 	}
 
@@ -241,7 +250,7 @@ func (m *Mux) Unregister(id int) (ch interface{}, err error) {
 
 		_, ok := m.cases[id]
 		if !ok {
-			err = errors.New(fmt.Sprintf("'%q' not found", id))
+			err = errors.New(fmt.Sprintf("Mux: '%q' not found", id))
 			return
 		}
 	}()
@@ -258,8 +267,8 @@ func (m *Mux) Unregister(id int) (ch interface{}, err error) {
 }
 
 //
-func (m *Mux) Out() (<-chan interface{}, error) {
-	return m._out, nil
+func (m *Mux) Out() <-chan *_muxOut {
+	return m._out
 }
 
 func init() {

@@ -1,4 +1,4 @@
-package share
+package common
 
 import (
 	"testing"
@@ -29,18 +29,18 @@ func TestDifferentType(t *testing.T) {
 	ass.Nil(err)
 	ass.NotEqual(0, iInt)
 
-	o, err := m.Out()
-	ass.Nil(err)
+	o := m.Out()
 
 	// send a string
 	cStr <- "test string"
 	v, ok := <-o
 	if ok {
-		s, ok := v.(string)
+		s, ok := v.Value.(string)
 		ass.True(ok)
 		if ok {
 			ass.Equal("test string", s)
 		}
+		ass.Equal(v.Id, iStr)
 	}
 
 	// send an integer
@@ -48,11 +48,12 @@ func TestDifferentType(t *testing.T) {
 	v, ok = <-o
 	ass.True(ok)
 	if ok {
-		i, ok := v.(int)
+		i, ok := v.Value.(int)
 		ass.True(ok)
 		if ok {
 			ass.Equal(55, i)
 		}
+		ass.Equal(v.Id, iInt)
 	}
 
 	close(cStr)
@@ -72,29 +73,30 @@ func TestChannelClose(t *testing.T) {
 	close(ch)
 
 	// close before registering
-	m.Register(ch)
-
-	o, err := m.Out()
+	id, err := m.Register(ch)
 	ass.Nil(err)
 
+	o := m.Out()
 	v, ok := <-o
 	ass.True(ok)
 	if ok {
-		s, ok := v.(string)
+		s, ok := v.Value.(string)
 		ass.True(ok)
 		if ok {
 			ass.Equal("test string 1", s)
 		}
+		ass.Equal(v.Id, id)
 	}
 
 	v, ok = <-o
 	ass.True(ok)
 	if ok {
-		s, ok := v.(string)
+		s, ok := v.Value.(string)
 		ass.True(ok)
 		if ok {
 			ass.Equal("test string 2", s)
 		}
+		ass.Equal(id, v.Id)
 	}
 }
 
@@ -105,12 +107,11 @@ func TestOutputClose(t *testing.T) {
 	m.Init()
 
 	ch := make(chan int, 1)
-	_, err := m.Register(ch)
+	id, err := m.Register(ch)
 	ass.Nil(err)
 
 	ch <- 66
-	o, err := m.Out()
-	ass.Nil(err)
+	o := m.Out()
 
 	// close now, output channel is closed
 	m.Close()
@@ -118,11 +119,12 @@ func TestOutputClose(t *testing.T) {
 	v, ok := <-o
 	ass.True(ok)
 	if ok {
-		i, ok := v.(int)
+		i, ok := v.Value.(int)
 		ass.True(ok)
 		if ok {
 			ass.Equal(66, i)
 		}
+		ass.Equal(v.Id, id)
 	}
 
 	// the second time should be failed
