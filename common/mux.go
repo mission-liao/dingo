@@ -34,7 +34,7 @@ type _newChannel struct {
 }
 
 // output of mux
-type _muxOut struct {
+type MuxOut struct {
 	// the 'id' returned from Mux.Register
 	Id    int
 	Value interface{}
@@ -53,7 +53,7 @@ type Mux struct {
 	_2delete []int
 	_2add    []*_newChannel
 	// output channel
-	_out chan *_muxOut
+	_out chan *MuxOut
 }
 
 //
@@ -69,7 +69,7 @@ func (m *Mux) Init() {
 		m.touched = time.Now()
 	}()
 
-	m._out = make(chan *_muxOut, 10)
+	m._out = make(chan *MuxOut, 10)
 
 	// mux routine
 	go func() {
@@ -163,7 +163,7 @@ func (m *Mux) Init() {
 				} else {
 					// send to output channel
 					if value.CanInterface() {
-						m._out <- &_muxOut{
+						m._out <- &MuxOut{
 							Id:    keys[chosen],
 							Value: value.Interface(),
 						}
@@ -286,7 +286,7 @@ func (m *Mux) Unregister(id int) (ch interface{}, err error) {
 }
 
 //
-func (m *Mux) Out() <-chan *_muxOut {
+func (m *Mux) Out() <-chan *MuxOut {
 	return m._out
 }
 

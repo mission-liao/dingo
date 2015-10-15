@@ -1,4 +1,4 @@
-package share
+package common
 
 type RtControl struct {
 	// a signal to tell go-routine to quit
