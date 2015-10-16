@@ -23,7 +23,7 @@ type _local struct {
 }
 
 // factory
-func newLocal() *_local {
+func NewLocal() *_local {
 	v := &_local{
 		cBackend:   common.NewRtCtrl(),
 		cSubscribe: common.NewRtCtrl(),
@@ -61,7 +61,7 @@ func (me *_local) init() {
 
 				body, err := json.Marshal(rep)
 				if err != nil {
-					// TODO:
+					// TODO: an error channel to reports errors
 				}
 
 				// send to Store
@@ -85,6 +85,11 @@ func (me *_local) init() {
 				rep, err := task.UnmarshalReport(v)
 				if err != nil {
 					// TODO:
+					break
+				}
+
+				if rep == nil {
+					break
 				}
 
 				func() {
@@ -109,13 +114,15 @@ func (me *_local) init() {
 	}(me.cSubscribe.Quit, me.cSubscribe.Done)
 }
 
-func (me *_local) Close() {
+func (me *_local) Close() (err error) {
 	me.cBackend.Close()
 	me.cSubscribe.Close()
 	me.muxReport.Close()
 
 	close(me.reports)
 	close(me.to)
+
+	return
 }
 
 //
@@ -152,13 +159,13 @@ func (me *_local) Subscribe() (reports <-chan task.Report, err error) {
 	return
 }
 
-func (me *_local) Poll(t task.Task) (err error) {
+func (me *_local) Poll(id task.IDer) (err error) {
 	me.reportLock.Lock()
 	defer me.reportLock.Unlock()
 
 	for i := len(me.unSent) - 1; i >= 0; i-- {
 		v := me.unSent[i]
-		if v.GetId() == t.GetId() {
+		if v.GetId() == id.GetId() {
 			me.reports <- v
 			// delete this element
 			me.unSent = append(me.unSent[:i], me.unSent[i+1:]...)
@@ -167,22 +174,22 @@ func (me *_local) Poll(t task.Task) (err error) {
 
 	found := false
 	for _, v := range me.toCheck {
-		if v == t.GetId() {
+		if v == id.GetId() {
 			found = true
 		}
 	}
 
 	if !found {
-		me.toCheck = append(me.toCheck, t.GetId())
+		me.toCheck = append(me.toCheck, id.GetId())
 	}
 
 	return
 }
 
-func (me *_local) Done(t task.Task) (err error) {
+func (me *_local) Done(id task.IDer) (err error) {
 	// clearing toCheck list
 	for k, v := range me.toCheck {
-		if v == t.GetId() {
+		if v == id.GetId() {
 			me.toCheck = append(me.toCheck[:k], me.toCheck[k+1:]...)
 			break
 		}
@@ -191,7 +198,7 @@ func (me *_local) Done(t task.Task) (err error) {
 	// clearing unSent
 	for i := len(me.unSent) - 1; i >= 0; i-- {
 		v := me.unSent[i]
-		if v.GetId() == t.GetId() {
+		if v.GetId() == id.GetId() {
 			// delete this element
 			me.unSent = append(me.unSent[:i], me.unSent[i+1:]...)
 		}

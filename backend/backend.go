@@ -1,31 +1,41 @@
 package backend
 
 import (
-	"../internal/share"
-	"../task"
+	"github.com/mission-liao/dingo/task"
 )
 
-type Backend interface {
-	share.Server
-
+// write reports to backend
+type Reporter interface {
 	// send report to backend
-	Update(r task.Report) error
-
-	// create a poller to receive reports from backend
 	//
-	// - multiple poller could be initiated for higher throughput.
-	NewPoller(chan<- task.Report) error
+	// parameters:
+	// - report: a input channel to receive report to upload
+	// returns:
+	// - id: id of 'report', you can used it for later operation.
+	// - err: errors
+	Report(report <-chan task.Report) (id string, err error)
 
-	// Monitor for task result, poller should maintain a list of 'checks'.
-	Check(t task.Task) error
+	// unbind the input channel
+	//
+	// parameters:
+	// - id: id of the input channel, acquired from Reporter.Report
+	// returns:
+	// - err: errors
+	Unbind(id string) (err error)
+}
+
+// read reports from backend
+type Store interface {
+	//
+	// - subscribe report channel
+	Subscribe() (reports <-chan task.Report, err error)
+
+	// polling results for tasks, callers maintain a list of 'to-check'.
+	Poll(id task.IDer) error
 
 	// Stop monitoring that task
 	//
 	// - ID of task / report are the same, therefore we use report here to
 	//   get ID of corresponding task.
-	Uncheck(r task.Report) error
-}
-
-func NewBackend() Backend {
-	return &_amqp{}
+	Done(id task.IDer) error
 }

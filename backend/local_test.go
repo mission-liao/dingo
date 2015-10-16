@@ -15,7 +15,7 @@ import (
 
 func TestLocalReporter(t *testing.T) {
 	ass := assert.New(t)
-	var v interface{} = newLocal()
+	var v interface{} = NewLocal()
 	reports := make(chan task.Report, 10)
 	reporter := v.(Reporter)
 
@@ -54,7 +54,7 @@ func (me *LocalStoreTestSuite) SetupSuite() {
 	me._invoker = task.NewDefaultInvoker()
 	me._task, err = me._invoker.ComposeTask("test", 123, "the string")
 	me.Nil(err)
-	me._inst = newLocal()
+	me._inst = NewLocal()
 	me._reporter, me._store = me._inst.(Reporter), me._inst.(Store)
 	me._reports = make(chan task.Report, 10)
 	me._id, err = me._reporter.Report(me._reports)
