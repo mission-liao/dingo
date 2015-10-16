@@ -1,55 +1,40 @@
 package broker
 
 import (
-	"../internal/share"
-	"../task"
+	"github.com/mission-liao/dingo/task"
 )
 
 //
-type Sender interface {
+type Producer interface {
 
 	//
 	Send(task.Task) error
 }
 
 //
-type Receiver interface {
+type Consumer interface {
+
+	// receive task from brokers
+	//
+	// - tasks: 'dingo' would consume from this channel for new tasks
+	// - errs: 'dingo' would consume from this channel for error messages
+	// - err: any error during initialization
+	Consume(rcpt <-chan Receipt) (tasks <-chan task.Task, errs <-chan error, err error)
 
 	//
-	NewReceiver(tasks chan<- taskInfo, errs chan<- error) (id string, err error)
-}
-
-//
-type Broker interface {
-	Sender
-	Receiver
-	share.Server
-}
-
-type TaskInfo struct {
-	T    task.Task
-	Done chan<- Receipt
-	Id   string
-}
-
-type ErrInfo struct {
-	Err error
-	Id  string
+	Stop() (err error)
 }
 
 var Status = struct {
 	OK               int
+	NOK              int
 	WORKER_NOT_FOUND int
 }{
-	1, 2,
+	1, 2, 3,
 }
 
 type Receipt struct {
+	Id      string
 	Status  int
 	Payload interface{}
-}
-
-// TODO: accept configuration
-func NewBroker() Broker {
-	return &_amqp{}
 }
