@@ -37,7 +37,9 @@ func (me *DingoMapperTestSuite) SetupSuite() {
 }
 
 func (me *DingoMapperTestSuite) TearDownSuite() {
-	me._mps.done()
+	me.Nil(me._mps.done())
+	close(me._tasks)
+	close(me._receipts)
 }
 
 //

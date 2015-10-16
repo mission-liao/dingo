@@ -119,7 +119,7 @@ func (me *_workers) allocate(m Matcher, fn interface{}, count int) (id string, r
 
 		// initiate controlling channle
 		ctrls := make([]*common.RtControl, 0, count)
-		tasks := make(chan task.Task, 100) // TODO: configuration?
+		tasks := make(chan task.Task, 10) // TODO: configuration?
 
 		me.workers[id] = &worker{
 			matcher: m,
