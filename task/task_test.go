@@ -12,14 +12,20 @@ func TestTaskEqual(t *testing.T) {
 
 	// same
 	{
-		m := map[string]string{
+		m1 := map[string]string{
 			"t1": "1",
 			"t2": "2",
 		}
-		t, err := ivk.ComposeTask("name#1", 1, "test123", m)
+
+		m2 := map[string]string{
+			"t1": "1",
+			"t2": "2",
+		}
+
+		t, err := ivk.ComposeTask("name#1", 1, "test123", m1)
 		ass.Nil(err)
 
-		o, err := ivk.ComposeTask("name#1", 1, "test123", m)
+		o, err := ivk.ComposeTask("name#1", 1, "test123", m2)
 		ass.Nil(err)
 		ass.True(t.Equal(o))
 	}

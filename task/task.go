@@ -38,7 +38,6 @@ func (t *_task) ComposeReport(s int, err error, r []interface{}) (Report, error)
 		Status: s,
 		Err:    err,
 		Ret:    r,
-		T:      t,
 	}, nil
 }
 func (t *_task) Equal(other Task) bool {
@@ -50,7 +49,7 @@ func (t *_task) Equal(other Task) bool {
 func UnmarshalTask(buf []byte) (t Task, err error) {
 	var _t _task
 	err = json.Unmarshal(buf, &_t)
-	if err != nil {
+	if err == nil {
 		t = &_t
 	}
 	return
