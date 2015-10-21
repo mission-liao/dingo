@@ -4,8 +4,6 @@ package backend
 
 import (
 	"encoding/json"
-	"fmt"
-	"strconv"
 	"sync"
 
 	"github.com/mission-liao/dingo/common"
@@ -38,6 +36,7 @@ type _local struct {
 	reports    chan meta.Report
 	reportLock sync.Mutex
 	muxReport  *common.Mux
+	rid        int
 	toCheck    []string
 	unSent     []meta.Report
 	subscriber map[string]chan<- meta.Report
@@ -150,24 +149,14 @@ func (me *_local) Close() (err error) {
 // Reporter
 //
 
-func (me *_local) Report(report <-chan meta.Report) (id string, err error) {
-	v, err := me.muxReport.Register(report)
-	if err != nil {
-		return
-	}
-
-	id = fmt.Sprintf("%d", v)
+func (me *_local) Report(report <-chan meta.Report) (err error) {
+	me.rid, err = me.muxReport.Register(report)
 	return
 }
 
-func (me *_local) Unbind(id string) (err error) {
+func (me *_local) Unbind() (err error) {
 	// convert string to int
-	_id, err := strconv.Atoi(id)
-	if err != nil {
-		return
-	}
-
-	_, err = me.muxReport.Unregister(_id)
+	_, err = me.muxReport.Unregister(me.rid)
 	return
 }
 

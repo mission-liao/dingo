@@ -16,17 +16,14 @@ type Reporter interface {
 	// parameters:
 	// - report: a input channel to receive report to upload
 	// returns:
-	// - id: id of 'report', you can used it for later operation.
 	// - err: errors
-	Report(report <-chan meta.Report) (id string, err error)
+	Report(report <-chan meta.Report) (err error)
 
 	// unbind the input channel
 	//
-	// parameters:
-	// - id: id of the input channel, acquired from Reporter.Report
 	// returns:
 	// - err: errors
-	Unbind(id string) (err error)
+	Unbind() (err error)
 }
 
 // read reports from backend

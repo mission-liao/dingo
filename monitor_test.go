@@ -1,6 +1,7 @@
 package dingo
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/mission-liao/dingo/backend"
@@ -12,7 +13,6 @@ import (
 type DingoMonitorTestSuite struct {
 	suite.Suite
 
-	_id       string
 	_count    int
 	_mnt      *_monitors
 	_store    backend.Store
@@ -39,13 +39,13 @@ func (me *DingoMonitorTestSuite) SetupSuite() {
 	me._mnt.more(me._count)
 
 	me._reporter = me._store.(backend.Reporter)
-	me._id, err = me._reporter.Report(me._reports)
+	err = me._reporter.Report(me._reports)
 	me.Nil(err)
 }
 
 func (me *DingoMonitorTestSuite) TearDownSuite() {
 	me.Nil(me._mnt.done())
-	me.Nil(me._reporter.Unbind(me._id))
+	me.Nil(me._reporter.Unbind())
 	me.Nil(me._store.(common.Server).Close())
 }
 
@@ -88,10 +88,13 @@ func (me *DingoMonitorTestSuite) TestParellenMonitoring() {
 		me._reports <- r
 	}
 
-	for _, v := range toSend {
-		r := <-report
-		me.Equal(v, r.GetStatus())
+	ret := []int{}
+	for _, _ = range toSend {
+		v := <-report
+		ret = append(ret, v.GetStatus())
 	}
+	sort.Ints(ret)
+	me.Equal(ret, toSend)
 }
 
 func (me *DingoMonitorTestSuite) TestFitReturns() {

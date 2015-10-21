@@ -23,10 +23,9 @@ func TestLocalReporter(t *testing.T) {
 	reporter := v.(Reporter)
 
 	// test case for Report/Unbind
-	id, err := reporter.Report(reports)
-	ass.NotEqual(0, id)
+	err = reporter.Report(reports)
 	ass.Nil(err)
-	err = reporter.Unbind(id)
+	err = reporter.Unbind()
 	ass.Nil(err)
 
 	// teardown
@@ -46,7 +45,6 @@ type LocalStoreTestSuite struct {
 	_reporter Reporter
 	_reports  chan meta.Report
 	_store    Store
-	_id       string
 }
 
 func (me *LocalStoreTestSuite) SetupSuite() {
@@ -67,12 +65,12 @@ func (me *LocalStoreTestSuite) SetupSuite() {
 	me.NotNil(me._reporter)
 	me.NotNil(me._store)
 	me._reports = make(chan meta.Report, 10)
-	me._id, err = me._reporter.Report(me._reports)
+	err = me._reporter.Report(me._reports)
 	me.Nil(err)
 }
 
 func (me *LocalStoreTestSuite) TearDownSuite() {
-	me.Nil(me._reporter.Unbind(me._id))
+	me.Nil(me._reporter.Unbind())
 	me._inst.(*_local).Close()
 }
 

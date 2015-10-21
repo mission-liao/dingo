@@ -70,7 +70,6 @@ type App interface {
 //
 
 type _object struct {
-	rid  string
 	used int
 	obj  interface{}
 }
@@ -130,7 +129,7 @@ func (me *_app) Close() (err error) {
 		}
 
 		if v.used&InstT.REPORTER == InstT.REPORTER {
-			chk(me.reporter.Unbind(v.rid))
+			chk(me.reporter.Unbind())
 		}
 
 		s, ok := v.obj.(common.Server)
@@ -227,8 +226,6 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 		}
 	}
 
-	var rid string
-
 	if producer != nil && me.producer == nil {
 		me.producer = producer
 		used |= InstT.PRODUCER
@@ -244,7 +241,7 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 
 		mp := newMappers(tasks, me.receipts)
 		if me.reporter != nil {
-			rid, err = me.reporter.Report(mp.reports())
+			err = me.reporter.Report(mp.reports())
 			if err != nil {
 				return
 			}
@@ -288,7 +285,7 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 
 	if reporter != nil && me.reporter == nil {
 		if me.mappers != nil {
-			rid, err = reporter.Report(me.mappers.reports())
+			err = reporter.Report(me.mappers.reports())
 			if err != nil {
 				return
 			}
@@ -306,7 +303,6 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 		}
 
 		me.objs[id] = &_object{
-			rid:  rid,
 			used: used,
 			obj:  obj,
 		}
