@@ -39,7 +39,7 @@ func (me *DingoWorkerTestSuite) TestParellelRun() {
 	stepIn := make(chan int, 3)
 	stepOut := make(chan int)
 
-	me._ws.allocate(newStrMatcher("test"), func(i int) {
+	me._ws.allocate(&StrMatcher{"test"}, func(i int) {
 		stepIn <- i
 		// workers would be blocked here
 		<-stepOut

@@ -3,378 +3,352 @@ package dingo
 import (
 	// standard
 	"errors"
+	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
 	// internal
-	"./backend"
-	"./broker"
-	"./task"
+	"github.com/mission-liao/dingo/backend"
+	"github.com/mission-liao/dingo/broker"
+	"github.com/mission-liao/dingo/common"
+	"github.com/mission-liao/dingo/task"
 )
 
+var InstT = struct {
+	DEFAULT  int
+	REPORTER int
+	STORE    int
+	PRODUCER int
+	CONSUMER int
+	ALL      int
+}{
+	0,
+	(1 << 0),
+	(1 << 1),
+	(1 << 2),
+	(1 << 3),
+	(1 << 4) - 1,
+}
+
 type App interface {
-	Init() error
+	//
 	Close() error
 
-	// send a task
-	Call(name string, args ...interface{}) (chan task.Report, error)
-
 	// hire a set of workers for a pattern
-	NewWorkers(match func(string) bool, fn interface{}, count int) (remain int, err error)
+	//
+	// parameters ->
+	// - match: tasks in dingo are recoginized by a 'name', this function decides
+	//          which task to accept by returning true.
+	// - fn: the function that actually perform the task.
+	// - count: count of workers to be initialized.
+	//
+	// returns ->
+	// - id: identifier of this group of workers
+	// - remain: remaining count of workers that not initialized.
+	// - err: any error produced
+	Register(m Matcher, fn interface{}, count int) (id string, remain int, err error)
 
-	// launch a monitor
-	NewMonitor() error
+	// attach an instance, instance could be any instance of
+	// backend.Reporter, backend.Backend, broker.Producer, broker.Consumer.
+	//
+	// parameters:
+	// - obj: object to be attached
+	// - types: interfaces contained in 'obj', refer to dingo.InstT
+	// returns:
+	// - id: identifier assigned to this object, 0 is invalid value
+	// - err: errors
+	Use(obj interface{}, types int) (id int, used int, err error)
 
-	// launch a mapper -- map tasks to workers
-	NewDispatcher() error
-
-	// launch a reducer -- collecting return values and push them to backend
-	NewReducer() error
+	// send a task
+	//
+	Call(name string, opt *Option, args ...interface{}) (<-chan task.Report, error)
 }
 
-type _report struct {
-	t *broker.TaskInfo
-	r task.Report
+//
+// app
+//
+
+type _object struct {
+	rid  string
+	used int
+	obj  interface{}
 }
 
-type _monitee struct {
-	t    task.Task
-	r    chan task.Report
-	last task.Report
-}
-
-type _worker struct {
-	match func(string) bool
-	task  chan broker.TaskInfo
-	quits []chan int
-}
-
-type app struct {
-	backend backend.Backend
-	broker  broker.Broker
+type _app struct {
 	invoker task.Invoker
 
-	quit, done chan int
+	cfg      Config
+	objsLock sync.RWMutex
+	objs     map[int]*_object
+	producer broker.Producer
+	consumer broker.Consumer
+	store    backend.Store
+	reporter backend.Reporter
+	receipts chan broker.Receipt
 
-	// monitoring routine
-	mTaskLock sync.Mutex
-	mTask     map[string]*_monitee
-
-	// dispatch routine
-	tasks     chan broker.TaskInfo
-	errs      chan broker.ErrInfo
-	reports   chan *_report
-	mQuit     map[string]chan<- int
-	mFinished map[string]<-chan int
-
-	// worker info
-	workers []*_worker
-
-	// report channel
+	// internal routines
+	mappers  *_mappers
+	monitors *_monitors
 }
 
-func NewApp() App {
-	return &app{}
+// factory function
+//
+func NewApp(c Config) (app App, err error) {
+	app = &_app{
+		receipts: make(chan broker.Receipt, 10),
+		objs:     make(map[int]*_object),
+		invoker:  task.NewDefaultInvoker(),
+		cfg:      c,
+	}
+
+	return
 }
 
 //
 // App interface
 //
 
-func (me *app) Init() (err error) {
-	// init broker
-	me.quit = make(chan int, 1) // quit signal
-	me.done = make(chan int, 1) // done signal
-	me.tasks = make(chan broker.TaskInfo, 10)
-	me.errs = make(chan broker.ErrInfo, 10)
-	me.reports = make(chan *_report, 10)
+func (me *_app) Close() (err error) {
+	me.objsLock.Lock()
+	defer me.objsLock.Unlock()
 
-	me.broker = broker.NewBroker()
-	err = me.broker.Init()
-	if err != nil {
-		return
-	}
-
-	// init backend
-	me.backend = backend.NewBackend()
-	err = me.backend.Init()
-	if err != nil {
-		return
-	}
-
-	// init ...
-	me.workers = make([]*_worker)
-
-	// create a monitor routine
-	go func(q, d) {
-		// forever loop
-		for {
-			select {
-			case time.After(5 * time.second):
-				// TODO: configurable duration
-				if me.backend == nil {
-					break
-				}
-
-				me.mTaskLock.Lock()
-				defer me.mTaskLock.Unlock()
-
-				for k, t := range me.mTask {
-					// get status from backend
-					r, err := me.backend.Poll(t.t)
-					if !r.Valid() {
-						// usually, this means the worker
-						// doesn't send report yet.
-
-						// TODO: a time out mechanism
-						continue
-					}
-					if !r.Identical(t.last) {
-						t.last = r
-						t.r <- r
-					}
-					if r.Done() {
-						// magically, it's safe to delete when interating in go
-						delete(me.mTask, k)
-					}
-				}
-			case q:
-				// TODO: purge tasks
-
-				{
-					me.mTaskLock.Lock()
-					defer me.mTaskLock.Unlock()
-
-					// release channels
-					for k, v := range me.mTask {
-						close(v.r)
-					}
-				}
-				d <- 1
-			}
+	chk := func(err_ error) {
+		if err == nil {
+			err = err_
 		}
-	}(me.quit, me.done)
-
-}
-
-func (me *app) Close() (err error) {
-	// quit monitor/dispatch routine
-	{
-		me.quit <- 1
-		<-me.done
-
-		me.quit <- 1
-		<-me.done
 	}
 
-	err = me.broker.Close()
-	err_ = me.backend.Close()
-	if err == nil {
-		err = err_
+	// TODO: the right shutdown procedure:
+	// - broadcase 'quit' message to 'all' routines
+	// - await 'all' routines to finish cleanup
+	// right now we would send a quit message to 'one' routine, and wait it done.
+
+	for _, v := range me.objs {
+		if v.used&InstT.CONSUMER == InstT.CONSUMER {
+			chk(me.consumer.Stop())
+		}
+
+		if v.used&InstT.REPORTER == InstT.REPORTER {
+			chk(me.reporter.Unbind(v.rid))
+		}
+
+		s, ok := v.obj.(common.Server)
+		if ok {
+			chk(s.Close())
+		}
 	}
 
-	close(me.done)
-	close(me.quit)
-	close(me.tasks)
-	close(me.reports)
-	close(me.errs)
+	// shutdown mappers
+	if me.mappers != nil {
+		chk(me.mappers.done())
+		me.mappers = nil
+	}
 
+	// shutdown monitors
+	if me.monitors != nil {
+		chk(me.monitors.done())
+		me.monitors = nil
+	}
+
+	close(me.receipts)
 	return
 }
 
-func (me *app) Call(name string, ignoreReport bool, args ...interface{}) (r chan task.Report, err error) {
-	if me.broker == nil {
-		err = errors.New("Broker is not initialized")
-		return
-	}
+func (me *_app) Register(m Matcher, fn interface{}, count int) (id string, remain int, err error) {
+	me.objsLock.RLock()
+	defer me.objsLock.RUnlock()
 
-	// lazy init of invoker
-	if me.invoker == nil {
-		me.invoker = task.NewDefaultInvoker()
-	}
-
-	t, err := me.invoker.ComposeTask(name, args)
-	if err != nil {
-		return
-	}
-
-	err = me.broker.Send(t)
-	if err != nil {
-		return
-	}
-
-	if ignoreReport || me.backend == nil {
-		return
-	}
-
-	// TODO: when leaving, those un-receiver Poller
-	// should be released.
-	var (
-		r chan<- task.Report
-	)
-
-	r, err = me.backend.NewPoller()
-	if err != nil {
-		// TODO: log it
-		return
-	}
-
-	// register task.Task to a monitor go routine
-	r := make(chan task.Report, 5)
-	{
-		me.mTaskLock.Lock()
-		defer me.mTaskLock.Unlock()
-
-		me.mTask[t.GetId()] = &_monitee{t, r}
-	}
-
-	// compose 1st report -- Sent
-	{
-		var r task.Report
-
-		r, err = t.ComposeReport(task.Status.Sent, nil, nil)
+	remain = count
+	if me.mappers != nil {
+		id, remain, err = me.mappers.allocateWorkers(m, fn, count)
 		if err != nil {
 			return
 		}
-		me.reports <- r
+	}
+
+	if me.monitors != nil {
+		err = me.monitors.register(m, fn)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
+	me.objsLock.Lock()
+	defer me.objsLock.Unlock()
+
+	var (
+		producer broker.Producer
+		consumer broker.Consumer
+		store    backend.Store
+		reporter backend.Reporter
+		ok       bool
+	)
+
+	if types == InstT.DEFAULT {
+		producer, _ = obj.(broker.Producer)
+		consumer, _ = obj.(broker.Consumer)
+		store, _ = obj.(backend.Store)
+		reporter, _ = obj.(backend.Reporter)
+	} else {
+		if types&InstT.PRODUCER == InstT.PRODUCER {
+			producer, ok = obj.(broker.Producer)
+			if !ok {
+				err = errors.New("producer is not found")
+				return
+			}
+		}
+
+		if types&InstT.CONSUMER == InstT.CONSUMER {
+			consumer, ok = obj.(broker.Consumer)
+			if !ok {
+				err = errors.New("consumer is not found")
+				return
+			}
+		}
+
+		if types&InstT.STORE == InstT.STORE {
+			store, ok = obj.(backend.Store)
+			if !ok {
+				err = errors.New("store is not found")
+				return
+			}
+		}
+
+		if types&InstT.REPORTER == InstT.REPORTER {
+			reporter, ok = obj.(backend.Reporter)
+			if !ok {
+				err = errors.New("reporter is not found")
+				return
+			}
+		}
+	}
+
+	var rid string
+
+	if producer != nil && me.producer == nil {
+		me.producer = producer
+		used |= InstT.PRODUCER
+	}
+
+	if consumer != nil && me.consumer == nil {
+		// TODO: handle errs channel
+		tasks, _, err_ := consumer.Consume(me.receipts)
+		if err_ != nil {
+			err = err_
+			return
+		}
+
+		mp := newMappers(tasks, me.receipts)
+		if me.reporter != nil {
+			rid, err = me.reporter.Report(mp.reports())
+			if err != nil {
+				return
+			}
+		}
+
+		remain, err_ := mp.more(me.cfg.Mappers_)
+		if err_ != nil {
+			err = err_
+			return
+		}
+
+		if remain > 0 {
+			err = errors.New(fmt.Sprintf("Unable to allocate mappers %v", remain))
+			return
+		}
+		me.mappers = mp
+		me.consumer = consumer
+		used |= InstT.CONSUMER
+	}
+
+	if store != nil && me.monitors == nil {
+		mn, err_ := newMonitors(store)
+		if err_ != nil {
+			err = err_
+			return
+		}
+
+		remain, err_ := mn.more(me.cfg.Monitors_)
+		if err_ != nil {
+			err = err_
+			return
+		}
+
+		if remain > 0 {
+			err = errors.New(fmt.Sprintf("Unable to allocate monitors %v", remain))
+			return
+		}
+		me.monitors = mn
+		used |= InstT.STORE
+	}
+
+	if reporter != nil && me.reporter == nil {
+		if me.mappers != nil {
+			rid, err = reporter.Report(me.mappers.reports())
+			if err != nil {
+				return
+			}
+		}
+
+		me.reporter = reporter
+		used |= InstT.REPORTER
+	}
+
+	// get an id
+	for {
+		id = rand.Int()
+		if _, ok := me.objs[id]; ok {
+			continue
+		}
+
+		me.objs[id] = &_object{
+			rid:  rid,
+			used: used,
+			obj:  obj,
+		}
+		break
 	}
 
 	return
 }
 
-func (me *_app) NewWorkers(name string, match func(string) bool, fn interface{}, count int) (remain int, err error) {
-	// lazy init of invoker
-	if me.invoker == nil {
-		me.invoker = task.NewDefaultInvoker()
+func (me *_app) Call(name string, opt *Option, args ...interface{}) (reports <-chan task.Report, err error) {
+	me.objsLock.RLock()
+	defer me.objsLock.RUnlock()
+
+	// TODO: attach Option to task.Task
+	if me.producer == nil {
+		err = errors.New("producer is not initialized")
+		return
 	}
 
-	quits := []chan int{}
-	task := make(chan broker.TaskInfo, count)
-	for ; count > 0; count-- {
-		q := make(chan int, 1)
-		//
-		go func(quit <-chan int, task <-chan broker.TaskInfo, report chan task.Report, ivk task.Invoker, fn interface{}) {
-			for {
-				select {
-				case t := <-task:
-					var (
-						r      task.Report
-						ret    []interface{}
-						err_   error
-						status int
-					)
-
-					// compose a report -- progress
-					r, err_ = t.ComposeReport(task.Status.Progress, nil, nil)
-					if err_ != nil {
-						r, err_ = t.ComposeReport(task.Status.Fail, err, nil)
-						if err_ != nil {
-							// TODO: log it
-							break
-						}
-					}
-					report <- r
-
-					// call the actuall function, where is the magic
-					ret, err_ = ivk.Invoke(fn, t.GetArgs())
-
-					// compose a report -- done / fail
-					if err_ != nil {
-						status = task.Status.Fail
-					} else {
-						status = task.Status.Done
-					}
-
-					r, err_ = t.ComposeReport(status, err, ret)
-					if err_ != nil {
-						// TODO: log it
-						break
-					}
-					report <- r
-
-				case <-quit:
-					// nothing to clean
-					return
-				}
-			}
-		}(q, t, me.reports, me.invoker, fn)
-
-		quits = append(quits, q)
+	t, err := me.invoker.ComposeTask(name, args...)
+	if err != nil {
+		return
 	}
 
-	me.workers = append(me.workers, &_worker{
-		match: match,
-		task:  task,
-		quits: quits,
-	})
+	// blocking call
+	err = me.producer.Send(t)
+	if err != nil {
+		return
+	}
 
-	return count, nil
+	if opt != nil && opt.IgnoreReport_ || me.monitors == nil {
+		return
+	}
+
+	reports, err = me.monitors.check(t)
+	if err != nil {
+		return
+	}
+
+	return
 }
 
-func (me *_app) NewMapper() error {
-	// TODO: keep a count of mapper?
-	go func(quit <-chan int, done chan<- int, tasks chan<- broker.TaskInfo) {
-		for {
-			select {
-			case t := <-tasks:
-				// find registered worker
-				found := false
-				for _, v := range me.workers {
-					if m.match(t.GetName()) {
-						v.task <- t
-						found = true
-						break
-					}
-				}
-
-				// compose a receipt
-				var rpt broker.Recepit
-				if !found {
-					rpt = broker.Receipt{
-						Status: broker.Status.WORKER_NOT_FOUND,
-					}
-				} else {
-					rpt = broker.Receipt{
-						Status: broker.Status.OK,
-					}
-				}
-				t.Done <- rpt
-
-			case <-quit:
-				done <- 1
-				return
-			}
-		}
-	}(me.quit, me.done)
-
-	return nil
-}
-
-func (me *_app) NewReducer() error {
-	// TODO: keep a count of reducer
-	go func(quit <-chan int, done chan<- int, report <-chan *_report, errs <-chan broker.ErrInfo) {
-		for {
-			select {
-			case r := <-report:
-				if me.backend != nil {
-					// push result to backend
-					err := me.backend.Update(r.r)
-					if err != nil {
-						// TODO: log it
-					}
-
-					// notify receiver that this work has been done
-					r.t.Done <- 1
-				}
-			case err := <-errs:
-				// TODO: logit
-				break
-			case <-quit:
-				done <- 1
-				return
-			}
-		}
-	}(me.quit, me.done, me.report, me.errs)
-
-	return nil
+func init() {
+	rand.Seed(time.Now().UnixNano())
 }

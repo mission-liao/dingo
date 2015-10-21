@@ -8,6 +8,29 @@ import (
 	"github.com/mission-liao/dingo/task"
 )
 
+//
+// configuration
+//
+
+type _localConfig struct {
+	_bypass bool `json:"Bypass"`
+}
+
+func (me *_localConfig) Bypass(yes bool) *_localConfig {
+	me._bypass = yes
+	return me
+}
+
+func defaultLocalConfig() *_localConfig {
+	return &_localConfig{
+		_bypass: true,
+	}
+}
+
+//
+//
+//
+
 type _local struct {
 	// broker routine
 	brk    *common.RtControl
@@ -28,14 +51,14 @@ type _local struct {
 }
 
 // factory
-func newLocal(bypass bool) (v *_local) {
+func newLocal(cfg *Config) (v *_local) {
 	v = &_local{
 		brk:    common.NewRtCtrl(),
 		to:     make(chan []byte, 10),
 		noJSON: make(chan task.Task, 10),
 		tasks:  make(chan task.Task, 10),
 		errs:   make(chan error, 10),
-		bypass: bypass,
+		bypass: cfg._local._bypass,
 
 		monitor:    common.NewRtCtrl(),
 		muxReceipt: &common.Mux{},
@@ -71,6 +94,7 @@ func (me *_local) init() {
 			select {
 			case _, _ = <-quit:
 				done <- 1
+				return
 			case v, ok := <-me.noJSON:
 				if !ok {
 					break

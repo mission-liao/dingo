@@ -46,7 +46,7 @@ func (me *DingoMapperTestSuite) TearDownSuite() {
 // test cases
 //
 
-func (me *DingoMapperTestSuite) TestParellenMapping() {
+func (me *DingoMapperTestSuite) TestParellelMapping() {
 	// make sure those mapper routines would be used
 	// when one is blocked.
 
@@ -54,10 +54,9 @@ func (me *DingoMapperTestSuite) TestParellenMapping() {
 	// - length of receipt channel
 	// - count of mapper routines
 	count := me._countOfMappers + cap(me._receipts)
-
 	stepIn := make(chan int, count)
 	stepOut := make(chan int, count)
-	me._mps.allocateWorkers(newStrMatcher("test"), func(i int) {
+	me._mps.allocateWorkers(&StrMatcher{"test"}, func(i int) {
 		stepIn <- i
 		// workers would be blocked here
 		<-stepOut
@@ -81,14 +80,15 @@ func (me *DingoMapperTestSuite) TestParellenMapping() {
 		// consume 1 receipts
 		<-me._receipts
 
-		// consume 1 report
-		<-me._mps.reportsChannel()
+		// consume 2 report
+		<-me._mps.reports()
+		<-me._mps.reports()
 
 		// let 1 worker get out
 		stepOut <- 1
 
 		// consume another report
-		<-me._mps.reportsChannel()
+		<-me._mps.reports()
 
 		rets = append(rets, <-stepIn)
 	}

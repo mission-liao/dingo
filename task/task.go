@@ -13,7 +13,7 @@ type Task interface {
 	IDer
 	GetName() string
 	GetArgs() []interface{}
-	ComposeReport(int, error, []interface{}) (Report, error)
+	ComposeReport(int, []interface{}, Err) (Report, error)
 	Equal(t Task) bool
 }
 
@@ -32,11 +32,13 @@ type _task struct {
 func (t *_task) GetName() string        { return t.Name }
 func (t *_task) GetId() string          { return t.Id }
 func (t *_task) GetArgs() []interface{} { return t.Args }
-func (t *_task) ComposeReport(s int, err error, r []interface{}) (Report, error) {
+func (t *_task) ComposeReport(s int, r []interface{}, err Err) (Report, error) {
+	err_, _ := err.(*_error)
 	return &_report{
 		Id:     t.Id,
 		Status: s,
-		Err:    err,
+		Err_:   err_,
+		Name:   t.Name,
 		Ret:    r,
 	}, nil
 }

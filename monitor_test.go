@@ -24,7 +24,6 @@ type DingoMonitorTestSuite struct {
 func TestDingoMonitorSuite(t *testing.T) {
 	suite.Run(t, &DingoMonitorTestSuite{
 		_invoker: task.NewDefaultInvoker(),
-		_store:   backend.NewLocal(),
 		_count:   3,
 		_reports: make(chan task.Report, 10),
 	})
@@ -32,6 +31,9 @@ func TestDingoMonitorSuite(t *testing.T) {
 
 func (me *DingoMonitorTestSuite) SetupSuite() {
 	var err error
+
+	me._store, err = backend.New("local", nil)
+	me.Nil(err)
 	me._mnt, err = newMonitors(me._store)
 	me.Nil(err)
 	me._mnt.more(me._count)
@@ -76,7 +78,7 @@ func (me *DingoMonitorTestSuite) TestParellenMonitoring() {
 	me.Len(toSend, me._count+task.Status.Count)
 	for _, v := range toSend {
 		// compose reports
-		r, err := t.ComposeReport(v, nil, []interface{}{})
+		r, err := t.ComposeReport(v, []interface{}{}, nil)
 		me.Nil(err)
 
 		if err != nil {
@@ -89,5 +91,37 @@ func (me *DingoMonitorTestSuite) TestParellenMonitoring() {
 	for _, v := range toSend {
 		r := <-report
 		me.Equal(v, r.GetStatus())
+	}
+}
+
+func (me *DingoMonitorTestSuite) TestFitReturns() {
+	me._mnt.register(&StrMatcher{"test_convert_return"}, func() (int, float32) {
+		return 0, 0
+	})
+
+	// compose a task
+	t, err := me._invoker.ComposeTask("test_convert_return")
+	me.Nil(err)
+	// register it to monitor's check list
+	report, err := me._mnt.check(t)
+	me.Nil(err)
+	// send a report with different type (compared to function's
+	// return value)
+	r, err := t.ComposeReport(task.Status.Done, []interface{}{
+		int64(101),
+		float32(5.2),
+	}, nil)
+	me.Nil(err)
+	me._reports <- r
+	// check returns
+	for {
+		r := <-report
+		if r.Done() {
+			ret := r.GetReturn()
+			me.Len(ret, 2)
+			me.Equal(int(101), ret[0])
+			me.Equal(float32(5.2), ret[1])
+			break
+		}
 	}
 }

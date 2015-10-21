@@ -14,6 +14,11 @@ type _watch struct {
 	reports chan task.Report
 }
 
+type _fn struct {
+	m  Matcher
+	fn interface{}
+}
+
 //
 // container of monitor
 //
@@ -24,6 +29,9 @@ type _monitors struct {
 	watched   map[string]*_watch
 	reports   <-chan task.Report
 	store     backend.Store
+	fnLock    sync.RWMutex
+	fns       []*_fn
+	invoker   task.Invoker
 }
 
 func (me *_monitors) init() (err error) {
@@ -33,6 +41,19 @@ func (me *_monitors) init() (err error) {
 	}
 
 	me.reports, err = me.store.Subscribe()
+	return
+}
+
+//
+func (me *_monitors) register(m Matcher, fn interface{}) (err error) {
+	me.fnLock.Lock()
+	defer me.fnLock.Unlock()
+
+	me.fns = append(me.fns, &_fn{
+		m:  m,
+		fn: fn,
+	})
+
 	return
 }
 
@@ -76,9 +97,6 @@ func (me *_monitors) done() (err error) {
 	}
 
 	// TODO: close all output channels
-
-	me.reports = nil
-	me.monitors = nil
 	return
 }
 
@@ -128,6 +146,8 @@ func newMonitors(store backend.Store) (mnt *_monitors, err error) {
 		store:    store,
 		monitors: make([]*monitor, 0, 10),
 		watched:  make(map[string]*_watch),
+		fns:      make([]*_fn, 0, 10),
+		invoker:  task.NewDefaultInvoker(),
 	}
 	err = mnt.init()
 	return
@@ -142,6 +162,29 @@ func (me *_monitors) _monitor_routine_(quit <-chan int, done chan<- int) {
 			if !ok {
 				goto cleanup
 			}
+
+			// convert returns to right type
+			func() {
+				returns := report.GetReturn()
+				if returns == nil || len(returns) == 0 {
+					return
+				}
+
+				me.fnLock.RLock()
+				defer me.fnLock.RUnlock()
+				for _, v := range me.fns {
+					if !v.m.Match(report.GetName()) {
+						continue
+					}
+
+					// TODO: a channel to report error
+					returns, err := me.invoker.FitReturns(v.fn, returns)
+					if err == nil {
+						report.SetReturn(returns)
+					}
+				}
+			}()
+
 			_2delete := false
 			func() {
 				me.watchLock.RLock()
@@ -160,8 +203,8 @@ func (me *_monitors) _monitor_routine_(quit <-chan int, done chan<- int) {
 					// duplicated report, discard it
 					return
 				} else if report.Done() {
-					_ = me.store.Done(report)
 					// TODO: a channel to report errors
+					_ = me.store.Done(report)
 
 					_2delete = true
 				}

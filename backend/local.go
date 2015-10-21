@@ -10,6 +10,25 @@ import (
 	"github.com/mission-liao/dingo/task"
 )
 
+//
+// configuration
+//
+
+type _localConfig struct {
+	_bypass bool `json:"Bypass"`
+}
+
+func (me *_localConfig) Bypass(yes bool) *_localConfig {
+	me._bypass = yes
+	return me
+}
+
+func defaultLocalConfig() *_localConfig {
+	return &_localConfig{
+		_bypass: true,
+	}
+}
+
 type _local struct {
 	cBackend   *common.RtControl
 	cSubscribe *common.RtControl
@@ -23,7 +42,7 @@ type _local struct {
 }
 
 // factory
-func NewLocal() *_local {
+func newLocal(cfg *Config) *_local {
 	v := &_local{
 		cBackend:   common.NewRtCtrl(),
 		cSubscribe: common.NewRtCtrl(),

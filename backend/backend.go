@@ -4,6 +4,11 @@ import (
 	"github.com/mission-liao/dingo/task"
 )
 
+type Backend interface {
+	Reporter
+	Store
+}
+
 // write reports to backend
 type Reporter interface {
 	// send report to backend
@@ -38,4 +43,13 @@ type Store interface {
 	// - ID of task / report are the same, therefore we use report here to
 	//   get ID of corresponding task.
 	Done(id task.IDer) error
+}
+
+func New(name string, cfg *Config) (b Backend, err error) {
+	switch name {
+	case "local":
+		b = newLocal(cfg)
+	}
+
+	return
 }

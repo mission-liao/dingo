@@ -61,7 +61,7 @@ func (me *_mappers) moreWorkers(id string, count int) (int, error) {
 	return me.workers.more(id, count)
 }
 
-func (me *_mappers) reportsChannel() <-chan task.Report {
+func (me *_mappers) reports() <-chan task.Report {
 	return me.workers.reportsChannel()
 }
 
@@ -79,9 +79,6 @@ func (m *_mappers) done() (err error) {
 
 	// clear mapper slice
 	m.mappers = nil
-
-	// unbound input channel
-	m.tasks = nil
 
 	return
 }

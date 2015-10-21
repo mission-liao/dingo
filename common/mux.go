@@ -182,18 +182,15 @@ func (m *Mux) Close() {
 		m.ctrl = nil
 	}
 
-	{
-		if m._out != nil {
-			close(m._out)
-			m._out = nil
-		}
-
-		func() {
-			m.rw.Lock()
-			defer m.rw.Unlock()
-			m.cases = nil
-		}()
+	if m._out != nil {
+		close(m._out)
 	}
+
+	func() {
+		m.rw.Lock()
+		defer m.rw.Unlock()
+		m.cases = nil
+	}()
 }
 
 //

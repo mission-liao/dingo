@@ -15,7 +15,11 @@ import (
 
 func TestLocalReporter(t *testing.T) {
 	ass := assert.New(t)
-	var v interface{} = NewLocal()
+
+	cfg := Default()
+	cfg.Local_().Bypass(false)
+
+	v, err := New("local", cfg)
 	reports := make(chan task.Report, 10)
 	reporter := v.(Reporter)
 
@@ -54,8 +58,15 @@ func (me *LocalStoreTestSuite) SetupSuite() {
 	me._invoker = task.NewDefaultInvoker()
 	me._task, err = me._invoker.ComposeTask("test", 123, "the string")
 	me.Nil(err)
-	me._inst = NewLocal()
+
+	cfg := Default()
+	cfg.Local_().Bypass(false)
+
+	me._inst, err = New("local", cfg)
+	me.Nil(err)
 	me._reporter, me._store = me._inst.(Reporter), me._inst.(Store)
+	me.NotNil(me._reporter)
+	me.NotNil(me._store)
 	me._reports = make(chan task.Report, 10)
 	me._id, err = me._reporter.Report(me._reports)
 	me.Nil(err)
@@ -68,7 +79,7 @@ func (me *LocalStoreTestSuite) TearDownSuite() {
 
 func (me *LocalStoreTestSuite) TestBasic() {
 	// send a report
-	report, err := me._task.ComposeReport(task.Status.Sent, nil, make([]interface{}, 0))
+	report, err := me._task.ComposeReport(task.Status.Sent, make([]interface{}, 0), nil)
 	me.Nil(err)
 	me._reports <- report
 

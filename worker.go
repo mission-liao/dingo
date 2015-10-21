@@ -36,18 +36,12 @@ type Matcher interface {
 	Match(patt string) bool
 }
 
-type strMatcher struct {
+type StrMatcher struct {
 	name string
 }
 
-func (me *strMatcher) Match(patt string) bool {
+func (me *StrMatcher) Match(patt string) bool {
 	return me.name == patt
-}
-
-func newStrMatcher(name string) Matcher {
-	return &strMatcher{
-		name: name,
-	}
 }
 
 //
@@ -189,6 +183,22 @@ func (me *_workers) dispatch(t task.Task) (err error) {
 	me.lock.RLock()
 	defer me.lock.RUnlock()
 
+	// compose a report -- sent
+	var (
+		r    task.Report
+		err_ error
+	)
+
+	r, err = t.ComposeReport(task.Status.Sent, nil, nil)
+	if err != nil {
+		r, err_ = t.ComposeReport(task.Status.Fail, nil, task.NewErr(0, err))
+		if err_ != nil {
+			// TODO: log it
+		}
+		return
+	}
+	me.reports <- r
+
 	found := false
 	if me.workers != nil {
 		for _, v := range me.workers {
@@ -225,7 +235,6 @@ func (me *_workers) done() (err error) {
 
 	// unbind reports channel
 	close(me.reports)
-	me.reports = nil
 
 	return
 }
@@ -253,6 +262,7 @@ func _worker_routine_(quit <-chan int, done chan<- int, tasks <-chan task.Task, 
 	for {
 		select {
 		case t, ok := <-tasks:
+			_ = "breakpoint"
 			if !ok {
 				// TODO: when channel is closed
 			}
@@ -266,7 +276,7 @@ func _worker_routine_(quit <-chan int, done chan<- int, tasks <-chan task.Task, 
 			// compose a report -- progress
 			r, err = t.ComposeReport(task.Status.Progress, nil, nil)
 			if err != nil {
-				r, err_ = t.ComposeReport(task.Status.Fail, err, nil)
+				r, err_ = t.ComposeReport(task.Status.Fail, nil, task.NewErr(0, err))
 				if err_ != nil {
 					// TODO: log it
 				}
@@ -284,7 +294,7 @@ func _worker_routine_(quit <-chan int, done chan<- int, tasks <-chan task.Task, 
 				status = task.Status.Done
 			}
 
-			r, err_ = t.ComposeReport(status, err, ret)
+			r, err_ = t.ComposeReport(status, ret, task.NewErr(0, err))
 			if err_ != nil {
 				// TODO: log it
 				break

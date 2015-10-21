@@ -5,6 +5,12 @@ import (
 )
 
 //
+type Broker interface {
+	Producer
+	Consumer
+}
+
+//
 type Producer interface {
 
 	//
@@ -37,4 +43,13 @@ type Receipt struct {
 	Id      string
 	Status  int
 	Payload interface{}
+}
+
+func New(name string, cfg *Config) (b Broker, err error) {
+	switch name {
+	case "local":
+		b = newLocal(cfg)
+	}
+
+	return
 }

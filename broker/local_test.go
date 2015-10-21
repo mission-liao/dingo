@@ -12,10 +12,20 @@ func TestLocalSend(t *testing.T) {
 	ass := assert.New(t)
 	ivk := task.NewDefaultInvoker()
 
-	for _, v := range []interface{}{
-		newLocal(false),
-		newLocal(true),
-	} {
+	var (
+		b1, b2 Broker
+		err    error
+	)
+	cfg := Default()
+	cfg.Local_().Bypass(false)
+	b1, err = New("local", cfg)
+	ass.Nil(err)
+
+	cfg.Local_().Bypass(true)
+	b2, err = New("local", cfg)
+	ass.Nil(err)
+
+	for _, v := range []interface{}{b1, b2} {
 		sender, receiver := v.(Producer), v.(Consumer)
 		rpt := make(chan Receipt, 10)
 
@@ -72,7 +82,11 @@ func TestLocalConsumeReceipt(t *testing.T) {
 	ivk := task.NewDefaultInvoker()
 	rpt := make(chan Receipt, 10)
 
-	var v interface{} = newLocal(false)
+	cfg := Default()
+	cfg.Local_().Bypass(false)
+
+	v, err := New("local", cfg)
+	ass.Nil(err)
 	sender, receiver := v.(Producer), v.(Consumer)
 	tasks, errs, err := receiver.Consume(rpt)
 	ass.Nil(err)

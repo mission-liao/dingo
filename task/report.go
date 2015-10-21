@@ -12,7 +12,9 @@ type Report interface {
 	//
 
 	GetStatus() int
+	GetName() string
 	GetReturn() []interface{}
+	GetErr() Err
 
 	//
 	// compare
@@ -21,14 +23,19 @@ type Report interface {
 	Valid() bool
 	Identical(Report) bool
 	Done() bool
+
+	//
+	// setter
+	//
+	SetReturn([]interface{})
 }
 
 type _report struct {
 	Id     string
+	Name   string
 	Status int
-	Err    error
+	Err_   *_error
 	Ret    []interface{}
-	T      Task
 }
 
 var Status = struct {
@@ -57,19 +64,21 @@ var Status = struct {
 // Report interface
 //
 
+func (r *_report) GetName() string          { return r.Name }
 func (r *_report) GetStatus() int           { return r.Status }
 func (r *_report) GetReturn() []interface{} { return r.Ret }
-func (r *_report) GetTask() Task            { return r.T }
 func (r *_report) GetId() string            { return r.Id }
-func (r *_report) GetError() error          { return r.Err }
+func (r *_report) GetErr() Err              { return r.Err_ }
 func (r *_report) Valid() bool              { return r.Status == Status.None }
 func (r *_report) Identical(other Report) bool {
+	// TODO: seems useless now?
 	if other == nil {
 		return false
 	}
 	return r.Status == other.GetStatus()
 }
-func (r *_report) Done() bool { return r.Status == Status.Done || r.Status == Status.Fail }
+func (r *_report) Done() bool                { return r.Status == Status.Done || r.Status == Status.Fail }
+func (r *_report) SetReturn(v []interface{}) { r.Ret = v }
 
 func UnmarshalReport(buf []byte) (r Report, err error) {
 	var _r _report
