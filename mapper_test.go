@@ -20,8 +20,8 @@ type DingoMapperTestSuite struct {
 
 func TestDingoMapperSuite(t *testing.T) {
 	suite.Run(t, &DingoMapperTestSuite{
-		_receipts:       make(chan broker.Receipt, 10),
-		_tasks:          make(chan task.Task, 10),
+		_receipts:       make(chan broker.Receipt, 5),
+		_tasks:          make(chan task.Task, 5),
 		_countOfMappers: 3,
 		_invoker:        task.NewDefaultInvoker(),
 	})
