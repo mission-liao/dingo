@@ -149,6 +149,34 @@ func (s *InvokeTestSuite) TestInt64() {
 	}
 }
 
+func (s *InvokeTestSuite) TestInt() {
+	// int
+	{
+		called := int(0)
+		chk := func(v int) (int, error) {
+			called = v
+			return v, nil
+		}
+		param, err := ioJSON(int(1))
+		s.Nil(err)
+		s.NotNil(param)
+		if param != nil {
+			ret, err := s.ivk.Invoke(chk, param)
+			s.Nil(err)
+			s.Len(ret, 2)
+			if ret != nil && len(ret) > 0 {
+				f, ok := ret[0].(int)
+				s.True(ok)
+				if ok {
+					s.Equal(int(1), f)
+				}
+			}
+
+			s.Equal(int(1), called)
+		}
+	}
+}
+
 func (s *InvokeTestSuite) TestString() {
 	{
 		called := ""
@@ -489,5 +517,19 @@ func (s *InvokeTestSuite) TestSlice() {
 	}
 }
 
+// TODO:
 func (s *InvokeTestSuite) TestPrivateField() {
+}
+
+func (s *InvokeTestSuite) TestFitReturns() {
+	chk := func() (int, float32, string) {
+		return 0, 0, ""
+	}
+	ret := []interface{}{int64(11), float64(12.5), "test string"}
+	refined, err := s.ivk.FitReturns(chk, ret)
+	s.Nil(err)
+	s.Len(refined, 3)
+	s.Equal(int(11), refined[0])
+	s.Equal(float32(12.5), refined[1])
+	s.Equal("test string", refined[2])
 }

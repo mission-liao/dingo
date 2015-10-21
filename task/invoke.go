@@ -15,6 +15,7 @@ import (
 
 type Invoker interface {
 	Invoke(f interface{}, param []interface{}) ([]interface{}, error)
+	FitReturns(f interface{}, returns []interface{}) ([]interface{}, error)
 	ComposeTask(name string, args ...interface{}) (Task, error)
 }
 
@@ -237,12 +238,53 @@ func (vk *_invoker) Invoke(f interface{}, param []interface{}) ([]interface{}, e
 	for i := 0; i < funcT.NumOut(); i++ {
 		if ret[i].CanInterface() {
 			out[i] = ret[i].Interface()
+		} else {
+			return nil, errors.New(fmt.Sprintf("Unable to convert to interface{} for %d", i))
 		}
 	}
 
 	return out, nil
 }
 
+// when marshal/unmarshal with json, some type information would be lost.
+// this function helps to convert those returns with correct type info provided
+// by function's reflection.
+//
+// parameters:
+// - f: the function
+// - returns: the array of returns
+// returns:
+// converted return array and error
+func (vk *_invoker) FitReturns(f interface{}, returns []interface{}) ([]interface{}, error) {
+	funcT := reflect.TypeOf(f)
+
+	// make sure parameter matched
+	if len(returns) != funcT.NumOut() {
+		return nil, errors.New(fmt.Sprintf("Parameter Count mismatch: %v %v", len(returns), funcT.NumOut()))
+	}
+
+	var (
+		err error
+		ret reflect.Value
+	)
+
+	out := make([]interface{}, funcT.NumOut())
+	for i := 0; i < funcT.NumOut(); i++ {
+		ret, err = vk.from(returns[i], funcT.Out(i))
+		if err != nil {
+			return nil, err
+		}
+		if ret.CanInterface() {
+			out[i] = ret.Interface()
+		} else {
+			return nil, errors.New(fmt.Sprintf("Unable to convert to interface{} for %d", i))
+		}
+	}
+
+	return out, nil
+}
+
+//
 func (vk *_invoker) ComposeTask(name string, args ...interface{}) (Task, error) {
 	return &_task{
 		Id:   uuid.NewV4().String(),
