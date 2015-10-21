@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/task"
+	"github.com/mission-liao/dingo/meta"
 )
 
 //
@@ -35,8 +35,8 @@ type _local struct {
 	// broker routine
 	brk    *common.RtControl
 	to     chan []byte
-	noJSON chan task.Task
-	tasks  chan task.Task
+	noJSON chan meta.Task
+	tasks  chan meta.Task
 	errs   chan error
 	bypass bool
 
@@ -44,7 +44,7 @@ type _local struct {
 	monitor    *common.RtControl
 	muxReceipt *common.Mux
 	uhLock     sync.Mutex
-	unhandled  map[string]task.Task
+	unhandled  map[string]meta.Task
 	fLock      sync.RWMutex
 	failures   []*Receipt
 	rid        int
@@ -55,14 +55,14 @@ func newLocal(cfg *Config) (v *_local) {
 	v = &_local{
 		brk:    common.NewRtCtrl(),
 		to:     make(chan []byte, 10),
-		noJSON: make(chan task.Task, 10),
-		tasks:  make(chan task.Task, 10),
+		noJSON: make(chan meta.Task, 10),
+		tasks:  make(chan meta.Task, 10),
 		errs:   make(chan error, 10),
 		bypass: cfg._local._bypass,
 
 		monitor:    common.NewRtCtrl(),
 		muxReceipt: &common.Mux{},
-		unhandled:  make(map[string]task.Task),
+		unhandled:  make(map[string]meta.Task),
 		failures:   make([]*Receipt, 0, 10),
 		rid:        0,
 	}
@@ -75,7 +75,7 @@ func (me *_local) init() {
 	me.muxReceipt.Init()
 
 	// output function of broker routine
-	out := func(t task.Task) {
+	out := func(t meta.Task) {
 		me.tasks <- t
 
 		func() {
@@ -106,7 +106,7 @@ func (me *_local) init() {
 					break
 				}
 
-				t_, err_ := task.UnmarshalTask(v)
+				t_, err_ := meta.UnmarshalTask(v)
 				if err_ != nil {
 					me.errs <- err_
 					break
@@ -178,7 +178,7 @@ func (me *_local) Close() {
 // Producer
 //
 
-func (me *_local) Send(t task.Task) (err error) {
+func (me *_local) Send(t meta.Task) (err error) {
 	if me.bypass {
 		me.noJSON <- t
 		return
@@ -198,7 +198,7 @@ func (me *_local) Send(t task.Task) (err error) {
 // Consumer
 //
 
-func (me *_local) Consume(rcpt <-chan Receipt) (tasks <-chan task.Task, errs <-chan error, err error) {
+func (me *_local) Consume(rcpt <-chan Receipt) (tasks <-chan meta.Task, errs <-chan error, err error) {
 	me.rid, err = me.muxReceipt.Register(rcpt)
 	tasks, errs = me.tasks, me.errs
 	return

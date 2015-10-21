@@ -6,12 +6,12 @@ import (
 
 	"github.com/mission-liao/dingo/backend"
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/task"
+	"github.com/mission-liao/dingo/meta"
 )
 
 type _watch struct {
 	last    int
-	reports chan task.Report
+	reports chan meta.Report
 }
 
 type _fn struct {
@@ -27,11 +27,11 @@ type _monitors struct {
 	monitors  []*monitor
 	watchLock sync.RWMutex
 	watched   map[string]*_watch
-	reports   <-chan task.Report
+	reports   <-chan meta.Report
 	store     backend.Store
 	fnLock    sync.RWMutex
 	fns       []*_fn
-	invoker   task.Invoker
+	invoker   meta.Invoker
 }
 
 func (me *_monitors) init() (err error) {
@@ -100,7 +100,7 @@ func (me *_monitors) done() (err error) {
 	return
 }
 
-func (me *_monitors) check(t task.Task) (reports <-chan task.Report, err error) {
+func (me *_monitors) check(t meta.Task) (reports <-chan meta.Report, err error) {
 	err = me.store.Poll(t)
 	if err != nil {
 		return
@@ -116,8 +116,8 @@ func (me *_monitors) check(t task.Task) (reports <-chan task.Report, err error) 
 			// buffer size
 
 			w := &_watch{
-				last:    task.Status.None,
-				reports: make(chan task.Report, task.Status.Count),
+				last:    meta.Status.None,
+				reports: make(chan meta.Report, meta.Status.Count),
 			}
 			reports = w.reports
 			me.watched[t.GetId()] = w
@@ -147,7 +147,7 @@ func newMonitors(store backend.Store) (mnt *_monitors, err error) {
 		monitors: make([]*monitor, 0, 10),
 		watched:  make(map[string]*_watch),
 		fns:      make([]*_fn, 0, 10),
-		invoker:  task.NewDefaultInvoker(),
+		invoker:  meta.NewDefaultInvoker(),
 	}
 	err = mnt.init()
 	return

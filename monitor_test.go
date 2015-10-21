@@ -5,7 +5,7 @@ import (
 
 	"github.com/mission-liao/dingo/backend"
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/task"
+	"github.com/mission-liao/dingo/meta"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -17,15 +17,15 @@ type DingoMonitorTestSuite struct {
 	_mnt      *_monitors
 	_store    backend.Store
 	_reporter backend.Reporter
-	_reports  chan task.Report
-	_invoker  task.Invoker
+	_reports  chan meta.Report
+	_invoker  meta.Invoker
 }
 
 func TestDingoMonitorSuite(t *testing.T) {
 	suite.Run(t, &DingoMonitorTestSuite{
-		_invoker: task.NewDefaultInvoker(),
+		_invoker: meta.NewDefaultInvoker(),
 		_count:   3,
-		_reports: make(chan task.Report, 10),
+		_reports: make(chan meta.Report, 10),
 	})
 }
 
@@ -66,16 +66,16 @@ func (me *DingoMonitorTestSuite) TestParellenMonitoring() {
 	me.Nil(err)
 
 	toSend := []int{
-		task.Status.Sent,
-		task.Status.Progress,
-		task.Status.Test1,
-		task.Status.Test2,
-		task.Status.Test3,
-		task.Status.Test4,
-		task.Status.Test5,
-		task.Status.Test6,
+		meta.Status.Sent,
+		meta.Status.Progress,
+		meta.Status.Test1,
+		meta.Status.Test2,
+		meta.Status.Test3,
+		meta.Status.Test4,
+		meta.Status.Test5,
+		meta.Status.Test6,
 	}
-	me.Len(toSend, me._count+task.Status.Count)
+	me.Len(toSend, me._count+meta.Status.Count)
 	for _, v := range toSend {
 		// compose reports
 		r, err := t.ComposeReport(v, []interface{}{}, nil)
@@ -107,7 +107,7 @@ func (me *DingoMonitorTestSuite) TestFitReturns() {
 	me.Nil(err)
 	// send a report with different type (compared to function's
 	// return value)
-	r, err := t.ComposeReport(task.Status.Done, []interface{}{
+	r, err := t.ComposeReport(meta.Status.Done, []interface{}{
 		int64(101),
 		float32(5.2),
 	}, nil)

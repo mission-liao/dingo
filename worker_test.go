@@ -4,7 +4,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/mission-liao/dingo/task"
+	"github.com/mission-liao/dingo/meta"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -12,7 +12,7 @@ type DingoWorkerTestSuite struct {
 	suite.Suite
 
 	_ws      *_workers
-	_invoker task.Invoker
+	_invoker meta.Invoker
 }
 
 func TestDingoWorkerSuite(t *testing.T) {
@@ -21,7 +21,7 @@ func TestDingoWorkerSuite(t *testing.T) {
 
 func (me *DingoWorkerTestSuite) SetupSuite() {
 	me._ws = newWorkers()
-	me._invoker = task.NewDefaultInvoker()
+	me._invoker = meta.NewDefaultInvoker()
 }
 
 func (me *DingoWorkerTestSuite) TearDownSuite() {

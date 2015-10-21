@@ -1,7 +1,7 @@
 package broker
 
 import (
-	"github.com/mission-liao/dingo/task"
+	"github.com/mission-liao/dingo/meta"
 )
 
 //
@@ -14,7 +14,7 @@ type Broker interface {
 type Producer interface {
 
 	//
-	Send(task.Task) error
+	Send(meta.Task) error
 }
 
 //
@@ -25,7 +25,7 @@ type Consumer interface {
 	// - tasks: 'dingo' would consume from this channel for new tasks
 	// - errs: 'dingo' would consume from this channel for error messages
 	// - err: any error during initialization
-	Consume(rcpt <-chan Receipt) (tasks <-chan task.Task, errs <-chan error, err error)
+	Consume(rcpt <-chan Receipt) (tasks <-chan meta.Task, errs <-chan error, err error)
 
 	//
 	Stop() (err error)

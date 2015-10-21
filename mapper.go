@@ -5,7 +5,7 @@ import (
 
 	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/task"
+	"github.com/mission-liao/dingo/meta"
 )
 
 //
@@ -16,7 +16,7 @@ type _mappers struct {
 	workers  *_workers
 	mappers  []*mapper
 	lock     sync.RWMutex
-	tasks    <-chan task.Task
+	tasks    <-chan meta.Task
 	receipts chan<- broker.Receipt
 }
 
@@ -61,7 +61,7 @@ func (me *_mappers) moreWorkers(id string, count int) (int, error) {
 	return me.workers.more(id, count)
 }
 
-func (me *_mappers) reports() <-chan task.Report {
+func (me *_mappers) reports() <-chan meta.Report {
 	return me.workers.reportsChannel()
 }
 
@@ -88,7 +88,7 @@ func (m *_mappers) done() (err error) {
 // - tasks: input channel
 // returns:
 // ...
-func newMappers(tasks <-chan task.Task, receipts chan<- broker.Receipt) *_mappers {
+func newMappers(tasks <-chan meta.Task, receipts chan<- broker.Receipt) *_mappers {
 	return &_mappers{
 		workers:  newWorkers(),
 		mappers:  make([]*mapper, 0, 10),
@@ -109,7 +109,7 @@ type mapper struct {
 // mapper routine
 //
 
-func (m *_mappers) _mapper_routine_(quit <-chan int, done chan<- int, tasks <-chan task.Task) {
+func (m *_mappers) _mapper_routine_(quit <-chan int, done chan<- int, tasks <-chan meta.Task) {
 	for {
 		select {
 		case t, ok := <-tasks:

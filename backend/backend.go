@@ -1,7 +1,7 @@
 package backend
 
 import (
-	"github.com/mission-liao/dingo/task"
+	"github.com/mission-liao/dingo/meta"
 )
 
 type Backend interface {
@@ -18,7 +18,7 @@ type Reporter interface {
 	// returns:
 	// - id: id of 'report', you can used it for later operation.
 	// - err: errors
-	Report(report <-chan task.Report) (id string, err error)
+	Report(report <-chan meta.Report) (id string, err error)
 
 	// unbind the input channel
 	//
@@ -33,16 +33,16 @@ type Reporter interface {
 type Store interface {
 	//
 	// - subscribe report channel
-	Subscribe() (reports <-chan task.Report, err error)
+	Subscribe() (reports <-chan meta.Report, err error)
 
 	// polling results for tasks, callers maintain a list of 'to-check'.
-	Poll(id task.IDer) error
+	Poll(id meta.IDer) error
 
 	// Stop monitoring that task
 	//
 	// - ID of task / report are the same, therefore we use report here to
 	//   get ID of corresponding task.
-	Done(id task.IDer) error
+	Done(id meta.IDer) error
 }
 
 func New(name string, cfg *Config) (b Backend, err error) {

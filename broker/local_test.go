@@ -4,13 +4,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mission-liao/dingo/task"
+	"github.com/mission-liao/dingo/meta"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLocalSend(t *testing.T) {
 	ass := assert.New(t)
-	ivk := task.NewDefaultInvoker()
+	ivk := meta.NewDefaultInvoker()
 
 	var (
 		b1, b2 Broker
@@ -79,7 +79,7 @@ func TestLocalSend(t *testing.T) {
 
 func TestLocalConsumeReceipt(t *testing.T) {
 	ass := assert.New(t)
-	ivk := task.NewDefaultInvoker()
+	ivk := meta.NewDefaultInvoker()
 	rpt := make(chan Receipt, 10)
 
 	cfg := Default()

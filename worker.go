@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/task"
+	"github.com/mission-liao/dingo/meta"
 	"github.com/satori/go.uuid"
 )
 
@@ -52,7 +52,7 @@ func (me *StrMatcher) Match(patt string) bool {
 
 type worker struct {
 	matcher Matcher
-	tasks   chan task.Task
+	tasks   chan meta.Task
 	ctrls   []*common.RtControl
 	fn      interface{}
 }
@@ -64,7 +64,7 @@ type worker struct {
 type _workers struct {
 	lock    sync.RWMutex
 	workers map[string]*worker
-	reports chan task.Report
+	reports chan meta.Report
 }
 
 // allocating a new group of workers
@@ -113,7 +113,7 @@ func (me *_workers) allocate(m Matcher, fn interface{}, count int) (id string, r
 
 		// initiate controlling channle
 		ctrls := make([]*common.RtControl, 0, count)
-		tasks := make(chan task.Task, 10) // TODO: configuration?
+		tasks := make(chan meta.Task, 10) // TODO: configuration?
 
 		me.workers[id] = &worker{
 			matcher: m,
@@ -173,25 +173,25 @@ func (me *_workers) more(id string, count int) (remain int, err error) {
 	return
 }
 
-// dispatching a 'task.Task'
+// dispatching a 'meta.Task'
 //
 // parameters:
 // - t: the task
 // returns:
 // - err: any error
-func (me *_workers) dispatch(t task.Task) (err error) {
+func (me *_workers) dispatch(t meta.Task) (err error) {
 	me.lock.RLock()
 	defer me.lock.RUnlock()
 
 	// compose a report -- sent
 	var (
-		r    task.Report
+		r    meta.Report
 		err_ error
 	)
 
-	r, err = t.ComposeReport(task.Status.Sent, nil, nil)
+	r, err = t.ComposeReport(meta.Status.Sent, nil, nil)
 	if err != nil {
-		r, err_ = t.ComposeReport(task.Status.Fail, nil, task.NewErr(0, err))
+		r, err_ = t.ComposeReport(meta.Status.Fail, nil, meta.NewErr(0, err))
 		if err_ != nil {
 			// TODO: log it
 		}
@@ -239,7 +239,7 @@ func (me *_workers) done() (err error) {
 	return
 }
 
-func (me *_workers) reportsChannel() <-chan task.Report {
+func (me *_workers) reportsChannel() <-chan meta.Report {
 	return me.reports
 }
 
@@ -247,7 +247,7 @@ func (me *_workers) reportsChannel() <-chan task.Report {
 func newWorkers() *_workers {
 	return &_workers{
 		workers: make(map[string]*worker),
-		reports: make(chan task.Report, 10),
+		reports: make(chan meta.Report, 10),
 	}
 }
 
@@ -255,9 +255,9 @@ func newWorkers() *_workers {
 // worker routine
 //
 
-func _worker_routine_(quit <-chan int, done chan<- int, tasks <-chan task.Task, reports chan<- task.Report, fn interface{}) {
+func _worker_routine_(quit <-chan int, done chan<- int, tasks <-chan meta.Task, reports chan<- meta.Report, fn interface{}) {
 	// TODO: concider a shared, common invoker instance?
-	ivk := task.NewDefaultInvoker()
+	ivk := meta.NewDefaultInvoker()
 
 	for {
 		select {
@@ -267,16 +267,16 @@ func _worker_routine_(quit <-chan int, done chan<- int, tasks <-chan task.Task, 
 				// TODO: when channel is closed
 			}
 			var (
-				r         task.Report
+				r         meta.Report
 				ret       []interface{}
 				err, err_ error
 				status    int
 			)
 
 			// compose a report -- progress
-			r, err = t.ComposeReport(task.Status.Progress, nil, nil)
+			r, err = t.ComposeReport(meta.Status.Progress, nil, nil)
 			if err != nil {
-				r, err_ = t.ComposeReport(task.Status.Fail, nil, task.NewErr(0, err))
+				r, err_ = t.ComposeReport(meta.Status.Fail, nil, meta.NewErr(0, err))
 				if err_ != nil {
 					// TODO: log it
 				}
@@ -289,12 +289,12 @@ func _worker_routine_(quit <-chan int, done chan<- int, tasks <-chan task.Task, 
 
 			// compose a report -- done / fail
 			if err != nil {
-				status = task.Status.Fail
+				status = meta.Status.Fail
 			} else {
-				status = task.Status.Done
+				status = meta.Status.Done
 			}
 
-			r, err_ = t.ComposeReport(status, ret, task.NewErr(0, err))
+			r, err_ = t.ComposeReport(status, ret, meta.NewErr(0, err))
 			if err_ != nil {
 				// TODO: log it
 				break

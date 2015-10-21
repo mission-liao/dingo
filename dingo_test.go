@@ -5,7 +5,7 @@ import (
 
 	"github.com/mission-liao/dingo/backend"
 	"github.com/mission-liao/dingo/broker"
-	"github.com/mission-liao/dingo/task"
+	"github.com/mission-liao/dingo/meta"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -84,9 +84,9 @@ func (me *DingoTestSuite) TestBasic() {
 
 		// await for reports
 		status := []int{
-			task.Status.Sent,
-			task.Status.Progress,
-			task.Status.Done,
+			meta.Status.Sent,
+			meta.Status.Progress,
+			meta.Status.Done,
 		}
 		for {
 			done := false

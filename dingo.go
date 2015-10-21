@@ -12,7 +12,7 @@ import (
 	"github.com/mission-liao/dingo/backend"
 	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/task"
+	"github.com/mission-liao/dingo/meta"
 )
 
 var InstT = struct {
@@ -62,7 +62,7 @@ type App interface {
 
 	// send a task
 	//
-	Call(name string, opt *Option, args ...interface{}) (<-chan task.Report, error)
+	Call(name string, opt *meta.Option, args ...interface{}) (<-chan meta.Report, error)
 }
 
 //
@@ -76,7 +76,7 @@ type _object struct {
 }
 
 type _app struct {
-	invoker task.Invoker
+	invoker meta.Invoker
 
 	cfg      Config
 	objsLock sync.RWMutex
@@ -98,7 +98,7 @@ func NewApp(c Config) (app App, err error) {
 	app = &_app{
 		receipts: make(chan broker.Receipt, 10),
 		objs:     make(map[int]*_object),
-		invoker:  task.NewDefaultInvoker(),
+		invoker:  meta.NewDefaultInvoker(),
 		cfg:      c,
 	}
 
@@ -316,11 +316,11 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 	return
 }
 
-func (me *_app) Call(name string, opt *Option, args ...interface{}) (reports <-chan task.Report, err error) {
+func (me *_app) Call(name string, opt *meta.Option, args ...interface{}) (reports <-chan meta.Report, err error) {
 	me.objsLock.RLock()
 	defer me.objsLock.RUnlock()
 
-	// TODO: attach Option to task.Task
+	// TODO: attach Option to meta.Task
 	if me.producer == nil {
 		err = errors.New("producer is not initialized")
 		return

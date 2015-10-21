@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/mission-liao/dingo/broker"
-	"github.com/mission-liao/dingo/task"
+	"github.com/mission-liao/dingo/meta"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -12,18 +12,18 @@ type DingoMapperTestSuite struct {
 	suite.Suite
 
 	_mps            *_mappers
-	_invoker        task.Invoker
+	_invoker        meta.Invoker
 	_receipts       chan broker.Receipt
-	_tasks          chan task.Task
+	_tasks          chan meta.Task
 	_countOfMappers int
 }
 
 func TestDingoMapperSuite(t *testing.T) {
 	suite.Run(t, &DingoMapperTestSuite{
 		_receipts:       make(chan broker.Receipt, 5),
-		_tasks:          make(chan task.Task, 5),
+		_tasks:          make(chan meta.Task, 5),
 		_countOfMappers: 3,
-		_invoker:        task.NewDefaultInvoker(),
+		_invoker:        meta.NewDefaultInvoker(),
 	})
 }
 

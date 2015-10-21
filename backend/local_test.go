@@ -3,10 +3,9 @@ package backend
 import (
 	"testing"
 
+	"github.com/mission-liao/dingo/meta"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-
-	"github.com/mission-liao/dingo/task"
 )
 
 //
@@ -20,7 +19,7 @@ func TestLocalReporter(t *testing.T) {
 	cfg.Local_().Bypass(false)
 
 	v, err := New("local", cfg)
-	reports := make(chan task.Report, 10)
+	reports := make(chan meta.Report, 10)
 	reporter := v.(Reporter)
 
 	// test case for Report/Unbind
@@ -41,11 +40,11 @@ func TestLocalReporter(t *testing.T) {
 type LocalStoreTestSuite struct {
 	suite.Suite
 
-	_invoker  task.Invoker
-	_task     task.Task
+	_invoker  meta.Invoker
+	_task     meta.Task
 	_inst     interface{}
 	_reporter Reporter
-	_reports  chan task.Report
+	_reports  chan meta.Report
 	_store    Store
 	_id       string
 }
@@ -55,7 +54,7 @@ func (me *LocalStoreTestSuite) SetupSuite() {
 		err error
 	)
 
-	me._invoker = task.NewDefaultInvoker()
+	me._invoker = meta.NewDefaultInvoker()
 	me._task, err = me._invoker.ComposeTask("test", 123, "the string")
 	me.Nil(err)
 
@@ -67,7 +66,7 @@ func (me *LocalStoreTestSuite) SetupSuite() {
 	me._reporter, me._store = me._inst.(Reporter), me._inst.(Store)
 	me.NotNil(me._reporter)
 	me.NotNil(me._store)
-	me._reports = make(chan task.Report, 10)
+	me._reports = make(chan meta.Report, 10)
 	me._id, err = me._reporter.Report(me._reports)
 	me.Nil(err)
 }
@@ -79,7 +78,7 @@ func (me *LocalStoreTestSuite) TearDownSuite() {
 
 func (me *LocalStoreTestSuite) TestBasic() {
 	// send a report
-	report, err := me._task.ComposeReport(task.Status.Sent, make([]interface{}, 0), nil)
+	report, err := me._task.ComposeReport(meta.Status.Sent, make([]interface{}, 0), nil)
 	me.Nil(err)
 	me._reports <- report
 

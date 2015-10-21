@@ -1,5 +1,7 @@
 package backend
 
+// TODO: bypass mode in local backend
+
 import (
 	"encoding/json"
 	"fmt"
@@ -7,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/task"
+	"github.com/mission-liao/dingo/meta"
 )
 
 //
@@ -33,12 +35,12 @@ type _local struct {
 	cBackend   *common.RtControl
 	cSubscribe *common.RtControl
 	to         chan []byte
-	reports    chan task.Report
+	reports    chan meta.Report
 	reportLock sync.Mutex
 	muxReport  *common.Mux
 	toCheck    []string
-	unSent     []task.Report
-	subscriber map[string]chan<- task.Report
+	unSent     []meta.Report
+	subscriber map[string]chan<- meta.Report
 }
 
 // factory
@@ -47,11 +49,11 @@ func newLocal(cfg *Config) *_local {
 		cBackend:   common.NewRtCtrl(),
 		cSubscribe: common.NewRtCtrl(),
 		to:         make(chan []byte, 10),
-		reports:    make(chan task.Report, 10),
+		reports:    make(chan meta.Report, 10),
 		muxReport:  &common.Mux{},
 		toCheck:    make([]string, 0, 10),
-		unSent:     make([]task.Report, 0, 10),
-		subscriber: make(map[string]chan<- task.Report),
+		unSent:     make([]meta.Report, 0, 10),
+		subscriber: make(map[string]chan<- meta.Report),
 	}
 	v.init()
 
@@ -73,7 +75,7 @@ func (me *_local) init() {
 					// TODO:
 				}
 
-				rep, valid := v.Value.(task.Report)
+				rep, valid := v.Value.(meta.Report)
 				if !valid {
 					// TODO:
 				}
@@ -101,7 +103,7 @@ func (me *_local) init() {
 					// TODO:
 				}
 
-				rep, err := task.UnmarshalReport(v)
+				rep, err := meta.UnmarshalReport(v)
 				if err != nil {
 					// TODO:
 					break
@@ -148,7 +150,7 @@ func (me *_local) Close() (err error) {
 // Reporter
 //
 
-func (me *_local) Report(report <-chan task.Report) (id string, err error) {
+func (me *_local) Report(report <-chan meta.Report) (id string, err error) {
 	v, err := me.muxReport.Register(report)
 	if err != nil {
 		return
@@ -173,12 +175,12 @@ func (me *_local) Unbind(id string) (err error) {
 // Store
 //
 
-func (me *_local) Subscribe() (reports <-chan task.Report, err error) {
+func (me *_local) Subscribe() (reports <-chan meta.Report, err error) {
 	reports = me.reports
 	return
 }
 
-func (me *_local) Poll(id task.IDer) (err error) {
+func (me *_local) Poll(id meta.IDer) (err error) {
 	me.reportLock.Lock()
 	defer me.reportLock.Unlock()
 
@@ -205,7 +207,7 @@ func (me *_local) Poll(id task.IDer) (err error) {
 	return
 }
 
-func (me *_local) Done(id task.IDer) (err error) {
+func (me *_local) Done(id meta.IDer) (err error) {
 	// clearing toCheck list
 	for k, v := range me.toCheck {
 		if v == id.GetId() {
