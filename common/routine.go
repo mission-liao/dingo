@@ -31,7 +31,7 @@ func (me *Routines) New() (<-chan int, *sync.WaitGroup) {
 	return me.quits[len(me.quits)-1], &me.wg
 }
 
-func (me *Routines) Done() {
+func (me *Routines) Close() {
 	me.qLock.Lock()
 	defer me.qLock.Unlock()
 

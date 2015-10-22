@@ -76,7 +76,7 @@ func (m *Mux) More(count int) (remain int, err error) {
 
 //
 func (m *Mux) Close() {
-	m.rs.Done()
+	m.rs.Close()
 
 	if m._out != nil {
 		close(m._out)
