@@ -30,8 +30,8 @@ func defaultLocalConfig() *_localConfig {
 }
 
 type _local struct {
-	cBackend   *common.RtControl
-	cSubscribe *common.RtControl
+	cBackend   *common.Routines
+	cSubscribe *common.Routines
 	to         chan []byte
 	reports    chan meta.Report
 	reportLock sync.Mutex
@@ -43,95 +43,105 @@ type _local struct {
 }
 
 // factory
-func newLocal(cfg *Config) *_local {
-	v := &_local{
-		cBackend:   common.NewRtCtrl(),
-		cSubscribe: common.NewRtCtrl(),
+func newLocal(cfg *Config) (v *_local, err error) {
+	v = &_local{
+		cBackend:   common.NewRoutines(),
+		cSubscribe: common.NewRoutines(),
 		to:         make(chan []byte, 10),
 		reports:    make(chan meta.Report, 10),
-		muxReport:  &common.Mux{},
+		muxReport:  common.NewMux(),
 		toCheck:    make([]string, 0, 10),
 		unSent:     make([]meta.Report, 0, 10),
 		subscriber: make(map[string]chan<- meta.Report),
 	}
-	v.init()
-
-	return v
+	err = v.init()
+	return
 }
 
-func (me *_local) init() {
-	me.muxReport.Init()
+func (me *_local) _reporter_routine_(reports <-chan *common.MuxOut, quit <-chan int, wait *sync.WaitGroup) {
+	defer wait.Done()
+
+	for {
+		select {
+		case _, _ = <-quit:
+			return
+		case v, ok := <-reports:
+			if !ok {
+				// TODO:
+			}
+
+			rep, valid := v.Value.(meta.Report)
+			if !valid {
+				// TODO:
+			}
+
+			body, err := json.Marshal(rep)
+			if err != nil {
+				// TODO: an error channel to reports errors
+			}
+
+			// send to Store
+			me.to <- body
+		}
+	}
+}
+
+func (me *_local) _store_routine_(quit <-chan int, wait *sync.WaitGroup) {
+	defer wait.Done()
+
+	for {
+		select {
+		case _, _ = <-quit:
+			return
+		case v, ok := <-me.to:
+			if !ok {
+				// TODO:
+			}
+
+			rep, err := meta.UnmarshalReport(v)
+			if err != nil {
+				// TODO:
+				break
+			}
+
+			if rep == nil {
+				break
+			}
+
+			func() {
+				me.reportLock.Lock()
+				me.reportLock.Unlock()
+
+				found := false
+				for _, v := range me.toCheck {
+					if v == rep.GetId() {
+						found = true
+						me.reports <- rep
+						break
+					}
+				}
+
+				if !found {
+					me.unSent = append(me.unSent, rep)
+				}
+			}()
+		}
+	}
+}
+
+func (me *_local) init() (err error) {
+	// TODO: allow configuration
+	_, err = me.muxReport.More(1)
 
 	// Reporter -> Store
-	go func(reports <-chan *common.MuxOut, quit <-chan int, done chan<- int) {
-		for {
-			select {
-			case _, _ = <-quit:
-				done <- 1
-				return
-			case v, ok := <-reports:
-				if !ok {
-					// TODO:
-				}
-
-				rep, valid := v.Value.(meta.Report)
-				if !valid {
-					// TODO:
-				}
-
-				body, err := json.Marshal(rep)
-				if err != nil {
-					// TODO: an error channel to reports errors
-				}
-
-				// send to Store
-				me.to <- body
-			}
-		}
-	}(me.muxReport.Out(), me.cBackend.Quit, me.cBackend.Done)
+	quit, wait := me.cBackend.New()
+	go me._reporter_routine_(me.muxReport.Out(), quit, wait)
 
 	// Store -> Subscriber
-	go func(quit <-chan int, done chan<- int) {
-		for {
-			select {
-			case _, _ = <-quit:
-				done <- 1
-				return
-			case v, ok := <-me.to:
-				if !ok {
-					// TODO:
-				}
+	quit, wait = me.cSubscribe.New()
+	go me._store_routine_(quit, wait)
 
-				rep, err := meta.UnmarshalReport(v)
-				if err != nil {
-					// TODO:
-					break
-				}
-
-				if rep == nil {
-					break
-				}
-
-				func() {
-					me.reportLock.Lock()
-					me.reportLock.Unlock()
-
-					found := false
-					for _, v := range me.toCheck {
-						if v == rep.GetId() {
-							found = true
-							me.reports <- rep
-							break
-						}
-					}
-
-					if !found {
-						me.unSent = append(me.unSent, rep)
-					}
-				}()
-			}
-		}
-	}(me.cSubscribe.Quit, me.cSubscribe.Done)
+	return
 }
 
 func (me *_local) Close() (err error) {

@@ -45,7 +45,7 @@ type Store interface {
 func New(name string, cfg *Config) (b Backend, err error) {
 	switch name {
 	case "local":
-		b = newLocal(cfg)
+		b, err = newLocal(cfg)
 	}
 
 	return
