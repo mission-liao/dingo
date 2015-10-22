@@ -13,40 +13,18 @@ import (
 //
 
 type _mappers struct {
-	workers  *_workers
-	mappers  []*mapper
-	lock     sync.RWMutex
-	tasks    <-chan meta.Task
-	receipts chan<- broker.Receipt
+	workers *_workers
+	mappers *common.Routines
 }
 
 // allocating more mappers
 //
 // parameters:
-// - count: count of mappers to be allocated
-// returns:
-// - remains: count of un-allocated mappers
-// - err: any error
-func (m *_mappers) more(count int) (remain int, err error) {
-	mps := make([]*mapper, 0, count)
-	remain = count
-
-	for ; remain > 0; remain-- {
-		mp := &mapper{
-			common.RtControl{
-				Quit: make(chan int, 1),
-				Done: make(chan int, 1),
-			},
-		}
-		mps = append(mps, mp)
-		go m._mapper_routine_(mp.Quit, mp.Done, m.tasks)
-	}
-
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.mappers = append(m.mappers, mps...)
-	return
+// - tasks: input channel for meta.Task
+// - receipts: output channel for broker.Receipt
+func (m *_mappers) more(tasks <-chan meta.Task, receipts chan<- broker.Receipt) {
+	quit, wait := m.mappers.New()
+	go m._mapper_routine_(quit, wait, tasks, receipts)
 }
 
 //
@@ -69,17 +47,8 @@ func (me *_mappers) reports() <-chan meta.Report {
 //
 //
 func (m *_mappers) done() (err error) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	// stop all mappers routine
-	for _, v := range m.mappers {
-		v.Close()
-	}
-
-	// clear mapper slice
-	m.mappers = nil
-
+	m.mappers.Close()
+	err = m.workers.done()
 	return
 }
 
@@ -88,43 +57,29 @@ func (m *_mappers) done() (err error) {
 // - tasks: input channel
 // returns:
 // ...
-func newMappers(tasks <-chan meta.Task, receipts chan<- broker.Receipt) *_mappers {
+func newMappers() *_mappers {
 	return &_mappers{
-		workers:  newWorkers(),
-		mappers:  make([]*mapper, 0, 10),
-		tasks:    tasks,
-		receipts: receipts,
+		workers: newWorkers(),
+		mappers: common.NewRoutines(),
 	}
-}
-
-//
-// record of mapper
-//
-
-type mapper struct {
-	common.RtControl
 }
 
 //
 // mapper routine
 //
 
-func (m *_mappers) _mapper_routine_(quit <-chan int, done chan<- int, tasks <-chan meta.Task) {
+func (m *_mappers) _mapper_routine_(quit <-chan int, wait *sync.WaitGroup, tasks <-chan meta.Task, receipts chan<- broker.Receipt) {
+	defer wait.Done()
 	for {
 		select {
 		case t, ok := <-tasks:
 			if !ok {
 				// TODO: channel is closed
+				goto cleanup
 			}
+
 			// find registered worker
-			var err error
-
-			func() {
-				m.lock.RLock()
-				defer m.lock.RUnlock()
-
-				err = m.workers.dispatch(t)
-			}()
+			err := m.workers.dispatch(t)
 
 			// compose a receipt
 			var rpt broker.Receipt
@@ -144,12 +99,14 @@ func (m *_mappers) _mapper_routine_(quit <-chan int, done chan<- int, tasks <-ch
 					Status: broker.Status.OK,
 				}
 			}
-			m.receipts <- rpt
+			receipts <- rpt
 
 		case <-quit:
 			// clean up code below
-			done <- 1
-			return
+			goto cleanup
 		}
 	}
+cleanup:
+	close(receipts)
+	return
 }

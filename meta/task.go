@@ -33,7 +33,18 @@ func (t *_task) GetName() string        { return t.Name }
 func (t *_task) GetId() string          { return t.Id }
 func (t *_task) GetArgs() []interface{} { return t.Args }
 func (t *_task) ComposeReport(s int, r []interface{}, err Err) (Report, error) {
-	err_, _ := err.(*_error)
+	var err_ *_error
+	if err != nil {
+		switch v := err.(type) {
+		case error:
+			err_ = NewErr(0, v).(*_error)
+		case *_error:
+			err_ = v
+		default:
+			// TODO: what? log?
+			err_ = nil
+		}
+	}
 	return &_report{
 		Id:     t.Id,
 		Status: s,

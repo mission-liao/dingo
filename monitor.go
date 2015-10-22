@@ -23,8 +23,7 @@ type _fn struct {
 // container of monitor
 //
 type _monitors struct {
-	mntlock   sync.Mutex
-	monitors  []*monitor
+	monitors  *common.Routines
 	watchLock sync.RWMutex
 	watched   map[string]*_watch
 	reports   <-chan meta.Report
@@ -65,36 +64,16 @@ func (me *_monitors) register(m Matcher, fn interface{}) (err error) {
 // - remains: count of un-allocated monitors
 // - err: any error
 func (me *_monitors) more(count int) (remain int, err error) {
-	mts := make([]*monitor, 0, count)
 	remain = count
-
 	for ; remain > 0; remain-- {
-		mt := &monitor{
-			common.RtControl{
-				Quit: make(chan int, 1),
-				Done: make(chan int, 1),
-			},
-		}
-		mts = append(mts, mt)
-		go me._monitor_routine_(mt.Quit, mt.Done)
+		go me._monitor_routine_(me.monitors.New())
 	}
-
-	me.mntlock.Lock()
-	defer me.mntlock.Unlock()
-
-	me.monitors = append(me.monitors, mts...)
 	return
 }
 
 //
 func (me *_monitors) done() (err error) {
-	me.mntlock.Lock()
-	defer me.mntlock.Unlock()
-
-	// stop all monitors routine
-	for _, v := range me.monitors {
-		v.Close()
-	}
+	me.monitors.Close()
 
 	// TODO: close all output channels
 	return
@@ -129,14 +108,6 @@ func (me *_monitors) check(t meta.Task) (reports <-chan meta.Report, err error) 
 	return
 }
 
-//
-// record for a monitor
-//
-
-type monitor struct {
-	common.RtControl
-}
-
 // factory function
 //
 // paramters:
@@ -144,7 +115,7 @@ type monitor struct {
 func newMonitors(store backend.Store) (mnt *_monitors, err error) {
 	mnt = &_monitors{
 		store:    store,
-		monitors: make([]*monitor, 0, 10),
+		monitors: common.NewRoutines(),
 		watched:  make(map[string]*_watch),
 		fns:      make([]*_fn, 0, 10),
 		invoker:  meta.NewDefaultInvoker(),
@@ -155,12 +126,14 @@ func newMonitors(store backend.Store) (mnt *_monitors, err error) {
 
 // monitor routine
 //
-func (me *_monitors) _monitor_routine_(quit <-chan int, done chan<- int) {
+func (me *_monitors) _monitor_routine_(quit <-chan int, wait *sync.WaitGroup) {
+	defer wait.Done()
 	for {
 		select {
 		case report, ok := <-me.reports:
 			if !ok {
-				goto cleanup
+				// report channel is closed, stop this routine
+				return
 			}
 
 			// convert returns to right type
@@ -232,11 +205,7 @@ func (me *_monitors) _monitor_routine_(quit <-chan int, done chan<- int) {
 				}()
 			}
 		case _, _ = <-quit:
-			goto cleanup
+			return
 		}
 	}
-
-cleanup:
-	done <- 1
-	return
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/mission-liao/dingo/broker"
+	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/meta"
 	"github.com/stretchr/testify/suite"
 )
@@ -13,25 +14,31 @@ type DingoMapperTestSuite struct {
 
 	_mps            *_mappers
 	_invoker        meta.Invoker
-	_receipts       chan broker.Receipt
 	_tasks          chan meta.Task
 	_countOfMappers int
+	_receiptsMux    *common.Mux
 }
 
 func TestDingoMapperSuite(t *testing.T) {
 	suite.Run(t, &DingoMapperTestSuite{
-		_receipts:       make(chan broker.Receipt, 5),
 		_tasks:          make(chan meta.Task, 5),
 		_countOfMappers: 3,
 		_invoker:        meta.NewDefaultInvoker(),
+		_receiptsMux:    common.NewMux(),
 	})
 }
 
 func (me *DingoMapperTestSuite) SetupSuite() {
-	me._mps = newMappers(me._tasks, me._receipts)
+	me._mps = newMappers()
 
 	// allocate 3 mapper routines
-	remain, err := me._mps.more(me._countOfMappers)
+	for remain := me._countOfMappers; remain > 0; remain-- {
+		receipts := make(chan broker.Receipt, 10)
+		me._mps.more(me._tasks, receipts)
+		_, err := me._receiptsMux.Register(receipts)
+		me.Nil(err)
+	}
+	remain, err := me._receiptsMux.More(3)
 	me.Equal(0, remain)
 	me.Nil(err)
 }
@@ -39,7 +46,7 @@ func (me *DingoMapperTestSuite) SetupSuite() {
 func (me *DingoMapperTestSuite) TearDownSuite() {
 	me.Nil(me._mps.done())
 	close(me._tasks)
-	close(me._receipts)
+	me._receiptsMux.Close()
 }
 
 //
@@ -53,7 +60,7 @@ func (me *DingoMapperTestSuite) TestParellelMapping() {
 	// the bottleneck of mapper are:
 	// - length of receipt channel
 	// - count of mapper routines
-	count := me._countOfMappers + cap(me._receipts)
+	count := me._countOfMappers + cap(me._tasks)
 	stepIn := make(chan int, count)
 	stepOut := make(chan int, count)
 	me._mps.allocateWorkers(&StrMatcher{"test"}, func(i int) {
@@ -76,9 +83,8 @@ func (me *DingoMapperTestSuite) TestParellelMapping() {
 	// this line
 	rets := []int{}
 	for i := 0; i < count; i++ {
-
 		// consume 1 receipts
-		<-me._receipts
+		<-me._receiptsMux.Out()
 
 		// consume 2 report
 		<-me._mps.reports()

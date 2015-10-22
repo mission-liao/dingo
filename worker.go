@@ -53,7 +53,7 @@ func (me *StrMatcher) Match(patt string) bool {
 type worker struct {
 	matcher Matcher
 	tasks   chan meta.Task
-	ctrls   []*common.RtControl
+	rs      *common.Routines
 	fn      interface{}
 }
 
@@ -112,13 +112,10 @@ func (me *_workers) allocate(m Matcher, fn interface{}, count int) (id string, r
 		}
 
 		// initiate controlling channle
-		ctrls := make([]*common.RtControl, 0, count)
-		tasks := make(chan meta.Task, 10) // TODO: configuration?
-
 		me.workers[id] = &worker{
 			matcher: m,
-			tasks:   tasks,
-			ctrls:   ctrls,
+			tasks:   make(chan meta.Task, 10), // TODO: configuration?
+			rs:      common.NewRoutines(),
 			fn:      fn,
 		}
 	}()
@@ -164,10 +161,8 @@ func (me *_workers) more(id string, count int) (remain int, err error) {
 
 	// initiating workers
 	for ; remain > 0; remain-- {
-		c := common.NewRtCtrl()
-		w.ctrls = append(w.ctrls, c)
-
-		go _worker_routine_(c.Quit, c.Done, w.tasks, me.reports, w.fn)
+		quit, wait := w.rs.New()
+		go _worker_routine_(quit, wait, w.tasks, me.reports, w.fn)
 	}
 
 	return
@@ -225,13 +220,8 @@ func (me *_workers) done() (err error) {
 
 	// stop all workers routine
 	for _, v := range me.workers {
-		for _, wk := range v.ctrls {
-			wk.Close()
-		}
+		v.rs.Close()
 	}
-
-	// clear worker map
-	me.workers = nil
 
 	// unbind reports channel
 	close(me.reports)
@@ -255,7 +245,8 @@ func newWorkers() *_workers {
 // worker routine
 //
 
-func _worker_routine_(quit <-chan int, done chan<- int, tasks <-chan meta.Task, reports chan<- meta.Report, fn interface{}) {
+func _worker_routine_(quit <-chan int, wait *sync.WaitGroup, tasks <-chan meta.Task, reports chan<- meta.Report, fn interface{}) {
+	defer wait.Done()
 	// TODO: concider a shared, common invoker instance?
 	ivk := meta.NewDefaultInvoker()
 
@@ -265,7 +256,9 @@ func _worker_routine_(quit <-chan int, done chan<- int, tasks <-chan meta.Task, 
 			_ = "breakpoint"
 			if !ok {
 				// TODO: when channel is closed
+				goto cleanup
 			}
+
 			var (
 				r         meta.Report
 				ret       []interface{}
@@ -303,8 +296,9 @@ func _worker_routine_(quit <-chan int, done chan<- int, tasks <-chan meta.Task, 
 
 		case _, _ = <-quit:
 			// nothing to clean
-			done <- 1
-			return
+			goto cleanup
 		}
 	}
+cleanup:
+	return
 }

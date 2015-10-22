@@ -84,7 +84,6 @@ type _app struct {
 	consumer broker.Consumer
 	store    backend.Store
 	reporter backend.Reporter
-	receipts chan broker.Receipt
 
 	// internal routines
 	mappers  *_mappers
@@ -95,10 +94,9 @@ type _app struct {
 //
 func NewApp(c Config) (app App, err error) {
 	app = &_app{
-		receipts: make(chan broker.Receipt, 10),
-		objs:     make(map[int]*_object),
-		invoker:  meta.NewDefaultInvoker(),
-		cfg:      c,
+		objs:    make(map[int]*_object),
+		invoker: meta.NewDefaultInvoker(),
+		cfg:     c,
 	}
 
 	return
@@ -124,10 +122,6 @@ func (me *_app) Close() (err error) {
 	// right now we would send a quit message to 'one' routine, and wait it done.
 
 	for _, v := range me.objs {
-		if v.used&InstT.CONSUMER == InstT.CONSUMER {
-			chk(me.consumer.Stop())
-		}
-
 		if v.used&InstT.REPORTER == InstT.REPORTER {
 			chk(me.reporter.Unbind())
 		}
@@ -150,7 +144,6 @@ func (me *_app) Close() (err error) {
 		me.monitors = nil
 	}
 
-	close(me.receipts)
 	return
 }
 
@@ -232,14 +225,7 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 	}
 
 	if consumer != nil && me.consumer == nil {
-		// TODO: handle errs channel
-		tasks, _, err_ := consumer.Consume(me.receipts)
-		if err_ != nil {
-			err = err_
-			return
-		}
-
-		mp := newMappers(tasks, me.receipts)
+		mp := newMappers()
 		if me.reporter != nil {
 			err = me.reporter.Report(mp.reports())
 			if err != nil {
@@ -247,15 +233,16 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 			}
 		}
 
-		remain, err_ := mp.more(me.cfg.Mappers_)
-		if err_ != nil {
-			err = err_
-			return
-		}
+		for remain := me.cfg.Mappers_; remain > 0; remain-- {
+			// TODO: handle errs channel
+			receipts := make(chan broker.Receipt, 10)
+			tasks, _, err_ := consumer.AddListener(receipts)
+			if err_ != nil {
+				err = err_
+				return
+			}
 
-		if remain > 0 {
-			err = errors.New(fmt.Sprintf("Unable to allocate mappers %v", remain))
-			return
+			mp.more(tasks, receipts)
 		}
 		me.mappers = mp
 		me.consumer = consumer
