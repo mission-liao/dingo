@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/meta"
 	"github.com/stretchr/testify/assert"
 )
@@ -30,7 +31,7 @@ func TestLocalSend(t *testing.T) {
 		rpt := make(chan Receipt, 10)
 
 		// prepare consumer
-		tasks, errs, err := receiver.Consume(rpt)
+		tasks, errs, err := receiver.AddListener(rpt)
 		ass.Nil(err)
 
 		// wait for 1 seconds,
@@ -72,8 +73,7 @@ func TestLocalSend(t *testing.T) {
 		}
 
 		// done
-		err = receiver.Stop()
-		ass.Nil(err)
+		ass.Nil(receiver.(common.Server).Close())
 	}
 }
 
@@ -88,7 +88,7 @@ func TestLocalConsumeReceipt(t *testing.T) {
 	v, err := New("local", cfg)
 	ass.Nil(err)
 	sender, receiver := v.(Producer), v.(Consumer)
-	tasks, errs, err := receiver.Consume(rpt)
+	tasks, errs, err := receiver.AddListener(rpt)
 	ass.Nil(err)
 
 	// wait for 1 seconds,
@@ -131,6 +131,5 @@ func TestLocalConsumeReceipt(t *testing.T) {
 	}
 
 	// done
-	err = receiver.Stop()
-	ass.Nil(err)
+	ass.Nil(receiver.(common.Server).Close())
 }

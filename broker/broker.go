@@ -19,16 +19,15 @@ type Producer interface {
 
 //
 type Consumer interface {
-
-	// receive task from brokers
+	// create a new consumer to receive tasks
 	//
+	// parameters:
+	// - rcpt: a channel that 'dingo' would send 'Receipt' for tasks from 'tasks'.
+	// returns:
 	// - tasks: 'dingo' would consume from this channel for new tasks
 	// - errs: 'dingo' would consume from this channel for error messages
 	// - err: any error during initialization
-	Consume(rcpt <-chan Receipt) (tasks <-chan meta.Task, errs <-chan error, err error)
-
-	//
-	Stop() (err error)
+	AddListener(rcpt <-chan Receipt) (tasks <-chan meta.Task, errs <-chan error, err error)
 }
 
 var Status = struct {
@@ -48,7 +47,9 @@ type Receipt struct {
 func New(name string, cfg *Config) (b Broker, err error) {
 	switch name {
 	case "local":
-		b = newLocal(cfg)
+		b, err = newLocal(cfg)
+	case "amqp":
+		b, err = newAmqp(cfg)
 	}
 
 	return
