@@ -28,6 +28,9 @@ type Consumer interface {
 	// - errs: 'dingo' would consume from this channel for error messages
 	// - err: any error during initialization
 	AddListener(rcpt <-chan Receipt) (tasks <-chan meta.Task, errs <-chan error, err error)
+
+	//
+	Stop() (err error)
 }
 
 var Status = struct {

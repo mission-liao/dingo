@@ -212,3 +212,14 @@ func (me *_local) AddListener(rcpt <-chan Receipt) (tasks <-chan meta.Task, errs
 	tasks, errs = me.tasks, me.errs
 	return
 }
+
+func (me *_local) Stop() (err error) {
+	// reset tasks, errs
+	me.tasks = make(chan meta.Task, 10)
+	me.errs = make(chan error, 10)
+
+	// reset receipts
+	me.muxReceipt.Close()
+	me.muxReceipt = common.NewMux()
+	return
+}

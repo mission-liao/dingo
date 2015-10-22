@@ -5,140 +5,197 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	// open source
+	"github.com/mission-liao/dingo/common"
+	"github.com/mission-liao/dingo/meta"
 	"github.com/streadway/amqp"
-
-	// internal
-	"../internal/share"
-	"../task"
 )
 
-type _control struct {
-	quit chan<- int
-	done <-chan int
+//
+// configuration
+//
+
+type _amqpConfig struct {
+	_host     string `json:"Host"`
+	_port     int    `json:"Port"`
+	_user     string `json:"User"`
+	_password string `json:"Password"`
 }
+
+//
+// setter
+//
+
+func (me *_amqpConfig) Host(host string) *_amqpConfig {
+	me._host = host
+	return me
+}
+
+func (me *_amqpConfig) Port(port int) *_amqpConfig {
+	me._port = port
+	return me
+}
+
+func (me *_amqpConfig) User(user string) *_amqpConfig {
+	me._user = user
+	return me
+}
+
+func (me *_amqpConfig) Password(password string) *_amqpConfig {
+	me._password = password
+	return me
+}
+
+//
+// getter
+//
+
+func (me *_amqpConfig) Connection() string {
+	return fmt.Sprintf("amqp://%v:%v@%v:%d/", me._user, me._password, me._host, me._port)
+}
+
+func defaultAmqpConfig() *_amqpConfig {
+	return &_amqpConfig{
+		_host:     "localhost",
+		_port:     5672,
+		_user:     "guest",
+		_password: "guest",
+	}
+}
+
+//
+// consumer
+//
+
+//
+// major component
+//
 
 type _amqp struct {
-	sender, receiver share.Server
+	sender, receiver *common.AmqpConnection
 	consumerTags     chan int
-	controls         map[string]*_control
+	consumers        *common.Routines
 }
 
-//
-// internal/share.Server interface
-//
+func newAmqp(cfg *Config) (v *_amqp, err error) {
+	v = &_amqp{
+		sender:    &common.AmqpConnection{},
+		receiver:  &common.AmqpConnection{},
+		consumers: common.NewRoutines(),
+	}
 
-func (me *_amqp) Init() (err error) {
-	// init sender, channels are ready after this step
-	me.sender = &share.AmqpConn{}
-	err = me.sender.Init()
+	conn := cfg.AMQP_().Connection()
+	err = v.sender.Init(conn)
 	if err != nil {
 		return
 	}
 
-	// init receiver, channels are ready after this step
-	me.receiver = &share.AmqpConn{}
-	err = me.receiver.Init()
+	err = v.receiver.Init(conn)
+	if err != nil {
+		return
+	}
 
+	err = v.init()
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (me *_amqp) init() (err error) {
 	// define relation between queue and exchange
-	{
-		// get a free channel,
-		// either sender/receiver's channel would works
-		var ci *share.AmqpChannel
-		select {
-		case ci <- me.sender.Channels:
-			break
-		default:
-			err = errors.New("No channel available")
-			return
-		}
 
-		defer func() {
-			// remember to return channel to pool
-			me.sender.Channels <- ci
-		}()
+	// get a free channel,
+	// either sender/receiver's channel would works
+	ci, err := me.sender.Channel()
+	if err != nil {
+		return
+	}
 
-		// init exchange
-		err = ci.Channel.ExchangeDeclare(
-			"dingo.x.task", // name of exchange
-			"direct",       // kind
-			true,           // durable
-			false,          // auto-delete
-			false,          // internal
-			false,          // noWait
-			nil,            // args
-		)
-		if err != nil {
-			return
-		}
+	// remember to return channel to pool
+	defer me.sender.ReleaseChannel(ci)
 
-		// init queue
-		err = ci.Channel.QueueDeclare(
-			"dingo.q.task", // name of queue
-			true,           // durable
-			false,          // auto-delete
-			false,          // exclusive
-			false,          // noWait
-			nil,            // args
-		)
-		if err != nil {
-			return
-		}
+	// init exchange
+	err = ci.Channel.ExchangeDeclare(
+		"dingo.x.task", // name of exchange
+		"direct",       // kind
+		true,           // durable
+		false,          // auto-delete
+		false,          // internal
+		false,          // noWait
+		nil,            // args
+	)
+	if err != nil {
+		return
+	}
 
-		// bind queue to exchange
-		// TODO: configurable name?
-		err = ci.Channel.QueueBind(
-			"dingo.q.task",
-			"",
-			"dingo.x.task",
-			false, // noWait
-			nil,   // args
-		)
+	// init queue
+	_, err = ci.Channel.QueueDeclare(
+		"dingo.q.task", // name of queue
+		true,           // durable
+		false,          // auto-delete
+		false,          // exclusive
+		false,          // noWait
+		nil,            // args
+	)
+	if err != nil {
+		return
+	}
 
-		// init qos
-		err = ci.Channel.Qos(3, 0, true)
-		if err != nil {
-			return
-		}
+	// bind queue to exchange
+	// TODO: configurable name?
+	err = ci.Channel.QueueBind(
+		"dingo.q.task",
+		"",
+		"dingo.x.task",
+		false, // noWait
+		nil,   // args
+	)
+	if err != nil {
+		return
+	}
+
+	// init qos
+	err = ci.Channel.Qos(3, 0, true)
+	if err != nil {
+		return
 	}
 
 	// TODO: get number from MaxChannel
-	consumerTags = make(chan int, 200)
+	me.consumerTags = make(chan int, 200)
 	for i := 0; i < 200; i++ {
-		consumerTags <- i
+		me.consumerTags <- i
 	}
-
-	me.controls = make(map[string]*_control)
 
 	return
 }
 
+//
+// common.Server interface
+//
+
 func (me *_amqp) Close() (err error) {
+	me.consumers.Close()
+
 	err = me.sender.Close()
-	err_ = me.receiver.Close()
+	err_ := me.receiver.Close()
 	if err == nil && err_ != nil {
+		// error from sender is propagated first
 		err = err_
 	}
 
-	// stop all running 'Receive' go routine
-	for _, v := range me.controls {
-		v.quit <- 1
-		<-v.done
-
-		close(v.quit)
-		close(v.done)
-	}
-
 	return
 }
 
 //
-// Sender interface
+// Producer interface
 //
 
-func (me *_amqp) Send(t task.Task) (err error) {
+func (me *_amqp) Send(t meta.Task) (err error) {
 	// marshaling to json
 	body, err := json.Marshal(t)
 	if err != nil {
@@ -146,10 +203,14 @@ func (me *_amqp) Send(t task.Task) (err error) {
 	}
 
 	// acquire a channel
-	ci := <-me.sender.Channels
-	defer func(ci *share.AmqpChannel) {
+	ci, err := me.sender.Channel()
+	if err != nil {
+		return
+	}
+
+	defer func(ci *common.AmqpChannel) {
 		// release it when leaving this function
-		me.sender.Channels <- ci
+		me.sender.ReleaseChannel(ci)
 	}(ci)
 
 	err = ci.Channel.Publish(
@@ -173,7 +234,9 @@ func (me *_amqp) Send(t task.Task) (err error) {
 		if !cf.Ack {
 			err = errors.New("Unable to publish to server")
 		}
-	case time.After(10 * time.Second):
+	case <-time.After(10 * time.Second):
+		// TODO: configuration
+		// TODO: add retry
 		// time out
 		err = errors.New("Server didn't reply 'Cancel' event in 10 seconds")
 	}
@@ -182,117 +245,121 @@ func (me *_amqp) Send(t task.Task) (err error) {
 }
 
 //
-// Receiver interface
+// Consumer interface
 //
 
-func (me *_amqp) NewReceiver(tasks chan<- taskInfo, errs chan<- errInfo) (string, error) {
+func (me *_amqp) AddListener(receipts <-chan Receipt) (<-chan meta.Task, <-chan error, error) {
+	tasks := make(chan meta.Task, 10)
+	errs := make(chan error, 10)
+	quit, wait := me.consumers.New()
+	go me._consumer_routine_(quit, wait, tasks, errs, receipts)
+
+	return tasks, errs, nil
+}
+
+func (me *_amqp) Stop() (err error) {
+	me.consumers.Close()
+	return
+}
+
+//
+// routine definitions
+//
+
+func (me *_amqp) _consumer_routine_(
+	quit <-chan int,
+	wait *sync.WaitGroup,
+	tasks chan<- meta.Task,
+	errs chan<- error,
+	receipts <-chan Receipt,
+) {
+	defer wait.Done()
+
 	// acquire an tag
 	id := <-me.consumerTags
 	tag := fmt.Sprintf("dingo.consumer.%d", id)
 
-	// init channels for control
-	ctrl := _control{
-		done: make(chan int, 1),
-		quit: make(chan int, 1),
+	// return id
+	defer func(id int) {
+		me.consumerTags <- id
+	}(id)
+
+	// acquire a channel
+	ci, err := me.receiver.Channel()
+	if err != nil {
+		errs <- err
+		return
 	}
-	me.controls[tag] = &ctrl
+	defer me.receiver.ReleaseChannel(ci)
 
-	go func(quit chan<- int, done <-chan int) {
-		// return id
-		defer func(id int) {
-			me.consumerTags <- id
-		}(id)
+	dv, err := ci.Channel.Consume(
+		"dingo.q.task",
+		tag,   // consumer Tag
+		false, // autoAck
+		false, // exclusive
+		false, // noLocal
+		false, // noWait
+		nil,   // args
+	)
+	if err != nil {
+		errs <- err
+		return
+	}
 
-		// acquire a channel
-		ci := <-me.receiver.Channels
-		defer func(c *share.AmqpChannel) {
-			// release it when leaving this function
-			me.receiver.Channels <- c
-		}(ci)
-
-		dv, err := ci.Channel.Consume(
-			"dingo.q.task",
-			tag,   // consumer Tag
-			false, // autoAck
-			false, // exclusive
-			false, // noLocal
-			false, // noWait
-			nil,   // args
-		)
-
-		if err != nil {
-			errs <- errInfo{
-				err: err,
-				Id:  tag,
+	for {
+		select {
+		case d, _ := <-dv:
+			t, err_ := meta.UnmarshalTask(d.Body)
+			if err_ != nil {
+				// an invalid task
+				d.Nack(false, false)
+				errs <- err_
+				break
 			}
-			return
-		}
 
-		for {
-			select {
-			case d := <-dv:
-				t, err := task.UnmarshalTask(d.Body)
-				if err {
-					// an invalid task
-					d.Nack(false)
-
-					errs <- errInfo{
-						err: err,
-						Id:  tag,
-					}
+			tasks <- t
+			reply, ok := <-receipts
+			if ok {
+				if reply.Status == Status.WORKER_NOT_FOUND {
+					d.Nack(false, false)
 				} else {
-					done := make(chan Receipt, 1) // never blocking
-					tasks <- taskInfo{
-						T:    t,
-						Done: done,
-					}
-
-					// raise a go routine for Ack
-					go func(d *amqp.Delivery, done chan Receipt) {
-						reply := <-done
-						close(done)
-
-						if reply.Status == Status.WORKER_NOT_FOUND {
-							d.Nack(false)
-						} else {
-							d.Ack(false)
-						}
-					}(&d, done)
+					d.Ack(false)
 				}
-			case <-quit:
-				err := ci.Channel.Cancel(tag, false)
-				if err != nil {
-					errs <- errInfo{
-						err: err,
-						Id:  tag,
-					}
-					// do not return here,
-					// we need to clean the delivery channel
-				}
-
-				// wait for reply from server for cancel event
-				select {
-				case name := <-ci.Cancel:
-					break
-				case <-time.After(10 * time.Second): // TODO: configuration
-					errs <- errors.New("Server didn't reply 'Cancel' event in 10 seconds")
-				}
-
-				// conuming remaining deliveries,
-				// and don't ack them. (make them requeue in amqp)
-				for cleared := false; cleared == false; {
-					select {
-					case <-d:
-						break
-					default:
-						cleared = true
-					}
-				}
-
-				finished <- 1
+			} else {
+				goto cleanup
 			}
+		case <-quit:
+			goto cleanup
 		}
-	}(ctrl.quit, ctrl.done)
+	}
 
-	return tag, nil
+cleanup:
+	err_ := ci.Channel.Cancel(tag, false)
+	if err_ != nil {
+		errs <- err_
+		// should we return here?,
+		// we still need to clean the delivery channel...
+	}
+
+	// conuming remaining deliveries,
+	// and don't ack them. (make them requeue in amqp)
+	for cleared := false; cleared == false; {
+		select {
+		case d, ok := <-dv:
+			if !ok {
+				cleared = true
+				break
+			}
+			// requeue
+			d.Nack(false, true)
+		default:
+			cleared = true
+		}
+	}
+
+	// close output channel
+	close(tasks)
+	close(errs)
+
+	return
 }

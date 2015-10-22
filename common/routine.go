@@ -39,6 +39,6 @@ func (me *Routines) Close() {
 		v <- 1
 		close(v)
 	}
-	me.quits = make([]chan int, 1)
+	me.quits = make([]chan int, 0, 10)
 	me.wg.Wait()
 }

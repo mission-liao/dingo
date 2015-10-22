@@ -253,7 +253,6 @@ func _worker_routine_(quit <-chan int, wait *sync.WaitGroup, tasks <-chan meta.T
 	for {
 		select {
 		case t, ok := <-tasks:
-			_ = "breakpoint"
 			if !ok {
 				// TODO: when channel is closed
 				goto cleanup

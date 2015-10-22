@@ -30,12 +30,12 @@ type AmqpConnection struct {
 // internal/share.Server interface
 //
 
-func (me *AmqpConnection) Init() (err error) {
+func (me *AmqpConnection) Init(conn string) (err error) {
 	me.maxChannel = 1024 // TODO: configurable
 	me.cntChannels = 0
 
 	// connect to AMQP
-	me.conn, err = amqp.Dial("amqp://guest:guest@localhost:5672/")
+	me.conn, err = amqp.Dial(conn)
 	if err != nil {
 		return
 	}
@@ -69,9 +69,6 @@ func (me *AmqpConnection) Close() error {
 			if err == nil {
 				err = err_
 			}
-
-			// release chan
-			close(ci.Confirm)
 		}
 	}
 
