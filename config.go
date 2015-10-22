@@ -33,7 +33,7 @@ func Default() *Config {
 	return &Config{
 		Broker_:   broker.Default(),
 		Backend_:  backend.Default(),
-		Mappers_:  1,
-		Monitors_: 1,
+		Mappers_:  3,
+		Monitors_: 3,
 	}
 }
