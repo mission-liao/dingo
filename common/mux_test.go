@@ -10,11 +10,13 @@ import (
 // test case
 //
 
-func TestDifferentType(t *testing.T) {
+func TestMuxDifferentType(t *testing.T) {
 	ass := assert.New(t)
 
-	m := &Mux{}
-	m.Init()
+	m := NewMux()
+	remain, err := m.More(3)
+	ass.Equal(0, remain)
+	ass.Nil(err)
 	defer m.Close()
 
 	// prepare for string channel
@@ -60,11 +62,13 @@ func TestDifferentType(t *testing.T) {
 	close(cInt)
 }
 
-func TestChannelClose(t *testing.T) {
+func TestMuxChannelClose(t *testing.T) {
 	ass := assert.New(t)
 
-	m := &Mux{}
-	m.Init()
+	m := NewMux()
+	remain, err := m.More(3)
+	ass.Equal(0, remain)
+	ass.Nil(err)
 	defer m.Close()
 
 	ch := make(chan string, 2)
@@ -100,11 +104,13 @@ func TestChannelClose(t *testing.T) {
 	}
 }
 
-func TestOutputClose(t *testing.T) {
+func TestMuxOutputClose(t *testing.T) {
 	ass := assert.New(t)
 
-	m := &Mux{}
-	m.Init()
+	m := NewMux()
+	remain, err := m.More(3)
+	ass.Equal(0, remain)
+	ass.Nil(err)
 
 	ch := make(chan int, 1)
 	id, err := m.Register(ch)

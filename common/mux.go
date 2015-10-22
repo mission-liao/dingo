@@ -41,12 +41,12 @@ type MuxOut struct {
 }
 
 type Mux struct {
-	ctrl *RtControl
+	rs *Routines
 
 	// check for new condition
-	rw               sync.RWMutex
-	cases            map[int]interface{}
-	updated, touched time.Time
+	rw      sync.RWMutex
+	cases   map[int]interface{}
+	touched time.Time
 
 	// modifier
 	lck      sync.Mutex
@@ -56,131 +56,27 @@ type Mux struct {
 	_out chan *MuxOut
 }
 
+func NewMux() (m *Mux) {
+	return &Mux{
+		rs:      NewRoutines(),
+		cases:   make(map[int]interface{}),
+		touched: time.Now(),
+		_out:    make(chan *MuxOut, 10),
+	}
+}
+
 //
-func (m *Mux) Init() {
-	m.cases = make(map[int]interface{})
-	m.ctrl = NewRtCtrl()
-
-	func() {
-		m.lck.Lock()
-		defer m.lck.Unlock()
-
-		m.cases[0] = m.ctrl.Quit
-		m.touched = time.Now()
-	}()
-
-	m._out = make(chan *MuxOut, 10)
-
-	// mux routine
-	go func() {
-		var cond []reflect.SelectCase
-		var keys []int
-		for {
-			// check for new arrival
-			if m.updated.Before(m.touched) {
-				func() {
-					// writer lock
-					m.rw.Lock()
-					defer m.rw.Unlock()
-
-					// locking
-					m.lck.Lock()
-					defer m.lck.Unlock()
-
-					// remove / append based on _2add, _2delete
-					for _, v := range m._2add {
-						m.cases[v.id] = v.v
-					}
-					m._2add = make([]*_newChannel, 0, 10)
-
-					for _, v := range m._2delete {
-						delete(m.cases, v)
-					}
-					m._2delete = make([]int, 0, 10)
-
-					// update timestamp
-					m.updated = time.Now()
-				}()
-
-				func() {
-					// reader lock
-					m.rw.RLock()
-					defer m.rw.RUnlock()
-
-					// re-init sorted key slice
-					keys = make([]int, 0, 10)
-					for k := range m.cases {
-						keys = append(keys, k)
-					}
-					sort.Ints(keys)
-
-					// re-init a new condition slice
-					cond = make([]reflect.SelectCase, 0, 10)
-					for _, k := range keys {
-						cond = append(cond, reflect.SelectCase{
-							Dir:  reflect.SelectRecv,
-							Chan: reflect.ValueOf(m.cases[k]),
-						})
-					}
-				}()
-			}
-
-			// add a time.After channel
-			// TODO: configuration for timeout
-			cond = append(cond, reflect.SelectCase{
-				Dir:  reflect.SelectRecv,
-				Chan: reflect.ValueOf(time.After(1 * time.Second)),
-			})
-
-			// select...
-			chosen, value, ok := reflect.Select(cond)
-			cond = cond[:len(cond)-1] // pop the last timer event
-			switch chosen {
-			case 0:
-				// quit channel is triggered,
-				// need to clean-up && quit.
-				m.ctrl.Done <- 1
-				return
-			case len(m.cases):
-				// time-out event is triggered,
-				// go for another round of for loop.
-				continue
-			default:
-				if !ok {
-					// that input channel is closed,
-					// remove it
-					func() {
-						m.lck.Lock()
-						defer m.lck.Unlock()
-
-						m._2delete = append(m._2delete, keys[chosen])
-						m.touched = time.Now()
-					}()
-
-					// its value is not trustable,
-					// so go for another round of for loop.
-					continue
-				} else {
-					// send to output channel
-					if value.CanInterface() {
-						m._out <- &MuxOut{
-							Id:    keys[chosen],
-							Value: value.Interface(),
-						}
-					}
-				}
-			}
-		}
-	}()
+func (m *Mux) More(count int) (remain int, err error) {
+	remain = count
+	for ; remain > 0; remain-- {
+		go m._mux_routine_(m.rs.New())
+	}
+	return
 }
 
 //
 func (m *Mux) Close() {
-	// routine control
-	if m.ctrl != nil {
-		m.ctrl.Close()
-		m.ctrl = nil
-	}
+	m.rs.Done()
 
 	if m._out != nil {
 		close(m._out)
@@ -285,6 +181,123 @@ func (m *Mux) Unregister(id int) (ch interface{}, err error) {
 //
 func (m *Mux) Out() <-chan *MuxOut {
 	return m._out
+}
+
+func (m *Mux) _mux_routine_(quit <-chan int, wait *sync.WaitGroup) {
+	defer wait.Done()
+	var (
+		cond       []reflect.SelectCase
+		keys       []int
+		updated    time.Time
+		lenOfcases int
+	)
+	for {
+		// check for new arrival
+		if updated.Before(m.touched) {
+			func() {
+				// writer lock
+				m.rw.Lock()
+				defer m.rw.Unlock()
+
+				// locking
+				m.lck.Lock()
+				defer m.lck.Unlock()
+
+				// remove / append based on _2add, _2delete
+				for _, v := range m._2add {
+					m.cases[v.id] = v.v
+				}
+				m._2add = make([]*_newChannel, 0, 10)
+
+				for _, v := range m._2delete {
+					delete(m.cases, v)
+				}
+				m._2delete = make([]int, 0, 10)
+
+				// update timestamp
+				updated = time.Now()
+			}()
+
+			func() {
+				// reader lock
+				m.rw.RLock()
+				defer m.rw.RUnlock()
+
+				// re-init sorted key slice
+				keys = make([]int, 0, 10)
+				for k := range m.cases {
+					keys = append(keys, k)
+				}
+				sort.Ints(keys)
+
+				// re-init a new condition slice
+				cond = make([]reflect.SelectCase, 0, 10)
+				for _, k := range keys {
+					cond = append(cond, reflect.SelectCase{
+						Dir:  reflect.SelectRecv,
+						Chan: reflect.ValueOf(m.cases[k]),
+					})
+				}
+			}()
+
+			// add quit channel
+			cond = append(cond, reflect.SelectCase{
+				Dir:  reflect.SelectRecv,
+				Chan: reflect.ValueOf(quit),
+			})
+			lenOfcases = len(m.cases)
+		}
+
+		// add time.After channel
+		// TODO: configuration for timeout
+		cond = append(cond, reflect.SelectCase{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(time.After(1 * time.Second)),
+		})
+
+		// select...
+		chosen, value, ok := reflect.Select(cond)
+		cond = cond[:len(cond)-1] // pop the last timer event
+		switch chosen {
+		case lenOfcases:
+			// quit channel is triggered,
+			// need to clean-up && quit.
+			return
+		case lenOfcases + 1:
+			// time-out event is triggered,
+			// go for another round of for loop.
+			continue
+		default:
+			if !ok {
+				// that input channel is closed,
+				// remove it
+				func() {
+					m.lck.Lock()
+					defer m.lck.Unlock()
+
+					m._2delete = append(m._2delete, keys[chosen])
+					m.touched = time.Now()
+				}()
+
+				// its value is not trustable,
+				// so go for another round of for loop.
+				continue
+			}
+
+			if 0 > chosen || chosen > lenOfcases+2 {
+				// TODO: log error
+				return
+			}
+
+			// send to output channel
+			if value.CanInterface() {
+				m._out <- &MuxOut{
+					Id:    keys[chosen],
+					Value: value.Interface(),
+				}
+			}
+		}
+	}
 }
 
 func init() {
