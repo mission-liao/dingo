@@ -56,15 +56,11 @@ func newAmqp(cfg *Config) (v *_amqp, err error) {
 		reports:   make(chan meta.Report, 10), // TODO: config
 		monitors:  common.NewHetroRoutines(),
 	}
-	err = v.Init()
+	err = v.init()
 	return
 }
 
-//
-// internal/common.Server interface
-//
-
-func (me *_amqp) Init() (err error) {
+func (me *_amqp) init() (err error) {
 	// call parent's Init
 	err = me.AmqpConnection.Init(me.cfg.AMQP_().Connection())
 	if err != nil {
@@ -92,6 +88,20 @@ func (me *_amqp) Init() (err error) {
 		return
 	}
 
+	return
+}
+
+//
+// common.Server interface
+//
+
+func (me *_amqp) Close() (err error) {
+	err = me.AmqpConnection.Close()
+	err_ := me.Unbind()
+	if err == nil {
+		err = err_
+	}
+	me.monitors.Close()
 	return
 }
 
