@@ -14,55 +14,13 @@ import (
 	"github.com/streadway/amqp"
 )
 
-//
-// configuration
-//
-
 type _amqpConfig struct {
-	_host     string `json:"Host"`
-	_port     int    `json:"Port"`
-	_user     string `json:"User"`
-	_password string `json:"Password"`
-}
-
-//
-// setter
-//
-
-func (me *_amqpConfig) Host(host string) *_amqpConfig {
-	me._host = host
-	return me
-}
-
-func (me *_amqpConfig) Port(port int) *_amqpConfig {
-	me._port = port
-	return me
-}
-
-func (me *_amqpConfig) User(user string) *_amqpConfig {
-	me._user = user
-	return me
-}
-
-func (me *_amqpConfig) Password(password string) *_amqpConfig {
-	me._password = password
-	return me
-}
-
-//
-// getter
-//
-
-func (me *_amqpConfig) Connection() string {
-	return fmt.Sprintf("amqp://%v:%v@%v:%d/", me._user, me._password, me._host, me._port)
+	common.AmqpConfig
 }
 
 func defaultAmqpConfig() *_amqpConfig {
 	return &_amqpConfig{
-		_host:     "localhost",
-		_port:     5672,
-		_user:     "guest",
-		_password: "guest",
+		AmqpConfig: *common.DefaultAmqpConfig(),
 	}
 }
 

@@ -3,17 +3,78 @@ package common
 import (
 	// standard
 	"errors"
+	"fmt"
 	"sync"
 
 	// open source
 	"github.com/streadway/amqp"
 )
 
+//
+// configuration
+//
+
+type AmqpConfig struct {
+	_host     string `json:"Host"`
+	_port     int    `json:"Port"`
+	_user     string `json:"User"`
+	_password string `json:"Password"`
+}
+
+func DefaultAmqpConfig() *AmqpConfig {
+	return &AmqpConfig{
+		_host:     "localhost",
+		_port:     5672,
+		_user:     "guest",
+		_password: "guest",
+	}
+}
+
+//
+// setter
+//
+
+func (me *AmqpConfig) Host(host string) *AmqpConfig {
+	me._host = host
+	return me
+}
+
+func (me *AmqpConfig) Port(port int) *AmqpConfig {
+	me._port = port
+	return me
+}
+
+func (me *AmqpConfig) User(user string) *AmqpConfig {
+	me._user = user
+	return me
+}
+
+func (me *AmqpConfig) Password(password string) *AmqpConfig {
+	me._password = password
+	return me
+}
+
+//
+// getter
+//
+
+func (me *AmqpConfig) Connection() string {
+	return fmt.Sprintf("amqp://%v:%v@%v:%d/", me._user, me._password, me._host, me._port)
+}
+
+//
+// wrapper of amqp.Channel
+//
+
 type AmqpChannel struct {
 	Channel *amqp.Channel
 	Confirm chan amqp.Confirmation
 	Cancel  chan string
 }
+
+//
+// wrapper of amqp.Connection
+//
 
 type AmqpConnection struct {
 	conn *amqp.Connection
@@ -27,7 +88,7 @@ type AmqpConnection struct {
 }
 
 //
-// internal/share.Server interface
+// common.Server interface
 //
 
 func (me *AmqpConnection) Init(conn string) (err error) {
