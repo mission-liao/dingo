@@ -1,23 +1,22 @@
 package broker
 
 type Config struct {
-	_consumers int           `json:"Consumers"`
-	_local     *_localConfig `json:"Local"`
-	_amqp      *_amqpConfig  `json:"AMQP"`
+	Consumers_ int `json:"Consumers"`
+	Local      *_localConfig
+	Amqp       *_amqpConfig
+	Redis      *_redisConfig
 }
 
 func (me *Config) Consumers(count int) *Config {
-	me._consumers = count
+	me.Consumers_ = count
 	return me
 }
 
-func (me *Config) Local_() *_localConfig { return me._local }
-func (me *Config) AMQP_() *_amqpConfig   { return me._amqp }
-
 func Default() *Config {
 	return &Config{
-		_consumers: 1,
-		_local:     defaultLocalConfig(),
-		_amqp:      defaultAmqpConfig(),
+		Consumers_: 1,
+		Local:      defaultLocalConfig(),
+		Amqp:       defaultAmqpConfig(),
+		Redis:      defaultRedisConfig(),
 	}
 }

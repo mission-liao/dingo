@@ -15,18 +15,18 @@ import (
 //
 
 type AmqpConfig struct {
-	_host     string `json:"Host"`
-	_port     int    `json:"Port"`
-	_user     string `json:"User"`
-	_password string `json:"Password"`
+	Host_     string `json:"Host"`
+	Port_     int    `json:"Port"`
+	User_     string `json:"User"`
+	Password_ string `json:"Password"`
 }
 
 func DefaultAmqpConfig() *AmqpConfig {
 	return &AmqpConfig{
-		_host:     "localhost",
-		_port:     5672,
-		_user:     "guest",
-		_password: "guest",
+		Host_:     "localhost",
+		Port_:     5672,
+		User_:     "guest",
+		Password_: "guest",
 	}
 }
 
@@ -35,22 +35,22 @@ func DefaultAmqpConfig() *AmqpConfig {
 //
 
 func (me *AmqpConfig) Host(host string) *AmqpConfig {
-	me._host = host
+	me.Host_ = host
 	return me
 }
 
 func (me *AmqpConfig) Port(port int) *AmqpConfig {
-	me._port = port
+	me.Port_ = port
 	return me
 }
 
 func (me *AmqpConfig) User(user string) *AmqpConfig {
-	me._user = user
+	me.User_ = user
 	return me
 }
 
 func (me *AmqpConfig) Password(password string) *AmqpConfig {
-	me._password = password
+	me.Password_ = password
 	return me
 }
 
@@ -59,7 +59,7 @@ func (me *AmqpConfig) Password(password string) *AmqpConfig {
 //
 
 func (me *AmqpConfig) Connection() string {
-	return fmt.Sprintf("amqp://%v:%v@%v:%d/", me._user, me._password, me._host, me._port)
+	return fmt.Sprintf("amqp://%v:%v@%v:%d/", me.User_, me.Password_, me.Host_, me.Port_)
 }
 
 //

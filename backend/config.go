@@ -2,16 +2,22 @@ package backend
 
 //
 type Config struct {
-	_local *_localConfig `json:"Local"`
-	_amqp  *_amqpConfig  `json:"AMQP"`
+	Local      *_localConfig
+	Amqp       *_amqpConfig
+	Redis      *_redisConfig
+	Reporters_ int `json:"Reporters"`
 }
-
-func (me *Config) Local_() *_localConfig { return me._local }
-func (me *Config) AMQP_() *_amqpConfig   { return me._amqp }
 
 func Default() *Config {
 	return &Config{
-		_local: defaultLocalConfig(),
-		_amqp:  defaultAmqpConfig(),
+		Local:      defaultLocalConfig(),
+		Amqp:       defaultAmqpConfig(),
+		Redis:      defaultRedisConfig(),
+		Reporters_: 3,
 	}
+}
+
+func (me *Config) Reporters(count int) *Config {
+	me.Reporters_ = count
+	return me
 }

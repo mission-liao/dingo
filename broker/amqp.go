@@ -25,10 +25,6 @@ func defaultAmqpConfig() *_amqpConfig {
 }
 
 //
-// consumer
-//
-
-//
 // major component
 //
 
@@ -45,7 +41,7 @@ func newAmqp(cfg *Config) (v *_amqp, err error) {
 		consumers: common.NewRoutines(),
 	}
 
-	conn := cfg.AMQP_().Connection()
+	conn := cfg.Amqp.Connection()
 	err = v.sender.Init(conn)
 	if err != nil {
 		return

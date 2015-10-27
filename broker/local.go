@@ -13,17 +13,17 @@ import (
 //
 
 type _localConfig struct {
-	_bypass bool `json:"Bypass"`
+	Bypass_ bool `json:"Bypass"`
 }
 
 func (me *_localConfig) Bypass(yes bool) *_localConfig {
-	me._bypass = yes
+	me.Bypass_ = yes
 	return me
 }
 
 func defaultLocalConfig() *_localConfig {
 	return &_localConfig{
-		_bypass: true,
+		Bypass_: true,
 	}
 }
 
@@ -58,7 +58,7 @@ func newLocal(cfg *Config) (v *_local, err error) {
 		noJSON: make(chan meta.Task, 10),
 		tasks:  make(chan meta.Task, 10),
 		errs:   make(chan error, 10),
-		bypass: cfg._local._bypass,
+		bypass: cfg.Local.Bypass_,
 
 		mnt:        common.NewRoutines(),
 		muxReceipt: common.NewMux(),

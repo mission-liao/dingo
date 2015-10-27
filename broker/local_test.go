@@ -18,11 +18,11 @@ func TestLocalSend(t *testing.T) {
 		err    error
 	)
 	cfg := Default()
-	cfg.Local_().Bypass(false)
+	cfg.Local.Bypass(false)
 	b1, err = New("local", cfg)
 	ass.Nil(err)
 
-	cfg.Local_().Bypass(true)
+	cfg.Local.Bypass(true)
 	b2, err = New("local", cfg)
 	ass.Nil(err)
 
@@ -83,7 +83,7 @@ func TestLocalConsumeReceipt(t *testing.T) {
 	rpt := make(chan Receipt, 10)
 
 	cfg := Default()
-	cfg.Local_().Bypass(false)
+	cfg.Local.Bypass(false)
 
 	v, err := New("local", cfg)
 	ass.Nil(err)

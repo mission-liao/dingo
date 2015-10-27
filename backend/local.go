@@ -15,17 +15,17 @@ import (
 //
 
 type _localConfig struct {
-	_bypass bool `json:"Bypass"`
+	Bypass_ bool `json:"Bypass"`
 }
 
 func (me *_localConfig) Bypass(yes bool) *_localConfig {
-	me._bypass = yes
+	me.Bypass_ = yes
 	return me
 }
 
 func defaultLocalConfig() *_localConfig {
 	return &_localConfig{
-		_bypass: true,
+		Bypass_: true,
 	}
 }
 

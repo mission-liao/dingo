@@ -16,7 +16,7 @@ func TestLocalReporter(t *testing.T) {
 	ass := assert.New(t)
 
 	cfg := Default()
-	cfg.Local_().Bypass(false)
+	cfg.Local.Bypass(false)
 
 	v, err := New("local", cfg)
 	reporter := v.(Reporter)
@@ -57,7 +57,7 @@ func (me *LocalStoreTestSuite) SetupSuite() {
 	me.Nil(err)
 
 	cfg := Default()
-	cfg.Local_().Bypass(false)
+	cfg.Local.Bypass(false)
 
 	me._inst, err = New("local", cfg)
 	me.Nil(err)

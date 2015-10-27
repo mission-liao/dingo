@@ -17,20 +17,12 @@ import (
 
 type _amqpConfig struct {
 	common.AmqpConfig
-
-	Reporters_ int `json:"Reporters"`
 }
 
 func defaultAmqpConfig() *_amqpConfig {
 	return &_amqpConfig{
 		AmqpConfig: *common.DefaultAmqpConfig(),
-		Reporters_: 3,
 	}
-}
-
-func (me *_amqpConfig) Reporters(count int) *_amqpConfig {
-	me.Reporters_ = count
-	return me
 }
 
 type _amqp struct {
@@ -62,7 +54,7 @@ func newAmqp(cfg *Config) (v *_amqp, err error) {
 
 func (me *_amqp) init() (err error) {
 	// call parent's Init
-	err = me.AmqpConnection.Init(me.cfg.AMQP_().Connection())
+	err = me.AmqpConnection.Init(me.cfg.Amqp.Connection())
 	if err != nil {
 		return
 	}
@@ -102,6 +94,7 @@ func (me *_amqp) Close() (err error) {
 		err = err_
 	}
 	me.monitors.Close()
+
 	return
 }
 
@@ -113,7 +106,7 @@ func (me *_amqp) Report(reports <-chan meta.Report) (err error) {
 	me.reportersLock.Lock()
 	defer me.reportersLock.Unlock()
 
-	remain := me.cfg._amqp.Reporters_
+	remain := me.cfg.Reporters_
 	for ; remain > 0; remain-- {
 		quit, wait := me.reporters.New()
 		go me._reporter_routine_(quit, wait, reports)
@@ -198,7 +191,7 @@ func (me *_amqp) Poll(id meta.ID) (err error) {
 		return
 	}
 
-	go me._store_routine_(quit, done, me.reports, ci, dv, id)
+	go me._monitor_routine_(quit, done, me.reports, ci, dv, id)
 	return
 }
 
@@ -220,6 +213,7 @@ func (me *_amqp) Done(id meta.ID) (err error) {
 //
 
 func (me *_amqp) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, reports <-chan meta.Report) {
+	// TODO: keep one AmqpConnection, instead of get/realease for each report.
 	defer wait.Done()
 
 	for {
@@ -302,7 +296,7 @@ cleanup:
 	// TODO: cosume all remaining reports?
 }
 
-func (me *_amqp) _store_routine_(
+func (me *_amqp) _monitor_routine_(
 	quit <-chan int,
 	done chan<- int,
 	reports chan<- meta.Report,
