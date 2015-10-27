@@ -53,6 +53,8 @@ func New(name string, cfg *Config) (b Broker, err error) {
 		b, err = newLocal(cfg)
 	case "amqp":
 		b, err = newAmqp(cfg)
+	case "redis":
+		b, err = newRedis(cfg)
 	}
 
 	return
