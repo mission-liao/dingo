@@ -19,10 +19,10 @@ func TestLocalReporter(t *testing.T) {
 	cfg.Local_().Bypass(false)
 
 	v, err := New("local", cfg)
-	reports := make(chan meta.Report, 10)
 	reporter := v.(Reporter)
 
 	// test case for Report/Unbind
+	reports := make(chan meta.Report, 10)
 	err = reporter.Report(reports)
 	ass.Nil(err)
 	err = reporter.Unbind()
@@ -65,8 +65,7 @@ func (me *LocalStoreTestSuite) SetupSuite() {
 	me.NotNil(me._reporter)
 	me.NotNil(me._store)
 	me._reports = make(chan meta.Report, 10)
-	err = me._reporter.Report(me._reports)
-	me.Nil(err)
+	me.Nil(me._reporter.Report(me._reports))
 }
 
 func (me *LocalStoreTestSuite) TearDownSuite() {
@@ -83,6 +82,7 @@ func (me *LocalStoreTestSuite) TestBasic() {
 	// poll corresponding task
 	me.Nil(me._store.Poll(me._task))
 	reports, err := me._store.Subscribe()
+	me.Nil(err)
 	select {
 	case v, ok := <-reports:
 		me.True(ok)
@@ -94,5 +94,7 @@ func (me *LocalStoreTestSuite) TestBasic() {
 }
 
 func TestLocalStoreSuite(t *testing.T) {
-	suite.Run(t, &LocalStoreTestSuite{})
+	suite.Run(t, &LocalStoreTestSuite{
+		_reports: make(chan meta.Report, 10),
+	})
 }

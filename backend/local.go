@@ -159,8 +159,8 @@ func (me *_local) Close() (err error) {
 // Reporter
 //
 
-func (me *_local) Report(report <-chan meta.Report) (err error) {
-	me.rid, err = me.muxReport.Register(report)
+func (me *_local) Report(reports <-chan meta.Report) (err error) {
+	me.rid, err = me.muxReport.Register(reports)
 	return
 }
 
@@ -179,7 +179,7 @@ func (me *_local) Subscribe() (reports <-chan meta.Report, err error) {
 	return
 }
 
-func (me *_local) Poll(id meta.IDer) (err error) {
+func (me *_local) Poll(id meta.ID) (err error) {
 	me.reportLock.Lock()
 	defer me.reportLock.Unlock()
 
@@ -206,7 +206,7 @@ func (me *_local) Poll(id meta.IDer) (err error) {
 	return
 }
 
-func (me *_local) Done(id meta.IDer) (err error) {
+func (me *_local) Done(id meta.ID) (err error) {
 	// clearing toCheck list
 	for k, v := range me.toCheck {
 		if v == id.GetId() {
