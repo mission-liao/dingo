@@ -98,3 +98,30 @@ func TestLocalStoreSuite(t *testing.T) {
 		_reports: make(chan meta.Report, 10),
 	})
 }
+
+//
+// Backend generic test cases
+//
+
+type LocalBackendTestSuite struct {
+	BackendTestSuite
+}
+
+func (me *LocalBackendTestSuite) SetupSuite() {
+	var (
+		err error
+	)
+
+	cfg := Default()
+	me._backend, err = New("local", cfg)
+	me.Nil(err)
+	me.BackendTestSuite.SetupSuite()
+}
+
+func (me *LocalBackendTestSuite) TearDownSuite() {
+	me.BackendTestSuite.TearDownSuite()
+}
+
+func TestLocalBackendSuite(t *testing.T) {
+	suite.Run(t, &LocalBackendTestSuite{})
+}

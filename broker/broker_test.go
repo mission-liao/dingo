@@ -1,42 +1,31 @@
 package broker
 
 import (
-	"testing"
-
 	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/meta"
 	"github.com/stretchr/testify/suite"
 )
 
-type AmqpBrokerTestSuite struct {
+type BrokerTestSuite struct {
 	suite.Suite
 
 	_broker  Broker
 	_invoker meta.Invoker
 }
 
-func (me *AmqpBrokerTestSuite) SetupSuite() {
-	var err error
-
-	me._broker, err = New("amqp", Default())
-	me.Nil(err)
+func (me *BrokerTestSuite) SetupSuite() {
+	me._invoker = meta.NewDefaultInvoker()
 }
 
-func (me *AmqpBrokerTestSuite) TearDownSuite() {
+func (me *BrokerTestSuite) TearDownSuite() {
 	me.Nil(me._broker.(common.Server).Close())
-}
-
-func TestAmqpBrokerSuite(t *testing.T) {
-	suite.Run(t, &AmqpBrokerTestSuite{
-		_invoker: meta.NewDefaultInvoker(),
-	})
 }
 
 //
 // test cases
 //
 
-func (me *AmqpBrokerTestSuite) TestBasic() {
+func (me *BrokerTestSuite) TestBasic() {
 	// init one listener
 	receipts := make(chan Receipt, 10)
 	tasks, _, err := me._broker.AddListener(receipts)

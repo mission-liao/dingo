@@ -7,6 +7,7 @@ import (
 	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/meta"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
 func TestLocalSend(t *testing.T) {
@@ -132,4 +133,28 @@ func TestLocalConsumeReceipt(t *testing.T) {
 
 	// done
 	ass.Nil(receiver.(common.Server).Close())
+}
+
+//
+// generic suite for Brokers
+//
+
+type LocalBrokerTestSuite struct {
+	BrokerTestSuite
+}
+
+func (me *LocalBrokerTestSuite) SetupSuite() {
+	var err error
+
+	me.BrokerTestSuite.SetupSuite()
+	me._broker, err = New("local", Default())
+	me.Nil(err)
+}
+
+func (me *LocalBrokerTestSuite) TearDownSuite() {
+	me.BrokerTestSuite.TearDownSuite()
+}
+
+func TestLocalBrokerSuite(t *testing.T) {
+	suite.Run(t, &LocalBrokerTestSuite{})
 }

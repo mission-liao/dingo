@@ -35,6 +35,8 @@ type Store interface {
 	// polling results for tasks, callers maintain a list of 'to-check'.
 	Poll(id meta.ID) error
 
+	// TODO: test case, make sure queue is deleted after 'Done'
+
 	// Stop monitoring that task
 	//
 	// - ID of task / report are the same, therefore we use report here to
