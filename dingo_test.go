@@ -23,8 +23,8 @@ func (me *DingoTestSuite) SetupSuite() {
 	// local + local
 	{
 		cfg := Default()
-		cfg.Broker().Local_().Bypass(false)
-		cfg.Backend().Local_().Bypass(false)
+		cfg.Broker().Local.Bypass(false)
+		cfg.Backend().Local.Bypass(false)
 		app, err := NewApp(*cfg)
 		me.Nil(err)
 
