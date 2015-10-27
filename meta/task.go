@@ -5,12 +5,12 @@ import (
 	"reflect"
 )
 
-type IDer interface {
+type ID interface {
 	GetId() string
 }
 
 type Task interface {
-	IDer
+	ID
 	GetName() string
 	GetArgs() []interface{}
 	ComposeReport(int, []interface{}, Err) (Report, error)

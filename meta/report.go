@@ -5,7 +5,7 @@ import (
 )
 
 type Report interface {
-	IDer
+	ID
 
 	//
 	// getter
