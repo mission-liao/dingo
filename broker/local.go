@@ -32,13 +32,13 @@ func defaultLocalConfig() *_localConfig {
 //
 
 type _local struct {
+	cfg *Config
 	// broker routine
 	brk    *common.Routines
 	to     chan []byte
 	noJSON chan meta.Task
 	tasks  chan meta.Task
 	errs   chan error
-	bypass bool
 
 	// monitor routine
 	mnt        *common.Routines
@@ -53,12 +53,12 @@ type _local struct {
 // factory
 func newLocal(cfg *Config) (v *_local, err error) {
 	v = &_local{
+		cfg:    cfg,
 		brk:    common.NewRoutines(),
 		to:     make(chan []byte, 10),
 		noJSON: make(chan meta.Task, 10),
 		tasks:  make(chan meta.Task, 10),
 		errs:   make(chan error, 10),
-		bypass: cfg.Local.Bypass_,
 
 		mnt:        common.NewRoutines(),
 		muxReceipt: common.NewMux(),
@@ -105,16 +105,16 @@ func (me *_local) _broker_routine_(quit <-chan int, wait *sync.WaitGroup) {
 	for {
 		select {
 		case _, _ = <-quit:
-			return
+			goto cleanup
 		case v, ok := <-me.noJSON:
 			if !ok {
-				break
+				goto cleanup
 			}
 			out(v)
 		case v, ok := <-me.to:
 			if !ok {
 				// TODO: ??
-				break
+				goto cleanup
 			}
 
 			t_, err_ := meta.UnmarshalTask(v)
@@ -125,18 +125,20 @@ func (me *_local) _broker_routine_(quit <-chan int, wait *sync.WaitGroup) {
 			out(t_)
 		}
 	}
+cleanup:
 }
 
 func (me *_local) _monitor_routine_(quit <-chan int, wait *sync.WaitGroup) {
 	defer wait.Done()
+
 	for {
 		select {
 		case _, _ = <-quit:
-			return
+			goto cleanup
 		case v, ok := <-me.muxReceipt.Out():
 			if !ok {
 				// mux is closed
-				return
+				goto cleanup
 			}
 
 			out, valid := v.Value.(Receipt)
@@ -166,6 +168,7 @@ func (me *_local) _monitor_routine_(quit <-chan int, wait *sync.WaitGroup) {
 			}()
 		}
 	}
+cleanup:
 }
 
 //
@@ -188,7 +191,7 @@ func (me *_local) Close() (err error) {
 //
 
 func (me *_local) Send(t meta.Task) (err error) {
-	if me.bypass {
+	if me.cfg.Local.Bypass_ {
 		me.noJSON <- t
 		return
 	}

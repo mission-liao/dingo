@@ -105,6 +105,8 @@ func TestLocalStoreSuite(t *testing.T) {
 
 type LocalBackendTestSuite struct {
 	BackendTestSuite
+
+	bypass bool
 }
 
 func (me *LocalBackendTestSuite) SetupSuite() {
@@ -113,6 +115,7 @@ func (me *LocalBackendTestSuite) SetupSuite() {
 	)
 
 	cfg := Default()
+	cfg.Local.Bypass(me.bypass)
 	me._backend, err = New("local", cfg)
 	me.Nil(err)
 	me.BackendTestSuite.SetupSuite()
@@ -123,5 +126,6 @@ func (me *LocalBackendTestSuite) TearDownSuite() {
 }
 
 func TestLocalBackendSuite(t *testing.T) {
-	suite.Run(t, &LocalBackendTestSuite{})
+	suite.Run(t, &LocalBackendTestSuite{bypass: true})
+	suite.Run(t, &LocalBackendTestSuite{bypass: false})
 }

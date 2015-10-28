@@ -4,6 +4,8 @@ package backend
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/mission-liao/dingo/common"
@@ -30,72 +32,97 @@ func defaultLocalConfig() *_localConfig {
 }
 
 type _local struct {
-	cBackend   *common.Routines
-	cSubscribe *common.Routines
-	to         chan []byte
-	reports    chan meta.Report
-	reportLock sync.Mutex
-	muxReport  *common.Mux
-	rid        int
-	toCheck    []string
-	unSent     []meta.Report
-	subscriber map[string]chan<- meta.Report
+	cfg           *Config
+	stores        *common.Routines
+	to            chan []byte
+	noJSON        chan meta.Report
+	reporters     *common.Routines
+	reportersLock sync.Mutex
+	reports       chan meta.Report
+	storeLock     sync.Mutex
+	toCheck       []string
+	unSent        []meta.Report
 }
 
 // factory
 func newLocal(cfg *Config) (v *_local, err error) {
 	v = &_local{
-		cBackend:   common.NewRoutines(),
-		cSubscribe: common.NewRoutines(),
-		to:         make(chan []byte, 10),
-		reports:    make(chan meta.Report, 10),
-		muxReport:  common.NewMux(),
-		toCheck:    make([]string, 0, 10),
-		unSent:     make([]meta.Report, 0, 10),
-		subscriber: make(map[string]chan<- meta.Report),
+		cfg:       cfg,
+		stores:    common.NewRoutines(),
+		reporters: common.NewRoutines(),
+		to:        make(chan []byte, 10),
+		noJSON:    make(chan meta.Report, 10),
+		reports:   make(chan meta.Report, 10),
+		toCheck:   make([]string, 0, 10),
+		unSent:    make([]meta.Report, 0, 10),
 	}
-	err = v.init()
+
+	// Store -> Subscriber
+	quit, wait := v.stores.New()
+	go v._store_routine_(quit, wait)
+
 	return
 }
 
-func (me *_local) _reporter_routine_(reports <-chan *common.MuxOut, quit <-chan int, wait *sync.WaitGroup) {
+func (me *_local) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, reports <-chan meta.Report) {
 	defer wait.Done()
 
 	for {
 		select {
 		case _, _ = <-quit:
-			return
+			goto cleanup
 		case v, ok := <-reports:
 			if !ok {
 				// TODO:
+				goto cleanup
 			}
 
-			rep, valid := v.Value.(meta.Report)
-			if !valid {
-				// TODO:
-			}
+			if me.cfg.Local.Bypass_ {
+				me.noJSON <- v
+			} else {
+				body, err := json.Marshal(v)
+				if err != nil {
+					// TODO: an error channel to reports errors
+					break
+				}
 
-			body, err := json.Marshal(rep)
-			if err != nil {
-				// TODO: an error channel to reports errors
+				// send to Store
+				me.to <- body
 			}
-
-			// send to Store
-			me.to <- body
 		}
 	}
+cleanup:
 }
 
 func (me *_local) _store_routine_(quit <-chan int, wait *sync.WaitGroup) {
 	defer wait.Done()
 
+	out := func(rep meta.Report) {
+		me.storeLock.Lock()
+		defer me.storeLock.Unlock()
+
+		found := false
+		for _, v := range me.toCheck {
+			if v == rep.GetId() {
+				found = true
+				me.reports <- rep
+				break
+			}
+		}
+
+		if !found {
+			me.unSent = append(me.unSent, rep)
+		}
+	}
+
 	for {
 		select {
 		case _, _ = <-quit:
-			return
+			goto cleanup
 		case v, ok := <-me.to:
 			if !ok {
 				// TODO:
+				goto cleanup
 			}
 
 			rep, err := meta.UnmarshalReport(v)
@@ -108,49 +135,30 @@ func (me *_local) _store_routine_(quit <-chan int, wait *sync.WaitGroup) {
 				break
 			}
 
-			func() {
-				me.reportLock.Lock()
-				me.reportLock.Unlock()
+			out(rep)
+		case v, ok := <-me.noJSON:
+			if !ok {
+				goto cleanup
+			}
 
-				found := false
-				for _, v := range me.toCheck {
-					if v == rep.GetId() {
-						found = true
-						me.reports <- rep
-						break
-					}
-				}
-
-				if !found {
-					me.unSent = append(me.unSent, rep)
-				}
-			}()
+			out(v)
 		}
 	}
+cleanup:
 }
 
-func (me *_local) init() (err error) {
-	// TODO: allow configuration
-	_, err = me.muxReport.More(1)
-
-	// Reporter -> Store
-	quit, wait := me.cBackend.New()
-	go me._reporter_routine_(me.muxReport.Out(), quit, wait)
-
-	// Store -> Subscriber
-	quit, wait = me.cSubscribe.New()
-	go me._store_routine_(quit, wait)
-
-	return
-}
+//
+// common.Server interface
+//
 
 func (me *_local) Close() (err error) {
-	me.cBackend.Close()
-	me.cSubscribe.Close()
-	me.muxReport.Close()
+	me.stores.Close()
+
+	err = me.Unbind()
 
 	close(me.reports)
 	close(me.to)
+	close(me.noJSON)
 
 	return
 }
@@ -160,13 +168,26 @@ func (me *_local) Close() (err error) {
 //
 
 func (me *_local) Report(reports <-chan meta.Report) (err error) {
-	me.rid, err = me.muxReport.Register(reports)
+	me.reportersLock.Lock()
+	defer me.reportersLock.Unlock()
+
+	remain := me.cfg.Reporters_
+	for ; remain > 0; remain-- {
+		quit, wait := me.reporters.New()
+		go me._reporter_routine_(quit, wait, reports)
+	}
+
+	if remain > 0 {
+		err = errors.New(fmt.Sprintf("Still %v reporters uninitiated", remain))
+	}
 	return
 }
 
 func (me *_local) Unbind() (err error) {
-	// convert string to int
-	_, err = me.muxReport.Unregister(me.rid)
+	me.reportersLock.Lock()
+	defer me.reportersLock.Unlock()
+
+	me.reporters.Close()
 	return
 }
 
@@ -180,8 +201,8 @@ func (me *_local) Subscribe() (reports <-chan meta.Report, err error) {
 }
 
 func (me *_local) Poll(id meta.ID) (err error) {
-	me.reportLock.Lock()
-	defer me.reportLock.Unlock()
+	me.storeLock.Lock()
+	defer me.storeLock.Unlock()
 
 	for i := len(me.unSent) - 1; i >= 0; i-- {
 		v := me.unSent[i]
@@ -207,6 +228,9 @@ func (me *_local) Poll(id meta.ID) (err error) {
 }
 
 func (me *_local) Done(id meta.ID) (err error) {
+	me.storeLock.Lock()
+	defer me.storeLock.Unlock()
+
 	// clearing toCheck list
 	for k, v := range me.toCheck {
 		if v == id.GetId() {
