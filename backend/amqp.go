@@ -191,7 +191,9 @@ func (me *_amqp) Poll(id meta.ID) (err error) {
 		return
 	}
 
-	go me._monitor_routine_(quit, done, me.reports, ci, dv, id)
+	if err == nil {
+		go me._monitor_routine_(quit, done, me.reports, ci, dv, id)
+	}
 	return
 }
 

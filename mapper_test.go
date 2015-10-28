@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type DingoMapperTestSuite struct {
+type MapperTestSuite struct {
 	suite.Suite
 
 	_mps            *_mappers
@@ -19,8 +19,8 @@ type DingoMapperTestSuite struct {
 	_receiptsMux    *common.Mux
 }
 
-func TestDingoMapperSuite(t *testing.T) {
-	suite.Run(t, &DingoMapperTestSuite{
+func TestMapperSuite(t *testing.T) {
+	suite.Run(t, &MapperTestSuite{
 		_tasks:          make(chan meta.Task, 5),
 		_countOfMappers: 3,
 		_invoker:        meta.NewDefaultInvoker(),
@@ -28,7 +28,7 @@ func TestDingoMapperSuite(t *testing.T) {
 	})
 }
 
-func (me *DingoMapperTestSuite) SetupSuite() {
+func (me *MapperTestSuite) SetupSuite() {
 	me._mps = newMappers()
 
 	// allocate 3 mapper routines
@@ -43,7 +43,7 @@ func (me *DingoMapperTestSuite) SetupSuite() {
 	me.Nil(err)
 }
 
-func (me *DingoMapperTestSuite) TearDownSuite() {
+func (me *MapperTestSuite) TearDownSuite() {
 	me.Nil(me._mps.done())
 	close(me._tasks)
 	me._receiptsMux.Close()
@@ -53,7 +53,7 @@ func (me *DingoMapperTestSuite) TearDownSuite() {
 // test cases
 //
 
-func (me *DingoMapperTestSuite) TestParellelMapping() {
+func (me *MapperTestSuite) TestParellelMapping() {
 	// make sure those mapper routines would be used
 	// when one is blocked.
 

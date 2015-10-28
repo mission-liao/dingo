@@ -120,38 +120,38 @@ func (me *AmqpConnection) Init(conn string) (err error) {
 func (me *AmqpConnection) Close() error {
 	var err error
 
-	for remain := me.cntChannels; remain > 0; remain-- {
-		// we may dead in this line
-		select {
-		case ci := <-me.channels:
-			// TODO: log errors
-			// close it
-			err_ := ci.Channel.Close()
-			if err == nil {
-				err = err_
-			}
-		}
-	}
+	// stop allocating new channels
+	me.noMore = true
 
-	{
+	func() {
 		me.cLock.Lock()
 		defer me.cLock.Unlock()
 
-		me.noMore = false
+		for remain := me.cntChannels; remain > 0; remain-- {
+			// we may dead in this line
+			select {
+			case ci := <-me.channels:
+				// TODO: log errors
+				// close it
+				err_ := ci.Channel.Close()
+				if err == nil {
+					err = err_
+				}
+			}
+		}
 
 		if me.channels != nil {
 			close(me.channels)
-			me.channels = nil
+		}
+	}()
+
+	if me.conn != nil {
+		err_ := me.conn.Close()
+		if err_ != nil && err == nil {
+			err = err_
 		}
 
-		if me.conn != nil {
-			err_ := me.conn.Close()
-			if err_ != nil && err == nil {
-				err = err_
-			}
-
-			me.conn = nil
-		}
+		me.conn = nil
 	}
 
 	return err

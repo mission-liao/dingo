@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type DingoMonitorTestSuite struct {
+type MonitorTestSuite struct {
 	suite.Suite
 
 	_count    int
@@ -21,15 +21,15 @@ type DingoMonitorTestSuite struct {
 	_invoker  meta.Invoker
 }
 
-func TestDingoMonitorSuite(t *testing.T) {
-	suite.Run(t, &DingoMonitorTestSuite{
+func TestMonitorSuite(t *testing.T) {
+	suite.Run(t, &MonitorTestSuite{
 		_invoker: meta.NewDefaultInvoker(),
 		_count:   3,
 		_reports: make(chan meta.Report, 10),
 	})
 }
 
-func (me *DingoMonitorTestSuite) SetupSuite() {
+func (me *MonitorTestSuite) SetupSuite() {
 	var err error
 
 	me._store, err = backend.New("local", nil)
@@ -43,7 +43,7 @@ func (me *DingoMonitorTestSuite) SetupSuite() {
 	me.Nil(err)
 }
 
-func (me *DingoMonitorTestSuite) TearDownSuite() {
+func (me *MonitorTestSuite) TearDownSuite() {
 	me.Nil(me._mnt.done())
 	me.Nil(me._reporter.Unbind())
 	me.Nil(me._store.(common.Server).Close())
@@ -53,7 +53,7 @@ func (me *DingoMonitorTestSuite) TearDownSuite() {
 // test case
 //
 
-func (me *DingoMonitorTestSuite) TestParellenMonitoring() {
+func (me *MonitorTestSuite) TestParellenMonitoring() {
 	// make sure other monitor routines would be
 	// called when one is blocked.
 
@@ -97,7 +97,7 @@ func (me *DingoMonitorTestSuite) TestParellenMonitoring() {
 	me.Equal(ret, toSend)
 }
 
-func (me *DingoMonitorTestSuite) TestFitReturns() {
+func (me *MonitorTestSuite) TestFitReturns() {
 	me._mnt.register(&StrMatcher{"test_convert_return"}, func() (int, float32) {
 		return 0, 0
 	})

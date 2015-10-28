@@ -152,12 +152,20 @@ func (me *_app) Register(m Matcher, fn interface{}, count int) (id string, remai
 	defer me.objsLock.RUnlock()
 
 	remain = count
+
+	if me.mappers == nil && me.monitors == nil {
+		err = errors.New("no monitors/mappers available.")
+		return
+	}
+
 	if me.mappers != nil {
 		id, remain, err = me.mappers.allocateWorkers(m, fn, count)
 		if err != nil {
 			return
 		}
 	}
+
+	// TODO: add test case the makes monitors and mappers sync
 
 	if me.monitors != nil {
 		err = me.monitors.register(m, fn)

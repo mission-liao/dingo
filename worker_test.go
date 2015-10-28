@@ -8,23 +8,23 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type DingoWorkerTestSuite struct {
+type WorkerTestSuite struct {
 	suite.Suite
 
 	_ws      *_workers
 	_invoker meta.Invoker
 }
 
-func TestDingoWorkerSuite(t *testing.T) {
-	suite.Run(t, &DingoWorkerTestSuite{})
+func TestWorkerSuite(t *testing.T) {
+	suite.Run(t, &WorkerTestSuite{})
 }
 
-func (me *DingoWorkerTestSuite) SetupSuite() {
+func (me *WorkerTestSuite) SetupSuite() {
 	me._ws = newWorkers()
 	me._invoker = meta.NewDefaultInvoker()
 }
 
-func (me *DingoWorkerTestSuite) TearDownSuite() {
+func (me *WorkerTestSuite) TearDownSuite() {
 	me._ws.done()
 }
 
@@ -32,7 +32,7 @@ func (me *DingoWorkerTestSuite) TearDownSuite() {
 // test cases
 //
 
-func (me *DingoWorkerTestSuite) TestParellelRun() {
+func (me *WorkerTestSuite) TestParellelRun() {
 	// make sure other workers would be called
 	// when one is blocked.
 
@@ -67,7 +67,7 @@ func (me *DingoWorkerTestSuite) TestParellelRun() {
 	close(stepOut)
 }
 
-func (me *DingoWorkerTestSuite) TestPanic() {
+func (me *WorkerTestSuite) TestPanic() {
 	// TODO: worker routine should recover from
 	// panic
 }

@@ -128,6 +128,8 @@ func (me *_redis) Done(id meta.ID) (err error) {
 		return
 	}
 
+	// TODO: delete key
+
 	return me.monitors.Stop(v)
 }
 
