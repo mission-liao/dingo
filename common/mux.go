@@ -90,7 +90,7 @@ func (m *Mux) Close() {
 }
 
 //
-func (m *Mux) Register(ch interface{}) (id int, err error) {
+func (m *Mux) Register(ch interface{}, want int) (id int, err error) {
 	m.rw.RLock()
 	defer m.rw.RUnlock()
 
@@ -102,13 +102,14 @@ func (m *Mux) Register(ch interface{}) (id int, err error) {
 	m.lck.Lock()
 	defer m.lck.Unlock()
 
-	for {
-		// generate a unique name
-		id = rand.Int()
+	chk := func(id int) bool {
+		if id == 0 {
+			return false
+		}
+
 		_, ok := m.cases[id]
 		if ok {
-			// duplication found
-			continue
+			return false
 		}
 
 		found := false
@@ -118,7 +119,14 @@ func (m *Mux) Register(ch interface{}) (id int, err error) {
 				break
 			}
 		}
-		if found {
+
+		return !found
+	}
+
+	id = want
+	for {
+		if !chk(id) {
+			id = rand.Int()
 			continue
 		}
 

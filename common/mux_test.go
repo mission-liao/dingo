@@ -21,13 +21,13 @@ func TestMuxDifferentType(t *testing.T) {
 
 	// prepare for string channel
 	cStr := make(chan string, 1)
-	iStr, err := m.Register(cStr)
+	iStr, err := m.Register(cStr, 0)
 	ass.Nil(err)
 	ass.NotEqual(0, iStr)
 
 	// prepare for integer channel
 	cInt := make(chan int, 1)
-	iInt, err := m.Register(cInt)
+	iInt, err := m.Register(cInt, 0)
 	ass.Nil(err)
 	ass.NotEqual(0, iInt)
 
@@ -77,7 +77,7 @@ func TestMuxChannelClose(t *testing.T) {
 	close(ch)
 
 	// close before registering
-	id, err := m.Register(ch)
+	id, err := m.Register(ch, 0)
 	ass.Nil(err)
 
 	o := m.Out()
@@ -113,7 +113,7 @@ func TestMuxOutputClose(t *testing.T) {
 	ass.Nil(err)
 
 	ch := make(chan int, 1)
-	id, err := m.Register(ch)
+	id, err := m.Register(ch, 0)
 	ass.Nil(err)
 
 	ch <- 66
@@ -138,4 +138,23 @@ func TestMuxOutputClose(t *testing.T) {
 	ass.False(ok)
 
 	close(ch)
+}
+
+func TestMuxIdGeneration(t *testing.T) {
+	ass := assert.New(t)
+	m := NewMux()
+	remain, err := m.More(3)
+	ass.Equal(0, remain)
+	ass.Nil(err)
+
+	ch1 := make(chan int, 1)
+	id, err := m.Register(ch1, 1)
+	ass.Equal(id, 1)
+	ass.Nil(err)
+
+	// should generate a new id
+	ch2 := make(chan int, 1)
+	id, err = m.Register(ch2, 1)
+	ass.True(id != 1)
+	ass.Nil(err)
 }
