@@ -30,7 +30,7 @@ type _amqp struct {
 
 	// store
 	reports  chan meta.Report
-	monitors *common.HetroRoutines
+	stores   *common.HetroRoutines
 	rids     map[string]int
 	ridsLock sync.Mutex
 
@@ -46,7 +46,7 @@ func newAmqp(cfg *Config) (v *_amqp, err error) {
 		rids:      make(map[string]int),
 		cfg:       cfg,
 		reports:   make(chan meta.Report, 10), // TODO: config
-		monitors:  common.NewHetroRoutines(),
+		stores:    common.NewHetroRoutines(),
 	}
 	err = v.init()
 	return
@@ -84,8 +84,15 @@ func (me *_amqp) init() (err error) {
 }
 
 //
-// common.Server interface
+// common.Object interface
 //
+
+func (me *_amqp) Events() ([]<-chan *common.Event, error) {
+	return []<-chan *common.Event{
+		me.reporters.Events(),
+		me.stores.Events(),
+	}, nil
+}
 
 func (me *_amqp) Close() (err error) {
 	err = me.AmqpConnection.Close()
@@ -93,8 +100,7 @@ func (me *_amqp) Close() (err error) {
 	if err == nil {
 		err = err_
 	}
-	me.monitors.Close()
-
+	me.stores.Close()
 	return
 }
 
@@ -106,10 +112,13 @@ func (me *_amqp) Report(reports <-chan meta.Report) (err error) {
 	me.reportersLock.Lock()
 	defer me.reportersLock.Unlock()
 
+	// close previous reporters
+	me.reporters.Close()
+
 	remain := me.cfg.Reporters_
 	for ; remain > 0; remain-- {
-		quit, wait := me.reporters.New()
-		go me._reporter_routine_(quit, wait, reports)
+		quit := me.reporters.New()
+		go me._reporter_routine_(quit, me.reporters.Wait(), me.reporters.Events(), reports)
 	}
 
 	if remain > 0 {
@@ -137,7 +146,7 @@ func (me *_amqp) Subscribe() (reports <-chan meta.Report, err error) {
 func (me *_amqp) Poll(id meta.ID) (err error) {
 	// bind to the queue for this task
 	tag, qName, rKey := getConsumerTag(id), getQueueName(id), getRoutingKey(id)
-	quit, done, idx := me.monitors.New()
+	quit, done, idx := me.stores.New(0)
 
 	me.ridsLock.Lock()
 	defer me.ridsLock.Unlock()
@@ -192,7 +201,7 @@ func (me *_amqp) Poll(id meta.ID) (err error) {
 	}
 
 	if err == nil {
-		go me._monitor_routine_(quit, done, me.reports, ci, dv, id)
+		go me._store_routine_(quit, done, me.stores.Events(), me.reports, ci, dv, id)
 	}
 	return
 }
@@ -203,18 +212,18 @@ func (me *_amqp) Done(id meta.ID) (err error) {
 
 	v, ok := me.rids[id.GetId()]
 	if !ok {
-		err = errors.New("monitor id not found")
+		err = errors.New("store id not found")
 		return
 	}
 
-	return me.monitors.Stop(v)
+	return me.stores.Stop(v)
 }
 
 //
 // routine definition
 //
 
-func (me *_amqp) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, reports <-chan meta.Report) {
+func (me *_amqp) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, reports <-chan meta.Report) {
 	// TODO: keep one AmqpConnection, instead of get/realease for each report.
 	defer wait.Done()
 
@@ -229,11 +238,15 @@ func (me *_amqp) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, repor
 			}
 
 			// TODO: errs channel
-			body, _ := json.Marshal(r)
+			body, err := json.Marshal(r)
+			if err != nil {
+				events <- common.NewEventFromError(common.InstT.REPORTER, err)
+				break
+			}
 
 			// TODO: errs channel
 			// acquire a channel
-			_ = func() (err error) {
+			err = func() (err error) {
 				ci, err := me.AmqpConnection.Channel()
 				if err != nil {
 					return
@@ -291,6 +304,10 @@ func (me *_amqp) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, repor
 
 				return
 			}()
+			if err != nil {
+				events <- common.NewEventFromError(common.InstT.REPORTER, err)
+				break
+			}
 		}
 	}
 
@@ -298,9 +315,10 @@ cleanup:
 	// TODO: cosume all remaining reports?
 }
 
-func (me *_amqp) _monitor_routine_(
+func (me *_amqp) _store_routine_(
 	quit <-chan int,
 	done chan<- int,
+	events chan<- *common.Event,
 	reports chan<- meta.Report,
 	ci *common.AmqpChannel,
 	dv <-chan amqp.Delivery,
@@ -326,7 +344,7 @@ func (me *_amqp) _monitor_routine_(
 			r, err := meta.UnmarshalReport(d.Body)
 			if err != nil {
 				d.Nack(false, false)
-				// TODO: errs channel
+				events <- common.NewEventFromError(common.InstT.STORE, err)
 				break
 			}
 
@@ -338,7 +356,7 @@ cleanup:
 	// cancel consuming
 	err = ci.Channel.Cancel(getConsumerTag(id), false)
 	if err != nil {
-		// TODO: errs channel
+		events <- common.NewEventFromError(common.InstT.STORE, err)
 		return
 	}
 
@@ -351,7 +369,7 @@ cleanup:
 		nil,              // args
 	)
 	if err != nil {
-		// TODO: errs channel
+		events <- common.NewEventFromError(common.InstT.STORE, err)
 		return
 	}
 
@@ -363,7 +381,7 @@ cleanup:
 		false, // noWait
 	)
 	if err != nil {
-		// TODO: errs channel
+		events <- common.NewEventFromError(common.InstT.STORE, err)
 		return
 	}
 }

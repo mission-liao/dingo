@@ -25,9 +25,8 @@ type Consumer interface {
 	// - rcpt: a channel that 'dingo' would send 'Receipt' for tasks from 'tasks'.
 	// returns:
 	// - tasks: 'dingo' would consume from this channel for new tasks
-	// - errs: 'dingo' would consume from this channel for error messages
 	// - err: any error during initialization
-	AddListener(rcpt <-chan Receipt) (tasks <-chan meta.Task, errs <-chan error, err error)
+	AddListener(rcpt <-chan Receipt) (tasks <-chan meta.Task, err error)
 
 	//
 	Stop() (err error)

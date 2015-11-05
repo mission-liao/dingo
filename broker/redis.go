@@ -46,8 +46,14 @@ func newRedis(cfg *Config) (v *_redis, err error) {
 }
 
 //
-// common.Server interface
+// common.Object interface
 //
+
+func (me *_redis) Events() ([]<-chan *common.Event, error) {
+	return []<-chan *common.Event{
+		me.listeners.Events(),
+	}, nil
+}
 
 func (me *_redis) Close() (err error) {
 	me.listeners.Close()
@@ -79,13 +85,13 @@ func (me *_redis) Send(t meta.Task) (err error) {
 // Consumer interface
 //
 
-func (me *_redis) AddListener(receipts <-chan Receipt) (<-chan meta.Task, <-chan error, error) {
-	tasks := make(chan meta.Task, 10)
-	errs := make(chan error, 10)
-	quit, wait := me.listeners.New()
-	go me._consumer_routine_(quit, wait, tasks, errs, receipts)
+func (me *_redis) AddListener(receipts <-chan Receipt) (tasks <-chan meta.Task, err error) {
+	t := make(chan meta.Task, 10)
+	quit := me.listeners.New()
+	go me._consumer_routine_(quit, me.listeners.Wait(), me.listeners.Events(), t, receipts)
 
-	return tasks, errs, nil
+	tasks = t
+	return
 }
 
 func (me *_redis) Stop() (err error) {
@@ -100,8 +106,8 @@ func (me *_redis) Stop() (err error) {
 func (me *_redis) _consumer_routine_(
 	quit <-chan int,
 	wait *sync.WaitGroup,
+	events chan<- *common.Event,
 	tasks chan<- meta.Task,
-	errs chan<- error,
 	receipts <-chan Receipt,
 ) {
 	defer wait.Done()
@@ -117,7 +123,7 @@ func (me *_redis) _consumer_routine_(
 			// blocking call on redis server
 			reply, err := conn.Do("BRPOP", _redisTaskQueue, 1) // TODO: configuration, in seconds
 			if err != nil {
-				errs <- err
+				events <- common.NewEventFromError(common.InstT.CONSUMER, err)
 				break
 			}
 
@@ -130,23 +136,32 @@ func (me *_redis) _consumer_routine_(
 			// an slice with length 2
 			v, ok := reply.([]interface{})
 			if !ok {
-				errs <- errors.New(fmt.Sprintf("invalid reply: %v", reply))
+				events <- common.NewEventFromError(
+					common.InstT.CONSUMER,
+					errors.New(fmt.Sprintf("invalid reply: %v", reply)),
+				)
 				break
 			}
 			if len(v) != 2 {
-				errs <- errors.New(fmt.Sprintf("invalid reply: %v", reply))
+				events <- common.NewEventFromError(
+					common.InstT.CONSUMER,
+					errors.New(fmt.Sprintf("invalid reply: %v", reply)),
+				)
 				break
 			}
 
 			b, ok := v[1].([]byte)
 			if !ok {
-				errs <- errors.New(fmt.Sprintf("invalid reply: %v", reply))
+				events <- common.NewEventFromError(
+					common.InstT.CONSUMER,
+					errors.New(fmt.Sprintf("invalid reply: %v", reply)),
+				)
 				break
 			}
 
 			t, err := meta.UnmarshalTask(b)
 			if err != nil {
-				errs <- err
+				events <- common.NewEventFromError(common.InstT.CONSUMER, err)
 				break
 			}
 

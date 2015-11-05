@@ -25,7 +25,7 @@ func (me *WorkerTestSuite) SetupSuite() {
 }
 
 func (me *WorkerTestSuite) TearDownSuite() {
-	me._ws.done()
+	me.Nil(me._ws.Close())
 }
 
 //

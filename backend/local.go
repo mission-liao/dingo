@@ -58,13 +58,13 @@ func newLocal(cfg *Config) (v *_local, err error) {
 	}
 
 	// Store -> Subscriber
-	quit, wait := v.stores.New()
-	go v._store_routine_(quit, wait)
+	quit := v.stores.New()
+	go v._store_routine_(quit, v.stores.Wait(), v.stores.Events())
 
 	return
 }
 
-func (me *_local) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, reports <-chan meta.Report) {
+func (me *_local) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, reports <-chan meta.Report) {
 	defer wait.Done()
 
 	for {
@@ -73,7 +73,6 @@ func (me *_local) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, repo
 			goto cleanup
 		case v, ok := <-reports:
 			if !ok {
-				// TODO:
 				goto cleanup
 			}
 
@@ -82,7 +81,7 @@ func (me *_local) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, repo
 			} else {
 				body, err := json.Marshal(v)
 				if err != nil {
-					// TODO: an error channel to reports errors
+					events <- common.NewEventFromError(common.InstT.REPORTER, err)
 					break
 				}
 
@@ -94,7 +93,7 @@ func (me *_local) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, repo
 cleanup:
 }
 
-func (me *_local) _store_routine_(quit <-chan int, wait *sync.WaitGroup) {
+func (me *_local) _store_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event) {
 	defer wait.Done()
 
 	out := func(rep meta.Report) {
@@ -121,17 +120,20 @@ func (me *_local) _store_routine_(quit <-chan int, wait *sync.WaitGroup) {
 			goto cleanup
 		case v, ok := <-me.to:
 			if !ok {
-				// TODO:
 				goto cleanup
 			}
 
 			rep, err := meta.UnmarshalReport(v)
 			if err != nil {
-				// TODO:
+				events <- common.NewEventFromError(common.InstT.STORE, err)
 				break
 			}
 
 			if rep == nil {
+				events <- common.NewEventFromError(
+					common.InstT.STORE,
+					errors.New(fmt.Sprintf("Unable to marshale from %v", v)),
+				)
 				break
 			}
 
@@ -148,8 +150,15 @@ cleanup:
 }
 
 //
-// common.Server interface
+// common.Object interface
 //
+
+func (me *_local) Events() ([]<-chan *common.Event, error) {
+	return []<-chan *common.Event{
+		me.reporters.Events(),
+		me.stores.Events(),
+	}, nil
+}
 
 func (me *_local) Close() (err error) {
 	me.stores.Close()
@@ -171,10 +180,13 @@ func (me *_local) Report(reports <-chan meta.Report) (err error) {
 	me.reportersLock.Lock()
 	defer me.reportersLock.Unlock()
 
+	// close previous allocated reporters
+	me.reporters.Close()
+
 	remain := me.cfg.Reporters_
 	for ; remain > 0; remain-- {
-		quit, wait := me.reporters.New()
-		go me._reporter_routine_(quit, wait, reports)
+		quit := me.reporters.New()
+		go me._reporter_routine_(quit, me.reporters.Wait(), me.reporters.Events(), reports)
 	}
 
 	if remain > 0 {

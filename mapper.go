@@ -23,8 +23,8 @@ type _mappers struct {
 // - tasks: input channel for meta.Task
 // - receipts: output channel for broker.Receipt
 func (m *_mappers) more(tasks <-chan meta.Task, receipts chan<- broker.Receipt) {
-	quit, wait := m.mappers.New()
-	go m._mapper_routine_(quit, wait, tasks, receipts)
+	quit := m.mappers.New()
+	go m._mapper_routine_(quit, m.mappers.Wait(), m.mappers.Events(), tasks, receipts)
 }
 
 //
@@ -44,11 +44,18 @@ func (me *_mappers) reports() <-chan meta.Report {
 }
 
 //
+// common.Object interface
 //
-//
-func (m *_mappers) done() (err error) {
+
+func (me *_mappers) Events() ([]<-chan *common.Event, error) {
+	return []<-chan *common.Event{
+		me.mappers.Events(),
+	}, nil
+}
+
+func (m *_mappers) Close() (err error) {
 	m.mappers.Close()
-	err = m.workers.done()
+	err = m.workers.Close()
 	return
 }
 
@@ -68,7 +75,7 @@ func newMappers() *_mappers {
 // mapper routine
 //
 
-func (m *_mappers) _mapper_routine_(quit <-chan int, wait *sync.WaitGroup, tasks <-chan meta.Task, receipts chan<- broker.Receipt) {
+func (m *_mappers) _mapper_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, tasks <-chan meta.Task, receipts chan<- broker.Receipt) {
 	defer wait.Done()
 	for {
 		select {

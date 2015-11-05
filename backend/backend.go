@@ -9,6 +9,8 @@ type Backend interface {
 	Store
 }
 
+// TODO: add test case for consecutive calling to Reporter.Report
+
 // write reports to backend
 type Reporter interface {
 	// send report to backend

@@ -18,7 +18,7 @@ func (me *BrokerTestSuite) SetupSuite() {
 }
 
 func (me *BrokerTestSuite) TearDownSuite() {
-	me.Nil(me._broker.(common.Server).Close())
+	me.Nil(me._broker.(common.Object).Close())
 }
 
 //
@@ -28,7 +28,7 @@ func (me *BrokerTestSuite) TearDownSuite() {
 func (me *BrokerTestSuite) TestBasic() {
 	// init one listener
 	receipts := make(chan Receipt, 10)
-	tasks, _, err := me._broker.AddListener(receipts)
+	tasks, err := me._broker.AddListener(receipts)
 	me.Nil(err)
 
 	// compose a task

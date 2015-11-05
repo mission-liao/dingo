@@ -2,6 +2,7 @@ package dingo
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/mission-liao/dingo/backend"
@@ -33,13 +34,34 @@ type _monitors struct {
 	invoker   meta.Invoker
 }
 
-func (me *_monitors) init() (err error) {
-	if me.store == nil {
+// factory function
+//
+// paramters:
+// - reports: input channel
+func newMonitors(store backend.Store) (mnt *_monitors, err error) {
+	mnt = &_monitors{
+		store:    store,
+		monitors: common.NewRoutines(),
+		watched:  make(map[string]*_watch),
+		fns:      make([]*_fn, 0, 10),
+		invoker:  meta.NewDefaultInvoker(),
+	}
+
+	if mnt.store == nil {
 		err = errors.New("store is not assigned.")
 		return
 	}
 
-	me.reports, err = me.store.Subscribe()
+	mnt.reports, err = mnt.store.Subscribe()
+	if err != nil {
+		return
+	}
+
+	if mnt.reports == nil {
+		err = errors.New("errs/reports channel is not available")
+		return
+	}
+
 	return
 }
 
@@ -66,13 +88,23 @@ func (me *_monitors) register(m Matcher, fn interface{}) (err error) {
 func (me *_monitors) more(count int) (remain int, err error) {
 	remain = count
 	for ; remain > 0; remain-- {
-		go me._monitor_routine_(me.monitors.New())
+		quit := me.monitors.New()
+		go me._monitor_routine_(quit, me.monitors.Wait(), me.monitors.Events())
 	}
 	return
 }
 
 //
-func (me *_monitors) done() (err error) {
+// common.Object interface
+//
+
+func (me *_monitors) Events() ([]<-chan *common.Event, error) {
+	return []<-chan *common.Event{
+		me.monitors.Events(),
+	}, nil
+}
+
+func (me *_monitors) Close() (err error) {
 	me.monitors.Close()
 
 	// TODO: close all output channels
@@ -108,31 +140,14 @@ func (me *_monitors) check(t meta.Task) (reports <-chan meta.Report, err error) 
 	return
 }
 
-// factory function
-//
-// paramters:
-// - reports: input channel
-func newMonitors(store backend.Store) (mnt *_monitors, err error) {
-	mnt = &_monitors{
-		store:    store,
-		monitors: common.NewRoutines(),
-		watched:  make(map[string]*_watch),
-		fns:      make([]*_fn, 0, 10),
-		invoker:  meta.NewDefaultInvoker(),
-	}
-	err = mnt.init()
-	return
-}
-
 // monitor routine
 //
-func (me *_monitors) _monitor_routine_(quit <-chan int, wait *sync.WaitGroup) {
+func (me *_monitors) _monitor_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event) {
 	defer wait.Done()
 	for {
 		select {
 		case report, ok := <-me.reports:
 			if !ok {
-				// report channel is closed, stop this routine
 				return
 			}
 
@@ -150,11 +165,13 @@ func (me *_monitors) _monitor_routine_(quit <-chan int, wait *sync.WaitGroup) {
 						continue
 					}
 
-					// TODO: a channel to report error
 					returns, err := me.invoker.FitReturns(v.fn, returns)
-					if err == nil {
-						report.SetReturn(returns)
+					if err != nil {
+						events <- common.NewEventFromError(common.InstT.MONITOR, err)
+						continue
 					}
+
+					report.SetReturn(returns)
 				}
 			}()
 
@@ -165,19 +182,30 @@ func (me *_monitors) _monitor_routine_(quit <-chan int, wait *sync.WaitGroup) {
 
 				w, ok := me.watched[report.GetId()]
 				if !ok {
-					// TODO: log it
+					events <- common.NewEventFromError(
+						common.InstT.MONITOR,
+						errors.New(fmt.Sprintf("ID not found:%v", report)),
+					)
 
 					// discard this report,
 					// something wrong in backend
 					return
 				}
 
+				// TODO: allow multiple failure report?
 				if w.last == report.GetStatus() {
+					events <- common.NewEventFromError(
+						common.InstT.MONITOR,
+						errors.New(fmt.Sprintf("report duplication:%v", report)),
+					)
+
 					// duplicated report, discard it
 					return
 				} else if report.Done() {
-					// TODO: a channel to report errors
-					_ = me.store.Done(report)
+					err := me.store.Done(report)
+					if err != nil {
+						events <- common.NewEventFromError(common.InstT.MONITOR, err)
+					}
 
 					_2delete = true
 				}
@@ -198,6 +226,11 @@ func (me *_monitors) _monitor_routine_(quit <-chan int, wait *sync.WaitGroup) {
 					id := report.GetId()
 					w, ok := me.watched[id]
 					if !ok {
+						events <- common.NewEventFromError(
+							common.InstT.MONITOR,
+							errors.New(fmt.Sprintf("when deletion, ID not found:%v", report)),
+						)
+
 						return
 					}
 					delete(me.watched, id)

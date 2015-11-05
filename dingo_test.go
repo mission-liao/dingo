@@ -1,10 +1,12 @@
 package dingo
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/mission-liao/dingo/backend"
 	"github.com/mission-liao/dingo/broker"
+	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/meta"
 	"github.com/stretchr/testify/suite"
 )
@@ -12,8 +14,11 @@ import (
 type DingoTestSuite struct {
 	suite.Suite
 
-	app *_app
-	cfg *Config
+	app    *_app
+	cfg    *Config
+	events []*common.Event
+	quit   chan int
+	wait   sync.WaitGroup
 }
 
 func (me *DingoTestSuite) SetupSuite() {
@@ -21,6 +26,51 @@ func (me *DingoTestSuite) SetupSuite() {
 	app, err := NewApp(*me.cfg)
 	me.Nil(err)
 	me.app = app.(*_app)
+}
+
+func (me *DingoTestSuite) SetupTest() {
+	me.events = make([]*common.Event, 0, 10)
+	me.quit = make(chan int, 1)
+	me.wait.Add(1)
+
+	go func() {
+		defer me.wait.Done()
+
+		_, in, err := me.app.Listen(common.InstT.ALL, common.ErrLvl.DEBUG, 0)
+		me.Nil(err)
+		me.NotNil(in)
+
+		for {
+			select {
+			case e, ok := <-in:
+				if !ok {
+					return
+				}
+				me.events = append(me.events, e)
+			case _, _ = <-me.quit:
+				for {
+					select {
+					case e, ok := <-in:
+						if !ok {
+							return
+						}
+						me.events = append(me.events, e)
+					default:
+						return
+					}
+				}
+			}
+		}
+	}()
+}
+
+func (me *DingoTestSuite) TearDownTest() {
+	me.quit <- 1
+	me.wait.Wait()
+
+	for _, v := range me.events {
+		me.Nil(v)
+	}
 }
 
 func (me *DingoTestSuite) TearDownSuite() {
@@ -104,18 +154,18 @@ func (me *LocalTestSuite) SetupSuite() {
 	{
 		v, err := broker.New("local", me.cfg.Broker())
 		me.Nil(err)
-		_, used, err := me.app.Use(v, InstT.DEFAULT)
+		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
 		me.Nil(err)
-		me.Equal(InstT.PRODUCER|InstT.CONSUMER, used)
+		me.Equal(common.InstT.PRODUCER|common.InstT.CONSUMER, used)
 	}
 
 	// backend
 	{
 		v, err := backend.New("local", me.cfg.Backend())
 		me.Nil(err)
-		_, used, err := me.app.Use(v, InstT.DEFAULT)
+		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
 		me.Nil(err)
-		me.Equal(InstT.REPORTER|InstT.STORE, used)
+		me.Equal(common.InstT.REPORTER|common.InstT.STORE, used)
 	}
 }
 
@@ -138,18 +188,18 @@ func (me *AmqpTestSuite) SetupSuite() {
 	{
 		v, err := broker.New("amqp", me.cfg.Broker())
 		me.Nil(err)
-		_, used, err := me.app.Use(v, InstT.DEFAULT)
+		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
 		me.Nil(err)
-		me.Equal(InstT.PRODUCER|InstT.CONSUMER, used)
+		me.Equal(common.InstT.PRODUCER|common.InstT.CONSUMER, used)
 	}
 
 	// backend
 	{
 		v, err := backend.New("amqp", me.cfg.Backend())
 		me.Nil(err)
-		_, used, err := me.app.Use(v, InstT.DEFAULT)
+		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
 		me.Nil(err)
-		me.Equal(InstT.REPORTER|InstT.STORE, used)
+		me.Equal(common.InstT.REPORTER|common.InstT.STORE, used)
 	}
 }
 
@@ -172,18 +222,18 @@ func (me *RedisTestSuite) SetupSuite() {
 	{
 		v, err := broker.New("redis", me.cfg.Broker())
 		me.Nil(err)
-		_, used, err := me.app.Use(v, InstT.DEFAULT)
+		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
 		me.Nil(err)
-		me.Equal(InstT.PRODUCER|InstT.CONSUMER, used)
+		me.Equal(common.InstT.PRODUCER|common.InstT.CONSUMER, used)
 	}
 
 	// backend
 	{
 		v, err := backend.New("redis", me.cfg.Backend())
 		me.Nil(err)
-		_, used, err := me.app.Use(v, InstT.DEFAULT)
+		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
 		me.Nil(err)
-		me.Equal(InstT.REPORTER|InstT.STORE, used)
+		me.Equal(common.InstT.REPORTER|common.InstT.STORE, used)
 	}
 }
 
@@ -206,18 +256,18 @@ func (me *AmqpRedisTestSuite) SetupSuite() {
 	{
 		v, err := broker.New("amqp", me.cfg.Broker())
 		me.Nil(err)
-		_, used, err := me.app.Use(v, InstT.DEFAULT)
+		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
 		me.Nil(err)
-		me.Equal(InstT.PRODUCER|InstT.CONSUMER, used)
+		me.Equal(common.InstT.PRODUCER|common.InstT.CONSUMER, used)
 	}
 
 	// backend
 	{
 		v, err := backend.New("redis", me.cfg.Backend())
 		me.Nil(err)
-		_, used, err := me.app.Use(v, InstT.DEFAULT)
+		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
 		me.Nil(err)
-		me.Equal(InstT.REPORTER|InstT.STORE, used)
+		me.Equal(common.InstT.REPORTER|common.InstT.STORE, used)
 	}
 }
 

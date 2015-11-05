@@ -26,7 +26,7 @@ func (me *BackendTestSuite) SetupSuite() {
 
 func (me *BackendTestSuite) TearDownSuite() {
 	me.Nil(me._reporter.Unbind())
-	me.Nil(me._backend.(common.Server).Close())
+	me.Nil(me._backend.(common.Object).Close())
 }
 
 //

@@ -2,6 +2,8 @@ package broker
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/mission-liao/dingo/common"
@@ -33,12 +35,12 @@ func defaultLocalConfig() *_localConfig {
 
 type _local struct {
 	cfg *Config
+
 	// broker routine
 	brk    *common.Routines
 	to     chan []byte
 	noJSON chan meta.Task
 	tasks  chan meta.Task
-	errs   chan error
 
 	// monitor routine
 	mnt        *common.Routines
@@ -53,12 +55,12 @@ type _local struct {
 // factory
 func newLocal(cfg *Config) (v *_local, err error) {
 	v = &_local{
-		cfg:    cfg,
+		cfg: cfg,
+
 		brk:    common.NewRoutines(),
 		to:     make(chan []byte, 10),
 		noJSON: make(chan meta.Task, 10),
 		tasks:  make(chan meta.Task, 10),
-		errs:   make(chan error, 10),
 
 		mnt:        common.NewRoutines(),
 		muxReceipt: common.NewMux(),
@@ -76,17 +78,17 @@ func (me *_local) init() (err error) {
 	_, err = me.muxReceipt.More(1)
 
 	// broker routine
-	quit, wait := me.brk.New()
-	go me._broker_routine_(quit, wait)
+	quit := me.brk.New()
+	go me._broker_routine_(quit, me.brk.Wait(), me.brk.Events())
 
 	// start a new monitor routine
-	quit, wait = me.mnt.New()
-	go me._monitor_routine_(quit, wait)
+	quit = me.mnt.New()
+	go me._monitor_routine_(quit, me.mnt.Wait(), me.mnt.Events())
 
 	return
 }
 
-func (me *_local) _broker_routine_(quit <-chan int, wait *sync.WaitGroup) {
+func (me *_local) _broker_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event) {
 	defer wait.Done()
 
 	// output function of broker routine
@@ -113,13 +115,12 @@ func (me *_local) _broker_routine_(quit <-chan int, wait *sync.WaitGroup) {
 			out(v)
 		case v, ok := <-me.to:
 			if !ok {
-				// TODO: ??
 				goto cleanup
 			}
 
-			t_, err_ := meta.UnmarshalTask(v)
-			if err_ != nil {
-				me.errs <- err_
+			t_, err := meta.UnmarshalTask(v)
+			if err != nil {
+				events <- common.NewEventFromError(common.InstT.PRODUCER, err)
 				break
 			}
 			out(t_)
@@ -128,7 +129,7 @@ func (me *_local) _broker_routine_(quit <-chan int, wait *sync.WaitGroup) {
 cleanup:
 }
 
-func (me *_local) _monitor_routine_(quit <-chan int, wait *sync.WaitGroup) {
+func (me *_local) _monitor_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event) {
 	defer wait.Done()
 
 	for {
@@ -143,7 +144,10 @@ func (me *_local) _monitor_routine_(quit <-chan int, wait *sync.WaitGroup) {
 
 			out, valid := v.Value.(Receipt)
 			if !valid {
-				// TODO: log it
+				events <- common.NewEventFromError(
+					common.InstT.CONSUMER,
+					errors.New(fmt.Sprintf("Invalid receipt received:%v", v)),
+				)
 				break
 			}
 			if out.Status != Status.OK {
@@ -172,8 +176,15 @@ cleanup:
 }
 
 //
-// constructor / destructor
+// common.Object interface
 //
+
+func (me *_local) Events() ([]<-chan *common.Event, error) {
+	return []<-chan *common.Event{
+		me.brk.Events(),
+		me.mnt.Events(),
+	}, nil
+}
 
 func (me *_local) Close() (err error) {
 	me.brk.Close()
@@ -181,7 +192,6 @@ func (me *_local) Close() (err error) {
 	close(me.to)
 	close(me.noJSON)
 	close(me.tasks)
-	close(me.errs)
 	me.muxReceipt.Close()
 	return
 }
@@ -210,16 +220,15 @@ func (me *_local) Send(t meta.Task) (err error) {
 // Consumer
 //
 
-func (me *_local) AddListener(rcpt <-chan Receipt) (tasks <-chan meta.Task, errs <-chan error, err error) {
-	me.rid, err = me.muxReceipt.Register(rcpt)
-	tasks, errs = me.tasks, me.errs
+func (me *_local) AddListener(rcpt <-chan Receipt) (tasks <-chan meta.Task, err error) {
+	me.rid, err = me.muxReceipt.Register(rcpt, 0)
+	tasks = me.tasks
 	return
 }
 
 func (me *_local) Stop() (err error) {
 	// reset tasks, errs
 	me.tasks = make(chan meta.Task, 10)
-	me.errs = make(chan error, 10)
 
 	// reset receipts
 	me.muxReceipt.Close()

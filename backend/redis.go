@@ -33,7 +33,7 @@ type _redis struct {
 
 	// store
 	reports  chan meta.Report
-	monitors *common.HetroRoutines
+	stores   *common.HetroRoutines
 	rids     map[string]int
 	ridsLock sync.Mutex
 }
@@ -43,7 +43,7 @@ func newRedis(cfg *Config) (v *_redis, err error) {
 		reporters: common.NewRoutines(),
 		reports:   make(chan meta.Report, 10),
 		rids:      make(map[string]int),
-		monitors:  common.NewHetroRoutines(),
+		stores:    common.NewHetroRoutines(),
 		cfg:       cfg,
 	}
 	v.pool, err = common.NewRedisPool(cfg.Redis.Connection(), cfg.Redis.Password_)
@@ -55,8 +55,15 @@ func newRedis(cfg *Config) (v *_redis, err error) {
 }
 
 //
-// common.Server interface
+// common.Object interface
 //
+
+func (me *_redis) Events() ([]<-chan *common.Event, error) {
+	return []<-chan *common.Event{
+		me.reporters.Events(),
+		me.stores.Events(),
+	}, nil
+}
 
 func (me *_redis) Close() (err error) {
 	me.reporters.Close()
@@ -65,8 +72,7 @@ func (me *_redis) Close() (err error) {
 	if err == nil {
 		err = err_
 	}
-	me.monitors.Close()
-
+	me.stores.Close()
 	return
 }
 
@@ -78,10 +84,13 @@ func (me *_redis) Report(reports <-chan meta.Report) (err error) {
 	me.reportersLock.Lock()
 	defer me.reportersLock.Unlock()
 
+	// close previous allocated reporters
+	me.reporters.Close()
+
 	remain := me.cfg.Reporters_
 	for ; remain > 0; remain-- {
-		quit, wait := me.reporters.New()
-		go me._reporter_routine_(quit, wait, reports)
+		quit := me.reporters.New()
+		go me._reporter_routine_(quit, me.reporters.Wait(), me.reporters.Events(), reports)
 	}
 
 	if remain > 0 {
@@ -107,13 +116,13 @@ func (me *_redis) Subscribe() (reports <-chan meta.Report, err error) {
 }
 
 func (me *_redis) Poll(id meta.ID) (err error) {
-	quit, done, idx := me.monitors.New()
+	quit, done, idx := me.stores.New(0)
 
 	me.ridsLock.Lock()
 	defer me.ridsLock.Unlock()
 	me.rids[id.GetId()] = idx
 
-	go me._monitor_routine_(quit, done, me.reports, id)
+	go me._store_routine_(quit, done, me.stores.Events(), me.reports, id)
 
 	return
 }
@@ -124,20 +133,20 @@ func (me *_redis) Done(id meta.ID) (err error) {
 
 	v, ok := me.rids[id.GetId()]
 	if !ok {
-		err = errors.New("monitor id not found")
+		err = errors.New("store id not found")
 		return
 	}
 
 	// TODO: delete key
 
-	return me.monitors.Stop(v)
+	return me.stores.Stop(v)
 }
 
 //
 // routine definition
 //
 
-func (me *_redis) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, reports <-chan meta.Report) {
+func (me *_redis) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, reports <-chan meta.Report) {
 	defer wait.Done()
 
 	conn := me.pool.Get()
@@ -153,19 +162,26 @@ func (me *_redis) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, repo
 			}
 
 			// TODO: errs channel
-			body, _ := json.Marshal(r)
+			body, err := json.Marshal(r)
+			if err != nil {
+				events <- common.NewEventFromError(common.InstT.REPORTER, err)
+				break
+			}
 
-			// TODO: errs channel
-			conn.Do("LPUSH", getKey(r), body)
+			_, err = conn.Do("LPUSH", getKey(r), body)
+			if err != nil {
+				events <- common.NewEventFromError(common.InstT.REPORTER, err)
+				break
+			}
 		}
 	}
 cleanup:
-	return
 }
 
-func (me *_redis) _monitor_routine_(
+func (me *_redis) _store_routine_(
 	quit <-chan int,
 	done chan<- int,
+	events chan<- *common.Event,
 	reports chan<- meta.Report,
 	id meta.ID) {
 
@@ -181,9 +197,12 @@ func (me *_redis) _monitor_routine_(
 		case _, _ = <-quit:
 			goto cleanup
 		default:
-			// TODO: errs channel
 			// blocking call to redis
-			reply, _ := conn.Do("BRPOP", getKey(id), 1) // TODO: configuration, in seconds
+			reply, err := conn.Do("BRPOP", getKey(id), 1) // TODO: configuration, in seconds
+			if err != nil {
+				events <- common.NewEventFromError(common.InstT.STORE, err)
+				break
+			}
 			if reply == nil {
 				// timeout
 				break
@@ -191,18 +210,34 @@ func (me *_redis) _monitor_routine_(
 
 			v, ok := reply.([]interface{})
 			if !ok {
+				events <- common.NewEventFromError(
+					common.InstT.STORE,
+					errors.New(fmt.Sprintf("Unable to get array of interface{} from %v", reply)),
+				)
 				break
 			}
 			if len(v) != 2 {
+				events <- common.NewEventFromError(
+					common.InstT.STORE,
+					errors.New(fmt.Sprintf("length of reply is not 2, but %v", v)),
+				)
 				break
 			}
 
 			b, ok := v[1].([]byte)
 			if !ok {
+				events <- common.NewEventFromError(
+					common.InstT.STORE,
+					errors.New(fmt.Sprintf("the first object of reply is not byte-array, but %v", v)),
+				)
 				break
 			}
 
-			r, _ := meta.UnmarshalReport(b)
+			r, err := meta.UnmarshalReport(b)
+			if err != nil {
+				events <- common.NewEventFromError(common.InstT.STORE, err)
+				break
+			}
 			reports <- r
 		}
 	}

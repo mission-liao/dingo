@@ -32,8 +32,14 @@ func NoErr() Err {
 	return &_error{}
 }
 
-func (me *_error) GetCode() int   { return me.Code }
-func (me *_error) GetMsg() string { return me.Msg }
-func (me *_error) ComposeError() error {
-	return errors.New(fmt.Sprintf("[%d] %v", me.Code, me.Msg))
+//
+// interface Err
+//
+func (me *_error) GetCode() int        { return me.Code }
+func (me *_error) GetMsg() string      { return me.Msg }
+func (me *_error) ComposeError() error { return errors.New(me.Error()) }
+
+// implement interface of error
+func (me *_error) Error() string {
+	return fmt.Sprintf("[%d] %v", me.Code, me.Msg)
 }

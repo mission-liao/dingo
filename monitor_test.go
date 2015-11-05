@@ -32,7 +32,7 @@ func TestMonitorSuite(t *testing.T) {
 func (me *MonitorTestSuite) SetupSuite() {
 	var err error
 
-	me._store, err = backend.New("local", nil)
+	me._store, err = backend.New("local", backend.Default())
 	me.Nil(err)
 	me._mnt, err = newMonitors(me._store)
 	me.Nil(err)
@@ -44,9 +44,9 @@ func (me *MonitorTestSuite) SetupSuite() {
 }
 
 func (me *MonitorTestSuite) TearDownSuite() {
-	me.Nil(me._mnt.done())
+	me.Nil(me._mnt.Close())
 	me.Nil(me._reporter.Unbind())
-	me.Nil(me._store.(common.Server).Close())
+	me.Nil(me._store.(common.Object).Close())
 }
 
 //

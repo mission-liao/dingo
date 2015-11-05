@@ -35,7 +35,7 @@ func (me *MapperTestSuite) SetupSuite() {
 	for remain := me._countOfMappers; remain > 0; remain-- {
 		receipts := make(chan broker.Receipt, 10)
 		me._mps.more(me._tasks, receipts)
-		_, err := me._receiptsMux.Register(receipts)
+		_, err := me._receiptsMux.Register(receipts, 0)
 		me.Nil(err)
 	}
 	remain, err := me._receiptsMux.More(3)
@@ -44,7 +44,7 @@ func (me *MapperTestSuite) SetupSuite() {
 }
 
 func (me *MapperTestSuite) TearDownSuite() {
-	me.Nil(me._mps.done())
+	me.Nil(me._mps.Close())
 	close(me._tasks)
 	me._receiptsMux.Close()
 }

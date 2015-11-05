@@ -32,7 +32,7 @@ func TestLocalSend(t *testing.T) {
 		rpt := make(chan Receipt, 10)
 
 		// prepare consumer
-		tasks, errs, err := receiver.AddListener(rpt)
+		tasks, err := receiver.AddListener(rpt)
 		ass.Nil(err)
 
 		// wait for 1 seconds,
@@ -65,16 +65,10 @@ func TestLocalSend(t *testing.T) {
 				}
 
 			}
-		case err, ok := <-errs:
-			if !ok {
-				ass.Fail("errs channel is closed")
-			} else {
-				ass.Fail(err.Error())
-			}
 		}
 
 		// done
-		ass.Nil(receiver.(common.Server).Close())
+		ass.Nil(receiver.(common.Object).Close())
 	}
 }
 
@@ -89,7 +83,7 @@ func TestLocalConsumeReceipt(t *testing.T) {
 	v, err := New("local", cfg)
 	ass.Nil(err)
 	sender, receiver := v.(Producer), v.(Consumer)
-	tasks, errs, err := receiver.AddListener(rpt)
+	tasks, err := receiver.AddListener(rpt)
 	ass.Nil(err)
 
 	// wait for 1 seconds,
@@ -123,16 +117,10 @@ func TestLocalConsumeReceipt(t *testing.T) {
 				Status: Status.OK,
 			}
 		}
-	case err, ok := <-errs:
-		if !ok {
-			ass.Fail("errs channel is closed")
-		} else {
-			ass.Fail(err.Error())
-		}
 	}
 
 	// done
-	ass.Nil(receiver.(common.Server).Close())
+	ass.Nil(receiver.(common.Object).Close())
 }
 
 //

@@ -129,8 +129,14 @@ func (me *_amqp) init() (err error) {
 }
 
 //
-// common.Server interface
+// common.Object interface
 //
+
+func (me *_amqp) Events() ([]<-chan *common.Event, error) {
+	return []<-chan *common.Event{
+		me.consumers.Events(),
+	}, nil
+}
 
 func (me *_amqp) Close() (err error) {
 	me.consumers.Close()
@@ -202,13 +208,13 @@ func (me *_amqp) Send(t meta.Task) (err error) {
 // Consumer interface
 //
 
-func (me *_amqp) AddListener(receipts <-chan Receipt) (<-chan meta.Task, <-chan error, error) {
-	tasks := make(chan meta.Task, 10)
-	errs := make(chan error, 10)
-	quit, wait := me.consumers.New()
-	go me._consumer_routine_(quit, wait, tasks, errs, receipts)
+func (me *_amqp) AddListener(receipts <-chan Receipt) (tasks <-chan meta.Task, err error) {
+	t := make(chan meta.Task, 10)
+	quit := me.consumers.New()
+	go me._consumer_routine_(quit, me.consumers.Wait(), me.consumers.Events(), t, receipts)
 
-	return tasks, errs, nil
+	tasks = t
+	return
 }
 
 func (me *_amqp) Stop() (err error) {
@@ -223,8 +229,8 @@ func (me *_amqp) Stop() (err error) {
 func (me *_amqp) _consumer_routine_(
 	quit <-chan int,
 	wait *sync.WaitGroup,
+	events chan<- *common.Event,
 	tasks chan<- meta.Task,
-	errs chan<- error,
 	receipts <-chan Receipt,
 ) {
 	defer wait.Done()
@@ -241,7 +247,7 @@ func (me *_amqp) _consumer_routine_(
 	// acquire a channel
 	ci, err := me.receiver.Channel()
 	if err != nil {
-		errs <- err
+		events <- common.NewEventFromError(common.InstT.CONSUMER, err)
 		return
 	}
 	defer me.receiver.ReleaseChannel(ci)
@@ -256,33 +262,36 @@ func (me *_amqp) _consumer_routine_(
 		nil,   // args
 	)
 	if err != nil {
-		errs <- err
+		events <- common.NewEventFromError(common.InstT.CONSUMER, err)
 		return
 	}
 
 	for {
 		select {
-		case d, _ := <-dv:
+		case d, ok := <-dv:
+			if !ok {
+				goto cleanup
+			}
 			t, err_ := meta.UnmarshalTask(d.Body)
 			if err_ != nil {
 				// an invalid task
 				d.Nack(false, false)
-				errs <- err_
+				events <- common.NewEventFromError(common.InstT.CONSUMER, err_)
 				break
 			}
 
 			tasks <- t
 			reply, ok := <-receipts
-			if ok {
-				if reply.Status == Status.WORKER_NOT_FOUND {
-					d.Nack(false, false)
-				} else {
-					d.Ack(false)
-				}
-			} else {
+			if !ok {
 				goto cleanup
 			}
-		case <-quit:
+
+			if reply.Status == Status.WORKER_NOT_FOUND {
+				d.Nack(false, false)
+			} else {
+				d.Ack(false)
+			}
+		case _, _ = <-quit:
 			goto cleanup
 		}
 	}
@@ -290,7 +299,7 @@ func (me *_amqp) _consumer_routine_(
 cleanup:
 	err_ := ci.Channel.Cancel(tag, false)
 	if err_ != nil {
-		errs <- err_
+		events <- common.NewEventFromError(common.InstT.CONSUMER, err_)
 		// should we return here?,
 		// we still need to clean the delivery channel...
 	}
@@ -313,7 +322,6 @@ cleanup:
 
 	// close output channel
 	close(tasks)
-	close(errs)
 
 	return
 }

@@ -62,9 +62,12 @@ type worker struct {
 //
 
 type _workers struct {
-	lock    sync.RWMutex
-	workers map[string]*worker
-	reports chan meta.Report
+	lock           sync.RWMutex
+	workers        map[string]*worker
+	reports        chan meta.Report
+	events         chan *common.Event
+	eventConverter *common.Routines
+	eventMux       *common.Mux
 }
 
 // allocating a new group of workers
@@ -93,14 +96,39 @@ func (me *_workers) allocate(m Matcher, fn interface{}, count int) (id string, r
 		return
 	}
 
-	func() {
+	if me.workers == nil {
+		err = errors.New("worker slice is not initialized")
+		return
+	}
+
+	var (
+		w   *worker
+		eid int
+	)
+	defer func() {
+		if err != nil {
+			if eid != 0 {
+				_, err_ := me.eventMux.Unregister(eid)
+				if err_ != nil {
+					// TODO: log it
+				}
+			}
+
+			if w != nil {
+				err_ := w.rs.Close()
+				if err_ != nil {
+					// TODO: log it?
+				}
+				close(w.tasks)
+			}
+		} else {
+			remain, err = me.more(id, count)
+		}
+	}()
+
+	err = func() (err error) {
 		me.lock.Lock()
 		defer me.lock.Unlock()
-
-		if me.workers == nil {
-			err = errors.New("worker slice is not initialized")
-			return
-		}
 
 		// get an unique id
 		for {
@@ -112,15 +140,22 @@ func (me *_workers) allocate(m Matcher, fn interface{}, count int) (id string, r
 		}
 
 		// initiate controlling channle
-		me.workers[id] = &worker{
+		w = &worker{
 			matcher: m,
 			tasks:   make(chan meta.Task, 10), // TODO: configuration?
 			rs:      common.NewRoutines(),
 			fn:      fn,
 		}
+
+		eid, err = me.eventMux.Register(w.rs.Events(), 1)
+		if err != nil {
+			return
+		}
+
+		me.workers[id] = w
+		return
 	}()
 
-	remain, err = me.more(id, count)
 	return
 }
 
@@ -161,8 +196,7 @@ func (me *_workers) more(id string, count int) (remain int, err error) {
 
 	// initiating workers
 	for ; remain > 0; remain-- {
-		quit, wait := w.rs.New()
-		go _worker_routine_(quit, wait, w.tasks, me.reports, w.fn)
+		go _worker_routine_(w.rs.New(), w.rs.Wait(), w.rs.Events(), w.tasks, me.reports, w.fn)
 	}
 
 	return
@@ -212,9 +246,16 @@ func (me *_workers) dispatch(t meta.Task) (err error) {
 }
 
 //
+// common.Object interface
 //
-//
-func (me *_workers) done() (err error) {
+
+func (me *_workers) Events() ([]<-chan *common.Event, error) {
+	return []<-chan *common.Event{
+		me.events,
+	}, nil
+}
+
+func (me *_workers) Close() (err error) {
 	me.lock.Lock()
 	defer me.lock.Unlock()
 
@@ -225,6 +266,7 @@ func (me *_workers) done() (err error) {
 
 	// unbind reports channel
 	close(me.reports)
+	me.reports = make(chan meta.Report, 10)
 
 	return
 }
@@ -234,18 +276,26 @@ func (me *_workers) reportsChannel() <-chan meta.Report {
 }
 
 // factory function
-func newWorkers() *_workers {
-	return &_workers{
-		workers: make(map[string]*worker),
-		reports: make(chan meta.Report, 10),
+func newWorkers() (w *_workers) {
+	w = &_workers{
+		workers:        make(map[string]*worker),
+		reports:        make(chan meta.Report, 10),
+		eventConverter: common.NewRoutines(),
+		events:         make(chan *common.Event, 10),
+		eventMux:       common.NewMux(),
 	}
+
+	go func(quit <-chan int, wait *sync.WaitGroup, in <-chan *common.MuxOut, out chan *common.Event) {
+	}(w.eventConverter.New(), w.eventConverter.Wait(), w.eventMux.Out(), w.events)
+
+	return
 }
 
 //
 // worker routine
 //
 
-func _worker_routine_(quit <-chan int, wait *sync.WaitGroup, tasks <-chan meta.Task, reports chan<- meta.Report, fn interface{}) {
+func _worker_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, tasks <-chan meta.Task, reports chan<- meta.Report, fn interface{}) {
 	defer wait.Done()
 	// TODO: concider a shared, common invoker instance?
 	ivk := meta.NewDefaultInvoker()
@@ -254,7 +304,6 @@ func _worker_routine_(quit <-chan int, wait *sync.WaitGroup, tasks <-chan meta.T
 		select {
 		case t, ok := <-tasks:
 			if !ok {
-				// TODO: when channel is closed
 				goto cleanup
 			}
 
@@ -268,10 +317,13 @@ func _worker_routine_(quit <-chan int, wait *sync.WaitGroup, tasks <-chan meta.T
 			// compose a report -- progress
 			r, err = t.ComposeReport(meta.Status.Progress, nil, nil)
 			if err != nil {
+				// TODO: a test case here
 				r, err_ = t.ComposeReport(meta.Status.Fail, nil, meta.NewErr(0, err))
 				if err_ != nil {
-					// TODO: log it
+					events <- common.NewEventFromError(common.InstT.WORKER, err_)
+					break
 				}
+				reports <- r
 				break
 			}
 			reports <- r
@@ -288,7 +340,7 @@ func _worker_routine_(quit <-chan int, wait *sync.WaitGroup, tasks <-chan meta.T
 
 			r, err_ = t.ComposeReport(status, ret, meta.NewErr(0, err))
 			if err_ != nil {
-				// TODO: log it
+				events <- common.NewEventFromError(common.InstT.WORKER, err_)
 				break
 			}
 			reports <- r
@@ -299,5 +351,4 @@ func _worker_routine_(quit <-chan int, wait *sync.WaitGroup, tasks <-chan meta.T
 		}
 	}
 cleanup:
-	return
 }
