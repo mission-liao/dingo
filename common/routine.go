@@ -18,28 +18,38 @@ import (
 //
 
 type Routines struct {
-	quits []chan int
-	qLock sync.Mutex
-	wg    sync.WaitGroup
+	quits  []chan int
+	qLock  sync.Mutex
+	wg     sync.WaitGroup
+	events chan *Event
 }
 
 func NewRoutines() *Routines {
 	return &Routines{
-		quits: make([]chan int, 0, 10),
+		quits:  make([]chan int, 0, 10),
+		events: make(chan *Event, 10),
 	}
 }
 
-func (me *Routines) New() (<-chan int, *sync.WaitGroup) {
+func (me *Routines) New() <-chan int {
 	me.wg.Add(1)
 
 	me.qLock.Lock()
 	defer me.qLock.Unlock()
 
 	me.quits = append(me.quits, make(chan int, 1))
-	return me.quits[len(me.quits)-1], &me.wg
+	return me.quits[len(me.quits)-1]
 }
 
-func (me *Routines) Close() {
+func (me *Routines) Wait() *sync.WaitGroup {
+	return &me.wg
+}
+
+func (me *Routines) Events() <-chan *Event {
+	return me.events
+}
+
+func (me *Routines) Close() (err error) {
 	me.qLock.Lock()
 	defer me.qLock.Unlock()
 
@@ -49,11 +59,15 @@ func (me *Routines) Close() {
 	}
 	me.quits = make([]chan int, 0, 10)
 	me.wg.Wait()
+	close(me.events)
+
+	return
 }
 
 // Heterogeneous Routines
 //
-//
+// similar to 'Routines', but can be closed
+// one by one.
 
 type _control struct {
 	quit, done chan int
@@ -62,25 +76,28 @@ type _control struct {
 type HetroRoutines struct {
 	ctrls     map[int]*_control
 	ctrlsLock sync.Mutex
+	events    chan *Event
 }
 
 func NewHetroRoutines() *HetroRoutines {
 	return &HetroRoutines{
-		ctrls: make(map[int]*_control),
+		ctrls:  make(map[int]*_control),
+		events: make(chan *Event, 10),
 	}
 }
 
-func (me *HetroRoutines) New() (quit <-chan int, done chan<- int, idx int) {
+func (me *HetroRoutines) New(want int) (quit <-chan int, done chan<- int, idx int) {
 	me.ctrlsLock.Lock()
 	defer me.ctrlsLock.Unlock()
 
 	// get an index
+	idx = want
 	for {
-		idx = rand.Int()
 		_, ok := me.ctrls[idx]
 		if !ok {
 			break
 		}
+		idx = rand.Int()
 	}
 
 	me.ctrls[idx] = &_control{
@@ -110,7 +127,11 @@ func (me *HetroRoutines) Stop(idx int) (err error) {
 	return
 }
 
-func (me *HetroRoutines) Close() {
+func (me *HetroRoutines) Events() <-chan *Event {
+	return me.events
+}
+
+func (me *HetroRoutines) Close() (err error) {
 	me.ctrlsLock.Lock()
 	defer me.ctrlsLock.Unlock()
 
@@ -126,6 +147,7 @@ func (me *HetroRoutines) Close() {
 	}
 
 	me.ctrls = make(map[int]*_control)
+	return
 }
 
 func init() {

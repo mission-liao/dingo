@@ -69,7 +69,7 @@ func NewMux() (m *Mux) {
 func (m *Mux) More(count int) (remain int, err error) {
 	remain = count
 	for ; remain > 0; remain-- {
-		go m._mux_routine_(m.rs.New())
+		go m._mux_routine_(m.rs.New(), m.rs.Wait())
 	}
 	return
 }
