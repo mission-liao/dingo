@@ -45,10 +45,12 @@ func (me *Routines) Wait() *sync.WaitGroup {
 	return &me.wg
 }
 
-func (me *Routines) Events() <-chan *Event {
+func (me *Routines) Events() chan *Event {
 	return me.events
 }
 
+// stop/release all allocated routines,
+// this function should be safe from multiple calls.
 func (me *Routines) Close() (err error) {
 	me.qLock.Lock()
 	defer me.qLock.Unlock()
@@ -59,7 +61,9 @@ func (me *Routines) Close() (err error) {
 	}
 	me.quits = make([]chan int, 0, 10)
 	me.wg.Wait()
+
 	close(me.events)
+	me.events = make(chan *Event, 10)
 
 	return
 }
@@ -127,7 +131,7 @@ func (me *HetroRoutines) Stop(idx int) (err error) {
 	return
 }
 
-func (me *HetroRoutines) Events() <-chan *Event {
+func (me *HetroRoutines) Events() chan *Event {
 	return me.events
 }
 

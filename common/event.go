@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-var ErrLevel = struct {
+var ErrLvl = struct {
 	DEBUG   int
 	INFO    int
 	WARNING int
@@ -42,7 +42,7 @@ func NewEventFromError(orig int, err error) *Event {
 	return &Event{
 		Origin: orig,
 		Time:   time.Now(),
-		Level:  ErrLevel.ERROR,
+		Level:  ErrLvl.ERROR,
 		Err:    err,
 	}
 }
