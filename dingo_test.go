@@ -1,8 +1,8 @@
 package dingo
 
 import (
-	"sync"
 	"testing"
+	"time"
 
 	"github.com/mission-liao/dingo/backend"
 	"github.com/mission-liao/dingo/broker"
@@ -16,9 +16,8 @@ type DingoTestSuite struct {
 
 	app    *_app
 	cfg    *Config
-	events []*common.Event
-	quit   chan int
-	wait   sync.WaitGroup
+	eid    int
+	events <-chan *common.Event
 }
 
 func (me *DingoTestSuite) SetupSuite() {
@@ -26,54 +25,35 @@ func (me *DingoTestSuite) SetupSuite() {
 	app, err := NewApp(*me.cfg)
 	me.Nil(err)
 	me.app = app.(*_app)
-}
-
-func (me *DingoTestSuite) SetupTest() {
-	me.events = make([]*common.Event, 0, 10)
-	me.quit = make(chan int, 1)
-	me.wait.Add(1)
-
-	go func() {
-		defer me.wait.Done()
-
-		_, in, err := me.app.Listen(common.InstT.ALL, common.ErrLvl.DEBUG, 0)
-		me.Nil(err)
-		me.NotNil(in)
-
-		for {
-			select {
-			case e, ok := <-in:
-				if !ok {
-					return
-				}
-				me.events = append(me.events, e)
-			case _, _ = <-me.quit:
-				for {
-					select {
-					case e, ok := <-in:
-						if !ok {
-							return
-						}
-						me.events = append(me.events, e)
-					default:
-						return
-					}
-				}
-			}
-		}
-	}()
+	me.eid, me.events, err = me.app.Listen(common.InstT.ALL, common.ErrLvl.DEBUG, 0)
+	me.Nil(err)
 }
 
 func (me *DingoTestSuite) TearDownTest() {
-	me.quit <- 1
-	me.wait.Wait()
+	for {
+		done := false
+		select {
+		case v, ok := <-me.events:
+			if !ok {
+				done = true
+				break
+			}
+			me.T().Errorf("receiving event:%+v", v)
 
-	for _, v := range me.events {
-		me.Nil(v)
+		// TODO: how to know that there is some error sent...
+		// not a good way to block until errors reach here.
+		case <-time.After(2 * time.Second):
+			done = true
+		}
+
+		if done {
+			break
+		}
 	}
 }
 
 func (me *DingoTestSuite) TearDownSuite() {
+	me.app.StopListen(me.eid)
 	me.Nil(me.app.Close())
 }
 
@@ -114,7 +94,7 @@ func (me *DingoTestSuite) TestBasic() {
 			// make sure the order of status is right
 			me.True(len(status) > 0)
 			if len(status) > 0 {
-				me.Equal(v.GetStatus(), status[0])
+				me.Equal(status[0], v.GetStatus())
 				status = status[1:]
 			}
 

@@ -29,7 +29,9 @@ func TestMapperSuite(t *testing.T) {
 }
 
 func (me *MapperTestSuite) SetupSuite() {
-	me._mps = newMappers()
+	var err error
+	me._mps, err = newMappers()
+	me.Nil(err)
 
 	// allocate 3 mapper routines
 	for remain := me._countOfMappers; remain > 0; remain-- {

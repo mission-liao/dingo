@@ -20,7 +20,9 @@ func TestWorkerSuite(t *testing.T) {
 }
 
 func (me *WorkerTestSuite) SetupSuite() {
-	me._ws = newWorkers()
+	var err error
+	me._ws, err = newWorkers()
+	me.Nil(err)
 	me._invoker = meta.NewDefaultInvoker()
 }
 

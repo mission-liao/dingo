@@ -276,7 +276,7 @@ func (me *_workers) reportsChannel() <-chan meta.Report {
 }
 
 // factory function
-func newWorkers() (w *_workers) {
+func newWorkers() (w *_workers, err error) {
 	w = &_workers{
 		workers:        make(map[string]*worker),
 		reports:        make(chan meta.Report, 10),
@@ -286,7 +286,26 @@ func newWorkers() (w *_workers) {
 	}
 
 	go func(quit <-chan int, wait *sync.WaitGroup, in <-chan *common.MuxOut, out chan *common.Event) {
+		defer wait.Done()
+		for {
+			select {
+			case _, _ = <-quit:
+				goto cleanup
+			case v, ok := <-in:
+				fmt.Println("receiving event in worker")
+				if !ok {
+					goto cleanup
+				}
+				out <- v.Value.(*common.Event)
+			}
+		}
+	cleanup:
 	}(w.eventConverter.New(), w.eventConverter.Wait(), w.eventMux.Out(), w.events)
+
+	remain, err := w.eventMux.More(1)
+	if err == nil && remain != 0 {
+		err = errors.New(fmt.Sprintf("Unable to allocate mux routine:%v"))
+	}
 
 	return
 }
@@ -334,6 +353,7 @@ func _worker_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *comm
 			// compose a report -- done / fail
 			if err != nil {
 				status = meta.Status.Fail
+				events <- common.NewEventFromError(common.InstT.WORKER, err_)
 			} else {
 				status = meta.Status.Done
 			}

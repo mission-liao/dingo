@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -111,7 +112,12 @@ func NewApp(c Config) (App, error) {
 	// preserved.
 	go v._event_routine_(v.events.New(), v.events.Wait(), v.eventMux.Out())
 
-	return v, nil
+	remain, err := v.eventMux.More(1)
+	if err == nil && remain != 0 {
+		err = errors.New(fmt.Sprintf("Unable to allocate mux routine: %v", remain))
+	}
+
+	return v, err
 }
 
 //
@@ -130,7 +136,7 @@ func (me *_app) _event_routine_(quit <-chan int, wait *sync.WaitGroup, events <-
 			m := me.eventOut.Load().(map[int]*_eventListener)
 			// to the channel containing everythin errors
 			for _, eln := range m {
-				if (eln.targets&e.Origin) == 0 || eln.level < e.Level {
+				if (eln.targets&e.Origin) == 0 || eln.level > e.Level {
 					continue
 				}
 
@@ -338,7 +344,11 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 	}
 
 	if consumer != nil {
-		mps = newMappers()
+		mps, err = newMappers()
+		if err != nil {
+			return
+		}
+
 		for remain := me.cfg.Mappers_; remain > 0; remain-- {
 			// TODO: handle events channel
 			receipts := make(chan broker.Receipt, 10)
@@ -399,31 +409,47 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 		}
 	}
 
-	v, ok := obj.(common.Object)
-	if ok {
-		var (
-			events []<-chan *common.Event
-			eid    int
-		)
-		events, err = v.Events()
+	attach_event := func(in []int, o interface{}) (out []int, err error) {
+		out = in
+		if reflect.ValueOf(o).IsNil() {
+			return
+		}
+
+		v, ok := o.(common.Object)
+		if !ok {
+			return
+		}
+
+		events, err := v.Events()
 		if err != nil {
 			return
 		}
-		for _, ch := range events {
-			eid, err = me.eventMux.Register(ch, 0)
+
+		var eid int
+		for _, e := range events {
+			eid, err = me.eventMux.Register(e, 0)
 			if err != nil {
 				return
 			}
-			eids = append(eids, eid)
+			out = append(out, eid)
 		}
+		return
+	}
+
+	eids, err = attach_event(eids, obj)
+	if err != nil {
+		return
+	}
+	eids, err = attach_event(eids, mps)
+	if err != nil {
+		return
+	}
+	eids, err = attach_event(eids, mns)
+	if err != nil {
+		return
 	}
 
 	// --- nothing should throw error below ---
-
-	me.objs[id] = &_object{
-		used: used,
-		obj:  obj,
-	}
 
 	// attach objects to app
 	if producer != nil {
@@ -443,6 +469,11 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 		me.monitors = mns
 		me.store = store
 		used |= common.InstT.STORE
+	}
+
+	me.objs[id] = &_object{
+		used: used,
+		obj:  obj,
 	}
 
 	return

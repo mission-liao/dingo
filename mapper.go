@@ -47,10 +47,14 @@ func (me *_mappers) reports() <-chan meta.Report {
 // common.Object interface
 //
 
-func (me *_mappers) Events() ([]<-chan *common.Event, error) {
-	return []<-chan *common.Event{
-		me.mappers.Events(),
-	}, nil
+func (me *_mappers) Events() (ret []<-chan *common.Event, err error) {
+	ret, err = me.workers.Events()
+	if err != nil {
+		return
+	}
+
+	ret = append(ret, me.mappers.Events())
+	return
 }
 
 func (m *_mappers) Close() (err error) {
@@ -64,11 +68,17 @@ func (m *_mappers) Close() (err error) {
 // - tasks: input channel
 // returns:
 // ...
-func newMappers() *_mappers {
-	return &_mappers{
-		workers: newWorkers(),
+func newMappers() (m *_mappers, err error) {
+	w, err := newWorkers()
+	if err != nil {
+		return
+	}
+
+	m = &_mappers{
+		workers: w,
 		mappers: common.NewRoutines(),
 	}
+	return
 }
 
 //
@@ -91,6 +101,9 @@ func (m *_mappers) _mapper_routine_(quit <-chan int, wait *sync.WaitGroup, event
 			// compose a receipt
 			var rpt broker.Receipt
 			if err != nil {
+				// send an error event
+				events <- common.NewEventFromError(common.InstT.MAPPER, err)
+
 				if err == errWorkerNotFound {
 					rpt = broker.Receipt{
 						Status: broker.Status.WORKER_NOT_FOUND,
