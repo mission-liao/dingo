@@ -157,9 +157,12 @@ func (me *_amqp) Poll(id meta.ID) (err error) {
 	if err != nil {
 		return
 	}
+	var dv <-chan amqp.Delivery
 	defer func() {
 		if err != nil {
 			me.AmqpConnection.ReleaseChannel(ci)
+		} else {
+			go me._store_routine_(quit, done, me.stores.Events(), me.reports, ci, dv, id)
 		}
 	}()
 	// declare a queue for this task
@@ -187,7 +190,7 @@ func (me *_amqp) Poll(id meta.ID) (err error) {
 		return
 	}
 
-	dv, err := ci.Channel.Consume(
+	dv, err = ci.Channel.Consume(
 		qName, // name of queue
 		tag,   // consumer Tag
 		false, // autoAck
@@ -200,9 +203,6 @@ func (me *_amqp) Poll(id meta.ID) (err error) {
 		return
 	}
 
-	if err == nil {
-		go me._store_routine_(quit, done, me.stores.Events(), me.reports, ci, dv, id)
-	}
 	return
 }
 
@@ -244,7 +244,6 @@ func (me *_amqp) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, event
 				break
 			}
 
-			// TODO: errs channel
 			// acquire a channel
 			err = func() (err error) {
 				ci, err := me.AmqpConnection.Channel()
@@ -300,6 +299,7 @@ func (me *_amqp) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, event
 				cf := <-ci.Confirm
 				if !cf.Ack {
 					err = errors.New("Unable to publish to server")
+					return
 				}
 
 				return
@@ -324,10 +324,19 @@ func (me *_amqp) _store_routine_(
 	dv <-chan amqp.Delivery,
 	id meta.ID) {
 
-	var err error
+	var (
+		err            error
+		isChannelError bool = false
+	)
 
 	defer func() {
-		me.AmqpConnection.ReleaseChannel(ci)
+		if isChannelError {
+			// when error occurs, this channel is
+			// automatically closed.
+			me.AmqpConnection.ReleaseChannel(nil)
+		} else {
+			me.AmqpConnection.ReleaseChannel(ci)
+		}
 		done <- 1
 		close(done)
 	}()
@@ -357,6 +366,7 @@ cleanup:
 	err = ci.Channel.Cancel(getConsumerTag(id), false)
 	if err != nil {
 		events <- common.NewEventFromError(common.InstT.STORE, err)
+		isChannelError = true
 		return
 	}
 
@@ -370,6 +380,7 @@ cleanup:
 	)
 	if err != nil {
 		events <- common.NewEventFromError(common.InstT.STORE, err)
+		isChannelError = true
 		return
 	}
 
@@ -382,6 +393,7 @@ cleanup:
 	)
 	if err != nil {
 		events <- common.NewEventFromError(common.InstT.STORE, err)
+		isChannelError = true
 		return
 	}
 }

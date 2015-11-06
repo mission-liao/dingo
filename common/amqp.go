@@ -212,5 +212,13 @@ func (me *AmqpConnection) Channel() (ch *AmqpChannel, err error) {
 func (me *AmqpConnection) ReleaseChannel(ci *AmqpChannel) {
 	if ci != nil {
 		me.channels <- ci
+	} else {
+		func() {
+			me.cLock.Lock()
+			defer me.cLock.Unlock()
+
+			me.noMore = false
+			me.cntChannels--
+		}()
 	}
 }
