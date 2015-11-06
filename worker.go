@@ -292,7 +292,6 @@ func newWorkers() (w *_workers, err error) {
 			case _, _ = <-quit:
 				goto cleanup
 			case v, ok := <-in:
-				fmt.Println("receiving event in worker")
 				if !ok {
 					goto cleanup
 				}
