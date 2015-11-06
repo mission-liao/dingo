@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -41,148 +42,124 @@ type MuxOut struct {
 }
 
 type Mux struct {
-	rs *Routines
+	rs      *Routines
+	changed []chan time.Time
+	rsLock  sync.Mutex
 
 	// check for new condition
-	rw      sync.RWMutex
-	cases   map[int]interface{}
-	touched time.Time
+	rw        sync.RWMutex
+	cases     atomic.Value
+	casesLock sync.Mutex
 
-	// modifier
-	lck      sync.Mutex
-	_2delete []int
-	_2add    []*_newChannel
 	// output channel
 	_out chan *MuxOut
 }
 
 func NewMux() (m *Mux) {
-	return &Mux{
+	m = &Mux{
 		rs:      NewRoutines(),
-		cases:   make(map[int]interface{}),
-		touched: time.Now(),
+		changed: make([]chan time.Time, 0, 10),
 		_out:    make(chan *MuxOut, 10),
 	}
+
+	m.cases.Store(make(map[int]interface{}))
+	return
 }
 
 //
-func (m *Mux) More(count int) (remain int, err error) {
+func (me *Mux) More(count int) (remain int, err error) {
 	remain = count
 	for ; remain > 0; remain-- {
-		go m._mux_routine_(m.rs.New(), m.rs.Wait())
+		c := make(chan time.Time, 10)
+		me.changed = append(me.changed, c)
+		go me._mux_routine_(me.rs.New(), me.rs.Wait(), c, me._out)
 	}
 	return
 }
 
 //
-func (m *Mux) Close() {
-	m.rs.Close()
-
-	if m._out != nil {
-		close(m._out)
-	}
-
+func (me *Mux) Close() {
 	func() {
-		m.rw.Lock()
-		defer m.rw.Unlock()
-		m.cases = nil
+		me.rsLock.Lock()
+		defer me.rsLock.Unlock()
+		me.rs.Close()
+
+		for _, v := range me.changed {
+			close(v)
+		}
+		me.changed = make([]chan time.Time, 0, 10)
 	}()
+
+	close(me._out)
+	me._out = make(chan *MuxOut, 10)
+
+	me.casesLock.Lock()
+	defer me.casesLock.Unlock()
+	me.cases.Store(make(map[int]interface{}))
 }
 
 //
-func (m *Mux) Register(ch interface{}, want int) (id int, err error) {
-	m.rw.RLock()
-	defer m.rw.RUnlock()
+func (me *Mux) Register(ch interface{}, expectedId int) (id int, err error) {
+	func() {
+		me.casesLock.Lock()
+		defer me.casesLock.Unlock()
 
-	if m.cases == nil {
-		err = errors.New("Mux: Not Initialized")
-		return
-	}
-
-	m.lck.Lock()
-	defer m.lck.Unlock()
-
-	chk := func(id int) bool {
-		if id == 0 {
-			return false
-		}
-
-		_, ok := m.cases[id]
-		if ok {
-			return false
-		}
-
-		found := false
-		for _, v := range m._2add {
-			if v.id == id {
-				found = true
+		m := me.cases.Load().(map[int]interface{})
+		id = expectedId
+		for {
+			if _, ok := m[id]; !ok {
 				break
 			}
-		}
 
-		return !found
-	}
-
-	id = want
-	for {
-		if !chk(id) {
 			id = rand.Int()
-			continue
 		}
 
-		break
-	}
+		m_ := make(map[int]interface{})
+		for k, _ := range m {
+			m_[k] = m[k]
+		}
+		m_[id] = ch
+		me.cases.Store(m_)
+	}()
 
-	m._2add = append(m._2add, &_newChannel{id, ch})
-	m.touched = time.Now()
+	me.rsLock.Lock()
+	defer me.rsLock.Unlock()
+
+	touched := time.Now()
+	for _, v := range me.changed {
+		v <- touched
+	}
 	return
 }
 
 //
-func (m *Mux) Unregister(id int) (ch interface{}, err error) {
-	if id == 0 {
-		err = errors.New("Mux: Unable to unregister quit channel")
-		return
-	}
-
+func (me *Mux) Unregister(id int) (ch interface{}, err error) {
 	func() {
-		m.rw.RLock()
-		defer m.rw.RUnlock()
+		me.casesLock.Lock()
+		defer me.casesLock.Unlock()
 
-		_, ok := m.cases[id]
-		if !ok {
-			// look for that id in _2add
-			found := false
-			func() {
-				m.lck.Lock()
-				defer m.lck.Unlock()
-
-				for k, v := range m._2add {
-					if v.id == id {
-						// remove that element
-						m._2add = append(m._2add[:k], m._2add[k+1:]...)
-
-						found = true
-						break
-					}
-				}
-			}()
-
-			if !found {
-				err = errors.New(fmt.Sprintf("Mux: '%q' not found", id))
-				return
-			}
+		var ok bool
+		m := me.cases.Load().(map[int]interface{})
+		if ch, ok = m[id]; !ok {
+			err = errors.New(fmt.Sprintf("Id not found:%v", id))
+			return
 		}
+		delete(m, id)
+
+		m_ := make(map[int]interface{})
+		for k, _ := range m {
+			m_[k] = m[k]
+		}
+		me.cases.Store(m_)
 	}()
 
-	func() {
-		m.lck.Lock()
-		defer m.lck.Unlock()
+	me.rsLock.Lock()
+	defer me.rsLock.Unlock()
 
-		m._2delete = append(m._2delete, id)
-		m.touched = time.Now()
-	}()
-
+	touched := time.Now()
+	for _, v := range me.changed {
+		v <- touched
+	}
 	return
 }
 
@@ -191,119 +168,131 @@ func (m *Mux) Out() <-chan *MuxOut {
 	return m._out
 }
 
-func (m *Mux) _mux_routine_(quit <-chan int, wait *sync.WaitGroup) {
+func (me *Mux) _mux_routine_(quit <-chan int, wait *sync.WaitGroup, changed <-chan time.Time, output chan<- *MuxOut) {
 	defer wait.Done()
 	var (
 		cond       []reflect.SelectCase
 		keys       []int
-		updated    time.Time
 		lenOfcases int
 	)
-	for {
-		// check for new arrival
-		if updated.Before(m.touched) {
-			func() {
-				// writer lock
-				m.rw.Lock()
-				defer m.rw.Unlock()
 
-				// locking
-				m.lck.Lock()
-				defer m.lck.Unlock()
+	out := func(value *reflect.Value, chosen int) {
+		if value.CanInterface() {
+			output <- &MuxOut{
+				Id:    keys[chosen],
+				Value: value.Interface(),
+			}
+		}
+	}
 
-				// remove / append based on _2add, _2delete
-				for _, v := range m._2add {
-					m.cases[v.id] = v.v
-				}
-				m._2add = make([]*_newChannel, 0, 10)
+	del := func(chosen int) {
+		cond = append(cond[:chosen], cond[chosen+1:]...)
+		keys = append(keys[:chosen], keys[chosen+1:]...)
+		lenOfcases--
+	}
 
-				for _, v := range m._2delete {
-					delete(m.cases, v)
-				}
-				m._2delete = make([]int, 0, 10)
+	update := func() {
+		m := me.cases.Load().(map[int]interface{})
 
-				// update timestamp
-				updated = time.Now()
-			}()
+		keys = make([]int, 0, 10)
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Ints(keys)
 
-			func() {
-				// reader lock
-				m.rw.RLock()
-				defer m.rw.RUnlock()
-
-				// re-init sorted key slice
-				keys = make([]int, 0, 10)
-				for k := range m.cases {
-					keys = append(keys, k)
-				}
-				sort.Ints(keys)
-
-				// re-init a new condition slice
-				cond = make([]reflect.SelectCase, 0, 10)
-				for _, k := range keys {
-					cond = append(cond, reflect.SelectCase{
-						Dir:  reflect.SelectRecv,
-						Chan: reflect.ValueOf(m.cases[k]),
-					})
-				}
-			}()
-
-			// add quit channel
+		cond = make([]reflect.SelectCase, 0, 10)
+		for _, k := range keys {
 			cond = append(cond, reflect.SelectCase{
 				Dir:  reflect.SelectRecv,
-				Chan: reflect.ValueOf(quit),
+				Chan: reflect.ValueOf(m[k]),
 			})
-			lenOfcases = len(m.cases)
 		}
 
-		// add time.After channel
-		// TODO: configuration for timeout
+		// add quit channel
 		cond = append(cond, reflect.SelectCase{
 			Dir:  reflect.SelectRecv,
-			Chan: reflect.ValueOf(time.After(1 * time.Second)),
+			Chan: reflect.ValueOf(quit),
+		})
+		// add changed channel
+		cond = append(cond, reflect.SelectCase{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(changed),
 		})
 
-		// select...
+		lenOfcases = len(m)
+	}
+
+	update()
+	for {
 		chosen, value, ok := reflect.Select(cond)
-		cond = cond[:len(cond)-1] // pop the last timer event
-		switch chosen {
-		case lenOfcases:
-			// quit channel is triggered,
-			// need to clean-up && quit.
-			return
-		case lenOfcases + 1:
-			// time-out event is triggered,
-			// go for another round of for loop.
+		if !ok {
+			// control channel is closed (quit, changed)
+			if chosen >= lenOfcases {
+				goto cleanup
+			}
+
+			// remove that channel
+			del(chosen)
+
+			// its value is not trustable,
+			// so go for another round of for loop.
 			continue
-		default:
-			if !ok {
-				// that input channel is closed,
-				// remove it
-				func() {
-					m.lck.Lock()
-					defer m.lck.Unlock()
+		}
 
-					m._2delete = append(m._2delete, keys[chosen])
-					m.touched = time.Now()
-				}()
+		switch chosen {
 
-				// its value is not trustable,
-				// so go for another round of for loop.
-				continue
-			}
+		// quit channel is triggered.
+		case lenOfcases:
+			goto cleanup
 
-			if 0 > chosen || chosen > lenOfcases+2 {
-				// TODO: log error
-				return
-			}
-
-			// send to output channel
-			if value.CanInterface() {
-				m._out <- &MuxOut{
-					Id:    keys[chosen],
-					Value: value.Interface(),
+		// changed channel is triggered
+		case lenOfcases + 1:
+			// clear remaining changed event
+			cleared := false
+			for {
+				select {
+				case <-changed:
+				default:
+					cleared = true
+				}
+				if cleared {
+					break
 				}
 			}
+			update()
+
+		// other registered channels
+		default:
+			// send to output channel
+			out(&value, chosen)
+		}
+	}
+cleanup:
+	// update for the last time
+	update()
+	cond = cond[:len(cond)-2] // pop quit, changed channel
+	cond = append(cond, reflect.SelectCase{
+		Dir: reflect.SelectDefault,
+	}) // append a default case
+
+	// consuming things remaining in channels,
+	// until cleared.
+	for {
+		chosen, value, ok := reflect.Select(cond)
+		// note: when default case is triggered,
+		// 'ok' is always false, which is meaningless.
+		if !ok && chosen < len(cond)-1 {
+			// remove that channel
+			del(chosen)
+			continue
+		}
+
+		switch chosen {
+		// default is triggered
+		case len(cond) - 1:
+			return
+		default:
+			out(&value, chosen)
 		}
 	}
 }

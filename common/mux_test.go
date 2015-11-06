@@ -23,7 +23,7 @@ func TestMuxDifferentType(t *testing.T) {
 	cStr := make(chan string, 1)
 	iStr, err := m.Register(cStr, 0)
 	ass.Nil(err)
-	ass.NotEqual(0, iStr)
+	ass.Equal(0, iStr)
 
 	// prepare for integer channel
 	cInt := make(chan int, 1)
