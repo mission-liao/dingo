@@ -33,12 +33,13 @@ type App interface {
 	//          which task to accept by returning true.
 	// - fn: the function that actually perform the task.
 	// - count: count of workers to be initialized.
+	// - share: the count of workers sharing one report channel
 	//
 	// returns ->
 	// - id: identifier of this group of workers
 	// - remain: remaining count of workers that not initialized.
 	// - err: any error produced
-	Register(m Matcher, fn interface{}, count int) (id string, remain int, err error)
+	Register(m Matcher, fn interface{}, count, share int) (id string, remain int, err error)
 
 	// attach an instance, instance could be any instance implementing
 	// backend.Reporter, backend.Backend, broker.Producer, broker.Consumer.
@@ -173,10 +174,6 @@ func (me *_app) Close() (err error) {
 	// right now we would send a quit message to 'one' routine, and wait it done.
 
 	for _, v := range me.objs {
-		if v.used&common.InstT.REPORTER == common.InstT.REPORTER {
-			chk(me.reporter.Unbind())
-		}
-
 		s, ok := v.obj.(common.Object)
 		if ok {
 			chk(s.Close())
@@ -213,21 +210,30 @@ func (me *_app) Close() (err error) {
 	return
 }
 
-func (me *_app) Register(m Matcher, fn interface{}, count int) (id string, remain int, err error) {
+func (me *_app) Register(m Matcher, fn interface{}, count, share int) (id string, remain int, err error) {
 	me.objsLock.RLock()
 	defer me.objsLock.RUnlock()
 
-	remain = count
+	var reports []<-chan meta.Report
 
-	if me.mappers == nil && me.monitors == nil {
-		err = errors.New("no monitors/mappers available.")
+	remain = count
+	if me.mappers == nil || me.monitors == nil || me.reporter == nil {
+		err = errors.New("no reporter/monitors/mappers available.")
 		return
 	}
 
 	if me.mappers != nil {
-		id, remain, err = me.mappers.allocateWorkers(m, fn, count)
+		id, reports, remain, err = me.mappers.allocateWorkers(m, fn, count, share)
 		if err != nil {
 			return
+		}
+
+		for _, v := range reports {
+			// id of report channel is ignored
+			_, err = me.reporter.Report(v)
+			if err != nil {
+				return
+			}
 		}
 	}
 
@@ -380,24 +386,6 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 		if remain > 0 {
 			err = errors.New(fmt.Sprintf("Unable to allocate monitors %v", remain))
 			return
-		}
-	}
-
-	// bridge reporter and mappers
-	{
-		var _m *_mappers = me.mappers
-		if mps != nil {
-			_m = mps
-		}
-		var _r backend.Reporter = me.reporter
-		if reporter != nil {
-			_r = reporter
-		}
-		if _r != nil && _m != nil {
-			err = _r.Report(_m.reports())
-			if err != nil {
-				return
-			}
 		}
 	}
 

@@ -45,7 +45,7 @@ func (me *WorkerTestSuite) TestParellelRun() {
 		stepIn <- i
 		// workers would be blocked here
 		<-stepOut
-	}, 3)
+	}, 3, 0)
 
 	for i := 0; i < 3; i++ {
 		t, err := me._invoker.ComposeTask("test", i)

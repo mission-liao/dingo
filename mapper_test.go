@@ -65,11 +65,14 @@ func (me *MapperTestSuite) TestParellelMapping() {
 	count := me._countOfMappers + cap(me._tasks)
 	stepIn := make(chan int, count)
 	stepOut := make(chan int, count)
-	me._mps.allocateWorkers(&StrMatcher{"test"}, func(i int) {
+	_, reports, remain, err := me._mps.allocateWorkers(&StrMatcher{"test"}, func(i int) {
 		stepIn <- i
 		// workers would be blocked here
 		<-stepOut
-	}, 1)
+	}, 1, 0)
+	me.Nil(err)
+	me.Equal(0, remain)
+	me.Len(reports, 1)
 
 	// send enough tasks to fill mapper routines & tasks channel
 	for i := 0; i < count; i++ {
@@ -89,14 +92,14 @@ func (me *MapperTestSuite) TestParellelMapping() {
 		<-me._receiptsMux.Out()
 
 		// consume 2 report
-		<-me._mps.reports()
-		<-me._mps.reports()
+		<-reports[0]
+		<-reports[0]
 
 		// let 1 worker get out
 		stepOut <- 1
 
 		// consume another report
-		<-me._mps.reports()
+		<-reports[0]
 
 		rets = append(rets, <-stepIn)
 	}

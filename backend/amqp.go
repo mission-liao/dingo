@@ -35,14 +35,13 @@ type _amqp struct {
 	ridsLock sync.Mutex
 
 	// reporter
-	reporters     *common.Routines
-	reportersLock sync.Mutex
-	cfg           *Config
+	reporters *common.HetroRoutines
+	cfg       *Config
 }
 
 func newAmqp(cfg *Config) (v *_amqp, err error) {
 	v = &_amqp{
-		reporters: common.NewRoutines(),
+		reporters: common.NewHetroRoutines(),
 		rids:      make(map[string]int),
 		cfg:       cfg,
 		reports:   make(chan meta.Report, 10), // TODO: config
@@ -96,10 +95,7 @@ func (me *_amqp) Events() ([]<-chan *common.Event, error) {
 
 func (me *_amqp) Close() (err error) {
 	err = me.AmqpConnection.Close()
-	err_ := me.Unbind()
-	if err == nil {
-		err = err_
-	}
+	me.reporters.Close()
 	me.stores.Close()
 	return
 }
@@ -108,30 +104,9 @@ func (me *_amqp) Close() (err error) {
 // Reporter interface
 //
 
-func (me *_amqp) Report(reports <-chan meta.Report) (err error) {
-	me.reportersLock.Lock()
-	defer me.reportersLock.Unlock()
-
-	// close previous reporters
-	me.reporters.Close()
-
-	remain := me.cfg.Reporters_
-	for ; remain > 0; remain-- {
-		quit := me.reporters.New()
-		go me._reporter_routine_(quit, me.reporters.Wait(), me.reporters.Events(), reports)
-	}
-
-	if remain > 0 {
-		err = errors.New(fmt.Sprintf("Still %v reporters uninitiated", remain))
-	}
-	return
-}
-
-func (me *_amqp) Unbind() (err error) {
-	me.reportersLock.Lock()
-	defer me.reportersLock.Unlock()
-
-	me.reporters.Close()
+func (me *_amqp) Report(reports <-chan meta.Report) (id int, err error) {
+	quit, done, id := me.reporters.New(0)
+	go me._reporter_routine_(quit, done, me.reporters.Events(), reports)
 	return
 }
 
@@ -223,9 +198,11 @@ func (me *_amqp) Done(id meta.ID) (err error) {
 // routine definition
 //
 
-func (me *_amqp) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, reports <-chan meta.Report) {
+func (me *_amqp) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan meta.Report) {
 	// TODO: keep one AmqpConnection, instead of get/realease for each report.
-	defer wait.Done()
+	defer func() {
+		done <- 1
+	}()
 
 	for {
 		select {

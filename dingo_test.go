@@ -42,7 +42,7 @@ func (me *DingoTestSuite) TearDownTest() {
 
 		// TODO: how to know that there is some error sent...
 		// not a good way to block until errors reach here.
-		case <-time.After(2 * time.Second):
+		case <-time.After(1 * time.Second):
 			done = true
 		}
 
@@ -67,7 +67,7 @@ func (me *DingoTestSuite) TestBasic() {
 	_, remain, err := me.app.Register(&StrMatcher{"test_basic"}, func(n int) int {
 		called = n
 		return n + 1
-	}, 1)
+	}, 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 

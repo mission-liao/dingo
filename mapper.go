@@ -31,16 +31,9 @@ func (m *_mappers) more(tasks <-chan meta.Task, receipts chan<- broker.Receipt) 
 // proxy of _workers
 //
 
-func (me *_mappers) allocateWorkers(m Matcher, fn interface{}, count int) (string, int, error) {
-	return me.workers.allocate(m, fn, count)
-}
-
-func (me *_mappers) moreWorkers(id string, count int) (int, error) {
-	return me.workers.more(id, count)
-}
-
-func (me *_mappers) reports() <-chan meta.Report {
-	return me.workers.reportsChannel()
+func (me *_mappers) allocateWorkers(m Matcher, fn interface{}, count, share int) (string, []<-chan meta.Report, int, error) {
+	i, r, n, err := me.workers.allocate(m, fn, count, share)
+	return i, r, n, err
 }
 
 //

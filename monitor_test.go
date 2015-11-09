@@ -39,13 +39,12 @@ func (me *MonitorTestSuite) SetupSuite() {
 	me._mnt.more(me._count)
 
 	me._reporter = me._store.(backend.Reporter)
-	err = me._reporter.Report(me._reports)
+	_, err = me._reporter.Report(me._reports)
 	me.Nil(err)
 }
 
 func (me *MonitorTestSuite) TearDownSuite() {
 	me.Nil(me._mnt.Close())
-	me.Nil(me._reporter.Unbind())
 	me.Nil(me._store.(common.Object).Close())
 }
 

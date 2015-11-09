@@ -32,16 +32,15 @@ func defaultLocalConfig() *_localConfig {
 }
 
 type _local struct {
-	cfg           *Config
-	stores        *common.Routines
-	to            chan []byte
-	noJSON        chan meta.Report
-	reporters     *common.Routines
-	reportersLock sync.Mutex
-	reports       chan meta.Report
-	storeLock     sync.Mutex
-	toCheck       []string
-	unSent        []meta.Report
+	cfg       *Config
+	stores    *common.Routines
+	to        chan []byte
+	noJSON    chan meta.Report
+	reporters *common.HetroRoutines
+	reports   chan meta.Report
+	storeLock sync.Mutex
+	toCheck   []string
+	unSent    []meta.Report
 }
 
 // factory
@@ -49,7 +48,7 @@ func newLocal(cfg *Config) (v *_local, err error) {
 	v = &_local{
 		cfg:       cfg,
 		stores:    common.NewRoutines(),
-		reporters: common.NewRoutines(),
+		reporters: common.NewHetroRoutines(),
 		to:        make(chan []byte, 10),
 		noJSON:    make(chan meta.Report, 10),
 		reports:   make(chan meta.Report, 10),
@@ -64,8 +63,10 @@ func newLocal(cfg *Config) (v *_local, err error) {
 	return
 }
 
-func (me *_local) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, reports <-chan meta.Report) {
-	defer wait.Done()
+func (me *_local) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan meta.Report) {
+	defer func() {
+		done <- 1
+	}()
 
 	for {
 		select {
@@ -162,8 +163,7 @@ func (me *_local) Events() ([]<-chan *common.Event, error) {
 
 func (me *_local) Close() (err error) {
 	me.stores.Close()
-
-	err = me.Unbind()
+	me.reporters.Close()
 
 	close(me.reports)
 	close(me.to)
@@ -176,30 +176,10 @@ func (me *_local) Close() (err error) {
 // Reporter
 //
 
-func (me *_local) Report(reports <-chan meta.Report) (err error) {
-	me.reportersLock.Lock()
-	defer me.reportersLock.Unlock()
+func (me *_local) Report(reports <-chan meta.Report) (id int, err error) {
+	quit, done, id := me.reporters.New(0)
+	go me._reporter_routine_(quit, done, me.reporters.Events(), reports)
 
-	// close previous allocated reporters
-	me.reporters.Close()
-
-	remain := me.cfg.Reporters_
-	for ; remain > 0; remain-- {
-		quit := me.reporters.New()
-		go me._reporter_routine_(quit, me.reporters.Wait(), me.reporters.Events(), reports)
-	}
-
-	if remain > 0 {
-		err = errors.New(fmt.Sprintf("Still %v reporters uninitiated", remain))
-	}
-	return
-}
-
-func (me *_local) Unbind() (err error) {
-	me.reportersLock.Lock()
-	defer me.reportersLock.Unlock()
-
-	me.reporters.Close()
 	return
 }
 

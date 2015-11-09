@@ -28,8 +28,7 @@ type _redis struct {
 	cfg  *Config
 
 	// reporter
-	reporters     *common.Routines
-	reportersLock sync.Mutex
+	reporters *common.HetroRoutines
 
 	// store
 	reports  chan meta.Report
@@ -40,7 +39,7 @@ type _redis struct {
 
 func newRedis(cfg *Config) (v *_redis, err error) {
 	v = &_redis{
-		reporters: common.NewRoutines(),
+		reporters: common.NewHetroRoutines(),
 		reports:   make(chan meta.Report, 10),
 		rids:      make(map[string]int),
 		stores:    common.NewHetroRoutines(),
@@ -67,12 +66,8 @@ func (me *_redis) Events() ([]<-chan *common.Event, error) {
 
 func (me *_redis) Close() (err error) {
 	me.reporters.Close()
-	err = me.pool.Close()
-	err_ := me.Unbind()
-	if err == nil {
-		err = err_
-	}
 	me.stores.Close()
+	err = me.pool.Close()
 	return
 }
 
@@ -80,30 +75,10 @@ func (me *_redis) Close() (err error) {
 // Reporter interface
 //
 
-func (me *_redis) Report(reports <-chan meta.Report) (err error) {
-	me.reportersLock.Lock()
-	defer me.reportersLock.Unlock()
+func (me *_redis) Report(reports <-chan meta.Report) (id int, err error) {
+	quit, done, id := me.reporters.New(0)
+	go me._reporter_routine_(quit, done, me.reporters.Events(), reports)
 
-	// close previous allocated reporters
-	me.reporters.Close()
-
-	remain := me.cfg.Reporters_
-	for ; remain > 0; remain-- {
-		quit := me.reporters.New()
-		go me._reporter_routine_(quit, me.reporters.Wait(), me.reporters.Events(), reports)
-	}
-
-	if remain > 0 {
-		err = errors.New(fmt.Sprintf("Still %v reporters uninitiated", remain))
-	}
-	return
-}
-
-func (me *_redis) Unbind() (err error) {
-	me.reportersLock.Lock()
-	defer me.reportersLock.Unlock()
-
-	me.reporters.Close()
 	return
 }
 
@@ -146,8 +121,10 @@ func (me *_redis) Done(id meta.ID) (err error) {
 // routine definition
 //
 
-func (me *_redis) _reporter_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, reports <-chan meta.Report) {
-	defer wait.Done()
+func (me *_redis) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan meta.Report) {
+	defer func() {
+		done <- 1
+	}()
 
 	conn := me.pool.Get()
 	defer conn.Close()
