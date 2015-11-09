@@ -78,8 +78,10 @@ func (vk *_invoker) convert2map(v, r reflect.Value, rt reflect.Type) (err error)
 }
 
 func (vk *_invoker) convert2struct(v, r reflect.Value, rt reflect.Type) (err error) {
-	if v.Kind() != reflect.Map {
-		err = errors.New(fmt.Sprintf("Only Map not %v convertible to struct", v.Kind().String()))
+	kind := v.Kind()
+
+	if !(kind == reflect.Map || kind == reflect.Struct) {
+		err = errors.New(fmt.Sprintf("Only Map/Struct not %v convertible to struct", v.Kind().String()))
 		return
 	}
 	for i := 0; i < r.NumField(); i++ {
@@ -91,11 +93,13 @@ func (vk *_invoker) convert2struct(v, r reflect.Value, rt reflect.Type) (err err
 		var converted reflect.Value
 
 		ft := rt.Field(i)
-		if ft.Anonymous {
-			converted, err = vk.convert(v, ft.Type)
-		} else {
+		switch kind {
+		case reflect.Map:
+			if ft.Anonymous {
+				converted, err = vk.convert(v, ft.Type)
+				break
+			}
 			// json tags
-			// TODO: move this to a private function
 			key := ft.Tag.Get("json")
 			if key != "" {
 				key = strings.Trim(key, "\"")
@@ -115,10 +119,12 @@ func (vk *_invoker) convert2struct(v, r reflect.Value, rt reflect.Type) (err err
 			}
 
 			converted, err = vk.convert(mv, fv.Type())
+		case reflect.Struct:
+			converted = v.FieldByName(ft.Name)
 		}
 
 		if err != nil {
-			break
+			return err
 		}
 
 		fv.Set(converted)

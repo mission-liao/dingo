@@ -1,6 +1,8 @@
 package meta
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"testing"
 
@@ -26,17 +28,39 @@ func ioJSON(v ...interface{}) ([]interface{}, error) {
 	return ret, nil
 }
 
+// simulate Gob encoding over the wire
+func ioGOB(v ...interface{}) ([]interface{}, error) {
+	var (
+		wire bytes.Buffer
+		ret  []interface{}
+	)
+	enc := gob.NewEncoder(&wire)
+	dec := gob.NewDecoder(&wire)
+
+	err := enc.Encode(v)
+	if err != nil {
+		return nil, err
+	}
+
+	err = dec.Decode(&ret)
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
 //
 // struct
 //
-type _struct struct {
+type Struct struct {
 	Name  string
 	Count int
 }
 
 // struct with private field
 type _struct_private struct {
-	_struct
+	Struct
 	private int
 }
 
@@ -44,13 +68,13 @@ type _struct_private struct {
 // embed struct
 //
 type _embed struct {
-	_struct
+	Struct
 	Age  int
 	Addr string
 }
 
 type _embed_with_collision struct {
-	_struct
+	Struct
 	Age  int
 	Addr string
 
@@ -59,7 +83,7 @@ type _embed_with_collision struct {
 	Count int    `json:"out.Count,omitempty"`
 
 	// struct pointer
-	S *_struct
+	S *Struct
 }
 
 //
@@ -68,19 +92,85 @@ type _embed_with_collision struct {
 type InvokeTestSuite struct {
 	suite.Suite
 
-	ivk Invoker
+	ivk     Invoker
+	convert func(...interface{}) ([]interface{}, error)
 }
 
-func (s *InvokeTestSuite) SetupSuite() {
-	// prepare invoker
-	s.ivk = NewDefaultInvoker()
+//
+// json
+//
 
-	// TODO: map
-	// TODO: slice
+type InvokeJsonTestSuite struct {
+	InvokeTestSuite
 }
 
-func TestInvokeTestSuiteMain(t *testing.T) {
-	suite.Run(t, &InvokeTestSuite{})
+func TestInvokeJsonSuite(t *testing.T) {
+	suite.Run(t, &InvokeJsonTestSuite{
+		InvokeTestSuite{
+			ivk:     NewDefaultInvoker(),
+			convert: ioJSON,
+		},
+	})
+}
+
+func (s *InvokeJsonTestSuite) TestMap2Struct() {
+	s.InvokeTestSuite._testMap2Struct(map[string]*Struct{
+		"a": &Struct{Name: "Mary", Count: 11},
+		"b": &Struct{Name: "Bob", Count: 10},
+		"c": &Struct{Name: "Tom", Count: 12},
+		"d": nil,
+	})
+}
+
+func (s *InvokeJsonTestSuite) TestSliceOfStruct() {
+	s.InvokeTestSuite._testSliceOfStruct([]*Struct{
+		&Struct{Name: "Mary", Count: 11},
+		&Struct{Name: "Bob", Count: 10},
+		&Struct{Name: "Tom", Count: 12},
+		nil,
+	})
+}
+
+//
+// gob
+//
+
+type InvokeGobTestSuite struct {
+	InvokeTestSuite
+}
+
+func TestInvokeGobSuite(t *testing.T) {
+	gob.Register(map[string]int{})
+	gob.Register(_embed{})
+	gob.Register(_embed_with_collision{})
+	gob.Register(Struct{})
+	gob.Register(map[string]*Struct{})
+	gob.Register([]*Struct{})
+
+	suite.Run(t, &InvokeGobTestSuite{
+		InvokeTestSuite{
+			ivk:     NewDefaultInvoker(),
+			convert: ioGOB,
+		},
+	})
+}
+
+func (s *InvokeGobTestSuite) TestMap2Struct() {
+	s.InvokeTestSuite._testMap2Struct(map[string]*Struct{
+		"a": &Struct{Name: "Mary", Count: 11},
+		"b": &Struct{Name: "Bob", Count: 10},
+		"c": &Struct{Name: "Tom", Count: 12},
+		"d": &Struct{}, // gob didn't allow nil value as struct
+	})
+}
+
+func (s *InvokeGobTestSuite) TestSliceOfStruct() {
+	s.InvokeTestSuite._testSliceOfStruct([]*Struct{
+		&Struct{Name: "Mary", Count: 11},
+		&Struct{Name: "Bob", Count: 10},
+		&Struct{Name: "Tom", Count: 12},
+		&Struct{},
+	})
 }
 
 //
@@ -96,7 +186,7 @@ func (s *InvokeTestSuite) TestFloat64() {
 			return v, nil
 		}
 
-		param, err := ioJSON(float64(1.0))
+		param, err := s.convert(float64(1.0))
 		s.Nil(err)
 		s.NotNil(param)
 		if param != nil {
@@ -129,7 +219,7 @@ func (s *InvokeTestSuite) TestInt64() {
 			called = v
 			return v, nil
 		}
-		param, err := ioJSON(int64(1))
+		param, err := s.convert(int64(1))
 		s.Nil(err)
 		s.NotNil(param)
 		if param != nil {
@@ -157,7 +247,7 @@ func (s *InvokeTestSuite) TestInt() {
 			called = v
 			return v, nil
 		}
-		param, err := ioJSON(int(1))
+		param, err := s.convert(int(1))
 		s.Nil(err)
 		s.NotNil(param)
 		if param != nil {
@@ -184,7 +274,7 @@ func (s *InvokeTestSuite) TestString() {
 			called = v
 			return v, nil
 		}
-		param, err := ioJSON("test string")
+		param, err := s.convert("test string")
 		s.Nil(err)
 		s.NotNil(param)
 		if param != nil {
@@ -205,15 +295,15 @@ func (s *InvokeTestSuite) TestString() {
 }
 
 func (s *InvokeTestSuite) TestStruct() {
-	// *_struct
+	// *Struct
 	{
-		called := (*_struct)(nil)
-		chk := func(v *_struct) (*_struct, error) {
+		called := (*Struct)(nil)
+		chk := func(v *Struct) (*Struct, error) {
 			called = v
 			return v, nil
 		}
-		v := &_struct{Name: "Bob", Count: 10}
-		param, err := ioJSON(v)
+		v := &Struct{Name: "Bob", Count: 10}
+		param, err := s.convert(v)
 		s.Nil(err)
 		s.NotNil(param)
 		if param != nil {
@@ -221,7 +311,7 @@ func (s *InvokeTestSuite) TestStruct() {
 			s.Nil(err)
 			s.Len(ret, 2)
 			if ret != nil && len(ret) > 0 {
-				f, ok := ret[0].(*_struct)
+				f, ok := ret[0].(*Struct)
 				s.True(ok)
 				if ok {
 					s.Equal(v, f)
@@ -232,12 +322,12 @@ func (s *InvokeTestSuite) TestStruct() {
 		}
 	}
 
-	// **_struct
+	// **Struct
 	{
-		called := (**_struct)(nil)
+		called := (**Struct)(nil)
 		name := ""
 		count := 0
-		chk := func(v **_struct) (**_struct, error) {
+		chk := func(v **Struct) (**Struct, error) {
 			called = v
 			if v != nil && *v != nil {
 				name = (**v).Name
@@ -247,10 +337,10 @@ func (s *InvokeTestSuite) TestStruct() {
 			return v, nil
 		}
 		{
-			v_ := &_struct{Name: "Bob", Count: 10}
+			v_ := &Struct{Name: "Bob", Count: 10}
 			// pointer-2-pointer
 			v := &v_
-			param, err := ioJSON(v)
+			param, err := s.convert(v)
 			s.Nil(err)
 			s.NotNil(param)
 			if param != nil {
@@ -258,7 +348,7 @@ func (s *InvokeTestSuite) TestStruct() {
 				s.Nil(err)
 				s.Len(ret, 2)
 				if ret != nil && len(ret) > 0 {
-					f, ok := ret[0].(**_struct)
+					f, ok := ret[0].(**Struct)
 					s.True(ok)
 					if ok {
 						s.Equal(v, f)
@@ -273,7 +363,7 @@ func (s *InvokeTestSuite) TestStruct() {
 
 		// calling with nil
 		{
-			param, err := ioJSON(nil)
+			param, err := s.convert(nil)
 			s.Nil(err)
 			s.NotNil(param)
 			if param != nil {
@@ -281,10 +371,10 @@ func (s *InvokeTestSuite) TestStruct() {
 				s.Nil(err)
 				s.Len(ret, 2)
 				if ret != nil && len(ret) > 0 {
-					f, ok := ret[0].(**_struct)
+					f, ok := ret[0].(**Struct)
 					s.True(ok)
 					if ok {
-						s.Equal((**_struct)(nil), f)
+						s.Equal((**Struct)(nil), f)
 					}
 				}
 			}
@@ -307,8 +397,8 @@ func (s *InvokeTestSuite) TestEmbed() {
 			}
 			return v, nil
 		}
-		v := &_embed{_struct: _struct{Name: "Bob", Count: 10}, Age: 100, Addr: "heaven"}
-		param, err := ioJSON(v)
+		v := &_embed{Struct: Struct{Name: "Bob", Count: 10}, Age: 100, Addr: "heaven"}
+		param, err := s.convert(v)
 		s.Nil(err)
 		s.NotNil(param)
 		if param != nil {
@@ -344,22 +434,23 @@ func (s *InvokeTestSuite) TestEmbedWithCollision() {
 				age = v.Age
 				count = v.Count
 				address = v.Addr
-				name_ = v._struct.Name
-				count_ = v._struct.Count
+				name_ = v.Struct.Name
+				count_ = v.Struct.Count
 				name_s = v.S.Name
 				count_s = v.S.Count
 			}
 			return v, nil
 		}
+		_ = "breakpoint"
 		v := &_embed_with_collision{
-			_struct: _struct{Name: "Bob", Count: 10},
-			Age:     100,
-			Addr:    "heaven",
-			Name:    "Mary",
-			Count:   11,
-			S:       &_struct{Name: "Tom", Count: 12},
+			Struct: Struct{Name: "Bob", Count: 10},
+			Age:    100,
+			Addr:   "heaven",
+			Name:   "Mary",
+			Count:  11,
+			S:      &Struct{Name: "Tom", Count: 12},
 		}
-		param, err := ioJSON(v)
+		param, err := s.convert(v)
 		s.Nil(err)
 		s.NotNil(param)
 		if param != nil {
@@ -389,131 +480,122 @@ func (s *InvokeTestSuite) TestEmbedWithCollision() {
 
 func (s *InvokeTestSuite) TestMap() {
 	// map[string]int
-	{
-		var called map[string]int
-		chk := func(v map[string]int) (map[string]int, error) {
-			called = v
-			return v, nil
-		}
-		v := map[string]int{"Tom": 12, "Bob": 10, "Mary": 11}
-		param, err := ioJSON(v)
+	var called map[string]int
+	chk := func(v map[string]int) (map[string]int, error) {
+		called = v
+		return v, nil
+	}
+	v := map[string]int{"Tom": 12, "Bob": 10, "Mary": 11}
+	param, err := s.convert(v)
+	s.Nil(err)
+	s.NotNil(param)
+	if param != nil {
+		ret, err := s.ivk.Invoke(chk, param)
 		s.Nil(err)
-		s.NotNil(param)
-		if param != nil {
-			ret, err := s.ivk.Invoke(chk, param)
-			s.Nil(err)
-			s.Len(ret, 2)
-			if ret != nil && len(ret) > 0 {
-				f, ok := ret[0].(map[string]int)
-				s.True(ok)
-				if ok {
-					s.Equal(v, f)
-				}
+		s.Len(ret, 2)
+		if ret != nil && len(ret) > 0 {
+			f, ok := ret[0].(map[string]int)
+			s.True(ok)
+			if ok {
+				s.Equal(v, f)
 			}
-
-			s.Equal(v, called)
 		}
+
+		s.Equal(v, called)
+	}
+}
+
+func (s *InvokeTestSuite) _testMap2Struct(v map[string]*Struct) {
+	// map[string]*Struct
+	var called map[string]*Struct
+	name, count := "", 0
+	chk := func(vv map[string]*Struct) (map[string]*Struct, error) {
+		called = vv
+		name = vv["a"].Name
+		count = vv["a"].Count
+		if v["d"] == nil {
+			s.Nil(vv["d"])
+		}
+		return vv, nil
 	}
 
-	// map[string]*_struct
-	{
-		var called map[string]*_struct
-		name, count := "", 0
-		chk := func(v map[string]*_struct) (map[string]*_struct, error) {
-			called = v
-			name = v["a"].Name
-			count = v["a"].Count
-			s.Nil(v["d"])
-			return v, nil
-		}
-		v := map[string]*_struct{
-			"a": &_struct{Name: "Mary", Count: 11},
-			"b": &_struct{Name: "Bob", Count: 10},
-			"c": &_struct{Name: "Tom", Count: 12},
-			"d": nil,
-		}
-		param, err := ioJSON(v)
+	param, err := s.convert(v)
+	s.Nil(err)
+	s.NotNil(param)
+	if param != nil {
+		ret, err := s.ivk.Invoke(chk, param)
 		s.Nil(err)
-		s.NotNil(param)
-		if param != nil {
-			ret, err := s.ivk.Invoke(chk, param)
-			s.Nil(err)
-			s.Len(ret, 2)
-			if ret != nil && len(ret) > 0 {
-				f, ok := ret[0].(map[string]*_struct)
-				s.True(ok)
-				if ok {
-					s.Equal(v, f)
-				}
+		s.Len(ret, 2)
+		if ret != nil && len(ret) > 0 {
+			f, ok := ret[0].(map[string]*Struct)
+			s.True(ok)
+			if ok {
+				s.Equal(v, f)
 			}
-
-			s.Equal(v, called)
-			s.Equal(v["a"].Name, name)
-			s.Equal(v["a"].Count, count)
 		}
+
+		s.Equal(v, called)
+		s.Equal(v["a"].Name, name)
+		s.Equal(v["a"].Count, count)
 	}
+
 }
 
 func (s *InvokeTestSuite) TestSlice() {
 	// []string
-	{
-		var called []string
-		chk := func(v []string) ([]string, error) {
-			called = v
-			return v, nil
-		}
-		v := []string{"Tom", "Bob", "Mary"}
-		param, err := ioJSON(v)
+	var called []string
+	chk := func(v []string) ([]string, error) {
+		called = v
+		return v, nil
+	}
+	v := []string{"Tom", "Bob", "Mary"}
+	param, err := s.convert(v)
+	s.Nil(err)
+	s.NotNil(param)
+	if param != nil {
+		ret, err := s.ivk.Invoke(chk, param)
 		s.Nil(err)
-		s.NotNil(param)
-		if param != nil {
-			ret, err := s.ivk.Invoke(chk, param)
-			s.Nil(err)
-			s.Len(ret, 2)
-			if ret != nil && len(ret) > 0 {
-				f, ok := ret[0].([]string)
-				s.True(ok)
-				if ok {
-					s.Equal(v, f)
-				}
+		s.Len(ret, 2)
+		if ret != nil && len(ret) > 0 {
+			f, ok := ret[0].([]string)
+			s.True(ok)
+			if ok {
+				s.Equal(v, f)
 			}
-
-			s.Equal(v, called)
 		}
+
+		s.Equal(v, called)
+	}
+}
+
+func (s *InvokeTestSuite) _testSliceOfStruct(v []*Struct) {
+	// []*Struct
+	var called []*Struct
+	chk := func(vv []*Struct) ([]*Struct, error) {
+		called = vv
+		s.Len(vv, 4)
+		if v[3] == nil {
+			s.Nil(vv[3])
+		}
+		return v, nil
 	}
 
-	// TODO: []*_struct
-	{
-		var called []*_struct
-		chk := func(v []*_struct) ([]*_struct, error) {
-			called = v
-			s.Len(v, 4)
-			s.Nil(v[3])
-			return v, nil
-		}
-		v := []*_struct{
-			&_struct{Name: "Mary", Count: 11},
-			&_struct{Name: "Bob", Count: 10},
-			&_struct{Name: "Tom", Count: 12},
-			nil,
-		}
-		param, err := ioJSON(v)
+	param, err := s.convert(v)
+	s.Nil(err)
+	s.NotNil(param)
+	if param != nil {
+		ret, err := s.ivk.Invoke(chk, param)
 		s.Nil(err)
-		s.NotNil(param)
-		if param != nil {
-			ret, err := s.ivk.Invoke(chk, param)
-			s.Nil(err)
-			s.Len(ret, 2)
-			if ret != nil && len(ret) > 0 {
-				f, ok := ret[0].([]*_struct)
-				s.True(ok)
-				if ok {
-					s.Equal(v, f)
-				}
+		s.Len(ret, 2)
+		if ret != nil && len(ret) > 0 {
+			f, ok := ret[0].([]*Struct)
+			s.True(ok)
+			if ok {
+				s.Equal(v, f)
 			}
-
-			s.Equal(v, called)
 		}
+
+		s.Equal(v, called)
 	}
 }
 
@@ -521,12 +603,12 @@ func (s *InvokeTestSuite) TestSlice() {
 func (s *InvokeTestSuite) TestPrivateField() {
 }
 
-func (s *InvokeTestSuite) TestFitReturns() {
+func (s *InvokeTestSuite) TestReturn() {
 	chk := func() (int, float32, string) {
 		return 0, 0, ""
 	}
 	ret := []interface{}{int64(11), float64(12.5), "test string"}
-	refined, err := s.ivk.FitReturns(chk, ret)
+	refined, err := s.ivk.Return(chk, ret)
 	s.Nil(err)
 	s.Len(refined, 3)
 	s.Equal(int(11), refined[0])
