@@ -15,7 +15,7 @@ import (
 
 type Invoker interface {
 	Invoke(f interface{}, param []interface{}) ([]interface{}, error)
-	FitReturns(f interface{}, returns []interface{}) ([]interface{}, error)
+	Return(f interface{}, returns []interface{}) ([]interface{}, error)
 	ComposeTask(name string, args ...interface{}) (Task, error)
 }
 
@@ -255,7 +255,7 @@ func (vk *_invoker) Invoke(f interface{}, param []interface{}) ([]interface{}, e
 // - returns: the array of returns
 // returns:
 // converted return array and error
-func (vk *_invoker) FitReturns(f interface{}, returns []interface{}) ([]interface{}, error) {
+func (vk *_invoker) Return(f interface{}, returns []interface{}) ([]interface{}, error) {
 	funcT := reflect.TypeOf(f)
 
 	// make sure parameter matched

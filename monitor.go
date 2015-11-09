@@ -165,7 +165,7 @@ func (me *_monitors) _monitor_routine_(quit <-chan int, wait *sync.WaitGroup, ev
 						continue
 					}
 
-					returns, err := me.invoker.FitReturns(v.fn, returns)
+					returns, err := me.invoker.Return(v.fn, returns)
 					if err != nil {
 						events <- common.NewEventFromError(common.InstT.MONITOR, err)
 						continue

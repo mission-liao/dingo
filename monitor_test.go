@@ -96,7 +96,7 @@ func (me *MonitorTestSuite) TestParellenMonitoring() {
 	me.Equal(ret, toSend)
 }
 
-func (me *MonitorTestSuite) TestFitReturns() {
+func (me *MonitorTestSuite) TestReturn() {
 	me._mnt.register(&StrMatcher{"test_convert_return"}, func() (int, float32) {
 		return 0, 0
 	})
