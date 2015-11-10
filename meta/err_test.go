@@ -10,10 +10,10 @@ import (
 func TestErrMarshal(t *testing.T) {
 	ass := assert.New(t)
 
-	body, err := json.Marshal(&_error{0, "test string"})
+	body, err := json.Marshal(&Error{0, "test string"})
 	ass.Nil(err)
 
-	var e _error
+	var e Error
 	err = json.Unmarshal(body, &e)
 	ass.Nil(err)
 

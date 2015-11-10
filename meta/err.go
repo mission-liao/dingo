@@ -1,45 +1,31 @@
 package meta
 
 import (
-	"errors"
 	"fmt"
 )
 
-type _error struct {
+type Error struct {
 	Code int
 	Msg  string
 }
 
-type Err interface {
-	GetCode() int
-	GetMsg() string
-	ComposeError() error
-}
-
-func NewErr(code int, err error) Err {
+func NewErr(code int, err error) *Error {
 	var msg string
 	if err != nil {
 		msg = err.Error()
 	}
 
-	return &_error{
+	return &Error{
 		Code: code,
 		Msg:  msg,
 	}
 }
 
-func NoErr() Err {
-	return &_error{}
+func NoErr() *Error {
+	return &Error{}
 }
 
-//
-// interface Err
-//
-func (me *_error) GetCode() int        { return me.Code }
-func (me *_error) GetMsg() string      { return me.Msg }
-func (me *_error) ComposeError() error { return errors.New(me.Error()) }
-
 // implement interface of error
-func (me *_error) Error() string {
+func (me *Error) Error() string {
 	return fmt.Sprintf("[%d] %v", me.Code, me.Msg)
 }

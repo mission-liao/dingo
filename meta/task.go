@@ -1,7 +1,6 @@
 package meta
 
 import (
-	"encoding/json"
 	"reflect"
 )
 
@@ -9,18 +8,10 @@ type ID interface {
 	GetId() string
 }
 
-type Task interface {
-	ID
-	GetName() string
-	GetArgs() []interface{}
-	ComposeReport(int, []interface{}, Err) (Report, error)
-	Equal(t Task) bool
-}
-
 //
 // building block of a task
 //
-type _task struct {
+type Task struct {
 	Id   string // dingo-generated id
 	Name string // function name
 	Args []interface{}
@@ -29,41 +20,27 @@ type _task struct {
 //
 // Task interface
 //
-func (t *_task) GetName() string        { return t.Name }
-func (t *_task) GetId() string          { return t.Id }
-func (t *_task) GetArgs() []interface{} { return t.Args }
-func (t *_task) ComposeReport(s int, r []interface{}, err Err) (Report, error) {
-	var err_ *_error
+func (t *Task) ComposeReport(s int, r []interface{}, err interface{}) (*Report, error) {
+	var err_ *Error
 	if err != nil {
 		switch v := err.(type) {
 		case error:
-			err_ = NewErr(0, v).(*_error)
-		case *_error:
+			err_ = NewErr(0, v)
+		case *Error:
 			err_ = v
 		default:
 			// TODO: what? log?
 			err_ = nil
 		}
 	}
-	return &_report{
+	return &Report{
 		Id:     t.Id,
 		Status: s,
-		Err_:   err_,
+		Err:    err_,
 		Name:   t.Name,
 		Ret:    r,
 	}, nil
 }
-func (t *_task) Equal(other Task) bool {
-	return true &&
-		t.Name == other.GetName() &&
-		reflect.DeepEqual(t.Args, other.GetArgs())
-}
-
-func UnmarshalTask(buf []byte) (t Task, err error) {
-	var _t _task
-	err = json.Unmarshal(buf, &_t)
-	if err == nil {
-		t = &_t
-	}
-	return
+func (t *Task) Equal(other *Task) bool {
+	return t.Name == other.Name && reflect.DeepEqual(t.Args, other.Args)
 }

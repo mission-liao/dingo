@@ -1,40 +1,10 @@
 package meta
 
-import (
-	"encoding/json"
-)
-
-type Report interface {
-	ID
-
-	//
-	// getter
-	//
-
-	GetStatus() int
-	GetName() string
-	GetReturn() []interface{}
-	GetErr() Err
-
-	//
-	// compare
-	//
-
-	Valid() bool
-	Identical(Report) bool
-	Done() bool
-
-	//
-	// setter
-	//
-	SetReturn([]interface{})
-}
-
-type _report struct {
+type Report struct {
 	Id     string
 	Name   string
 	Status int
-	Err_   *_error
+	Err    *Error
 	Ret    []interface{}
 }
 
@@ -64,27 +34,13 @@ var Status = struct {
 // Report interface
 //
 
-func (r *_report) GetName() string          { return r.Name }
-func (r *_report) GetStatus() int           { return r.Status }
-func (r *_report) GetReturn() []interface{} { return r.Ret }
-func (r *_report) GetId() string            { return r.Id }
-func (r *_report) GetErr() Err              { return r.Err_ }
-func (r *_report) Valid() bool              { return r.Status == Status.None }
-func (r *_report) Identical(other Report) bool {
+func (r *Report) Valid() bool { return r.Status == Status.None }
+func (r *Report) Identical(other *Report) bool {
 	// TODO: seems useless now?
 	if other == nil {
 		return false
 	}
-	return r.Status == other.GetStatus()
+	return r.Status == other.Status
 }
-func (r *_report) Done() bool                { return r.Status == Status.Done || r.Status == Status.Fail }
-func (r *_report) SetReturn(v []interface{}) { r.Ret = v }
-
-func UnmarshalReport(buf []byte) (r Report, err error) {
-	var _r _report
-	err = json.Unmarshal(buf, &_r)
-	if err == nil {
-		r = &_r
-	}
-	return
-}
+func (r *Report) Done() bool                { return r.Status == Status.Done || r.Status == Status.Fail }
+func (r *Report) SetReturn(v []interface{}) { r.Ret = v }

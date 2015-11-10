@@ -16,7 +16,7 @@ import (
 type Invoker interface {
 	Invoke(f interface{}, param []interface{}) ([]interface{}, error)
 	Return(f interface{}, returns []interface{}) ([]interface{}, error)
-	ComposeTask(name string, args ...interface{}) (Task, error)
+	ComposeTask(name string, args ...interface{}) (*Task, error)
 }
 
 type _invoker struct {
@@ -291,8 +291,8 @@ func (vk *_invoker) Return(f interface{}, returns []interface{}) ([]interface{},
 }
 
 //
-func (vk *_invoker) ComposeTask(name string, args ...interface{}) (Task, error) {
-	return &_task{
+func (vk *_invoker) ComposeTask(name string, args ...interface{}) (*Task, error) {
+	return &Task{
 		Id:   uuid.NewV4().String(),
 		Name: name,
 		Args: args,
