@@ -1,4 +1,4 @@
-package meta
+package transport
 
 type Option struct {
 	IgnoreReport_ bool `json:"IgnoreReport"`

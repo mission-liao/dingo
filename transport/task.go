@@ -1,11 +1,11 @@
-package meta
+package transport
 
 import (
 	"reflect"
 )
 
-type ID interface {
-	ID() string
+type Meta interface {
+	GetID() string
 }
 
 //
@@ -20,7 +20,7 @@ type Task struct {
 //
 // getter
 //
-func (t *Task) ID() string          { return t.I }
+func (t *Task) GetID() string       { return t.I }
 func (t *Task) Name() string        { return t.N }
 func (t *Task) Args() []interface{} { return t.A }
 

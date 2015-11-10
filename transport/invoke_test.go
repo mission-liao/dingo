@@ -1,4 +1,4 @@
-package meta
+package transport
 
 import (
 	"bytes"
@@ -441,7 +441,6 @@ func (s *InvokeTestSuite) TestEmbedWithCollision() {
 			}
 			return v, nil
 		}
-		_ = "breakpoint"
 		v := &_embed_with_collision{
 			Struct: Struct{Name: "Bob", Count: 10},
 			Age:    100,

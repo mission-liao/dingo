@@ -1,4 +1,4 @@
-package meta
+package transport
 
 type Report struct {
 	I string
@@ -33,7 +33,7 @@ var Status = struct {
 //
 // getter
 //
-func (r *Report) ID() string            { return r.I }
+func (r *Report) GetID() string         { return r.I }
 func (r *Report) Name() string          { return r.N }
 func (r *Report) Status() int           { return r.S }
 func (r *Report) Err() *Error           { return r.E }

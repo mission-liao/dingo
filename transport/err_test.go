@@ -1,4 +1,4 @@
-package meta
+package transport
 
 import (
 	"encoding/json"
