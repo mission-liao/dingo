@@ -5,20 +5,27 @@ import (
 )
 
 type ID interface {
-	GetId() string
+	ID() string
 }
 
 //
 // building block of a task
 //
 type Task struct {
-	Id   string // dingo-generated id
-	Name string // function name
-	Args []interface{}
+	I string // dingo-generated id
+	N string // function name
+	A []interface{}
 }
 
 //
-// Task interface
+// getter
+//
+func (t *Task) ID() string          { return t.I }
+func (t *Task) Name() string        { return t.N }
+func (t *Task) Args() []interface{} { return t.A }
+
+//
+// APIs
 //
 func (t *Task) ComposeReport(s int, r []interface{}, err interface{}) (*Report, error) {
 	var err_ *Error
@@ -34,13 +41,13 @@ func (t *Task) ComposeReport(s int, r []interface{}, err interface{}) (*Report, 
 		}
 	}
 	return &Report{
-		Id:     t.Id,
-		Status: s,
-		Err:    err_,
-		Name:   t.Name,
-		Ret:    r,
+		I: t.I,
+		S: s,
+		E: err_,
+		N: t.N,
+		R: r,
 	}, nil
 }
 func (t *Task) Equal(other *Task) bool {
-	return t.Name == other.Name && reflect.DeepEqual(t.Args, other.Args)
+	return t.N == other.N && reflect.DeepEqual(t.A, other.A)
 }

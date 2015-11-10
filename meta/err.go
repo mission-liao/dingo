@@ -5,8 +5,8 @@ import (
 )
 
 type Error struct {
-	Code int
-	Msg  string
+	C int
+	M string
 }
 
 func NewErr(code int, err error) *Error {
@@ -16,8 +16,8 @@ func NewErr(code int, err error) *Error {
 	}
 
 	return &Error{
-		Code: code,
-		Msg:  msg,
+		C: code,
+		M: msg,
 	}
 }
 
@@ -25,7 +25,6 @@ func NoErr() *Error {
 	return &Error{}
 }
 
-// implement interface of error
-func (me *Error) Error() string {
-	return fmt.Sprintf("[%d] %v", me.Code, me.Msg)
-}
+func (me *Error) Code() int     { return me.C }
+func (me *Error) Msg() string   { return me.M }
+func (me *Error) Error() string { return fmt.Sprintf("[%d] %v", me.C, me.M) }

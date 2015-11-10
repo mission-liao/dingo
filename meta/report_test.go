@@ -11,10 +11,10 @@ func TestReportMarshal(t *testing.T) {
 	ass := assert.New(t)
 
 	body, err := json.Marshal(&Report{
-		Id:     "test_id",
-		Status: 101,
-		Err:    &Error{102, "test error"},
-		Ret:    nil,
+		I: "test_id",
+		S: 101,
+		E: &Error{102, "test error"},
+		R: nil,
 	})
 	ass.Nil(err)
 
@@ -22,9 +22,9 @@ func TestReportMarshal(t *testing.T) {
 	err = json.Unmarshal(body, &r)
 	ass.Nil(err)
 	if err == nil {
-		ass.Equal(101, r.Status)
-		ass.Equal("test_id", r.Id)
-		ass.Equal(102, r.Err.Code)
-		ass.Equal("test error", r.Err.Msg)
+		ass.Equal(101, r.Status())
+		ass.Equal("test_id", r.ID())
+		ass.Equal(102, r.Err().Code())
+		ass.Equal("test error", r.Err().Msg())
 	}
 }

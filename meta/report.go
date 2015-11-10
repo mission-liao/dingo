@@ -1,11 +1,11 @@
 package meta
 
 type Report struct {
-	Id     string
-	Name   string
-	Status int
-	Err    *Error
-	Ret    []interface{}
+	I string
+	N string
+	S int
+	E *Error
+	R []interface{}
 }
 
 var Status = struct {
@@ -31,16 +31,27 @@ var Status = struct {
 }
 
 //
-// Report interface
+// getter
 //
+func (r *Report) ID() string            { return r.I }
+func (r *Report) Name() string          { return r.N }
+func (r *Report) Status() int           { return r.S }
+func (r *Report) Err() *Error           { return r.E }
+func (r *Report) Return() []interface{} { return r.R }
 
-func (r *Report) Valid() bool { return r.Status == Status.None }
-func (r *Report) Identical(other *Report) bool {
-	// TODO: seems useless now?
+//
+// setter
+//
+func (r *Report) SetReturn(ret []interface{}) { r.R = ret }
+
+//
+// checker
+//
+func (r *Report) Valid() bool { return r.S == Status.None }
+func (r *Report) Done() bool  { return r.S == Status.Done || r.S == Status.Fail }
+func (r *Report) Equal(other *Report) bool {
 	if other == nil {
 		return false
 	}
-	return r.Status == other.Status
+	return r.S == other.S
 }
-func (r *Report) Done() bool                { return r.Status == Status.Done || r.Status == Status.Fail }
-func (r *Report) SetReturn(v []interface{}) { r.Ret = v }
