@@ -24,7 +24,7 @@ func TestReportMarshal(t *testing.T) {
 	if err == nil {
 		ass.Equal(101, r.Status())
 		ass.Equal("test_id", r.GetID())
-		ass.Equal(102, r.Err().Code())
+		ass.Equal(int64(102), r.Err().Code())
 		ass.Equal("test error", r.Err().Msg())
 	}
 }
