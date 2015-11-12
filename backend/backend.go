@@ -1,12 +1,17 @@
 package backend
 
 import (
-	"github.com/mission-liao/dingo/meta"
+	"github.com/mission-liao/dingo/transport"
 )
 
 type Backend interface {
 	Reporter
 	Store
+}
+
+type Envelope struct {
+	ID   transport.Meta
+	Body []byte
 }
 
 // TODO: add test case for consecutive calling to Reporter.Report
@@ -19,17 +24,13 @@ type Reporter interface {
 	// - reports: a input channel to receive report to upload
 	// returns:
 	// - err: errors
-	Report(reports <-chan meta.Report) (id int, err error)
+	Report(reports <-chan *Envelope) (id int, err error)
 }
 
 // read reports from backend
 type Store interface {
-	//
-	// - subscribe report channel
-	Subscribe() (reports <-chan meta.Report, err error)
-
 	// polling results for tasks, callers maintain a list of 'to-check'.
-	Poll(id meta.ID) error
+	Poll(id transport.Meta) (reports <-chan []byte, err error)
 
 	// TODO: test case, make sure queue is deleted after 'Done'
 
@@ -37,7 +38,7 @@ type Store interface {
 	//
 	// - ID of task / report are the same, therefore we use report here to
 	//   get ID of corresponding task.
-	Done(id meta.ID) error
+	Done(id transport.Meta) error
 }
 
 func New(name string, cfg *Config) (b Backend, err error) {

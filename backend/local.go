@@ -3,13 +3,10 @@ package backend
 // TODO: bypass mode in local backend
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/meta"
+	"github.com/mission-liao/dingo/transport"
 )
 
 //
@@ -17,30 +14,21 @@ import (
 //
 
 type _localConfig struct {
-	Bypass_ bool `json:"Bypass"`
-}
-
-func (me *_localConfig) Bypass(yes bool) *_localConfig {
-	me.Bypass_ = yes
-	return me
 }
 
 func defaultLocalConfig() *_localConfig {
-	return &_localConfig{
-		Bypass_: true,
-	}
+	return &_localConfig{}
 }
 
 type _local struct {
 	cfg       *Config
-	stores    *common.Routines
-	to        chan []byte
-	noJSON    chan meta.Report
+	to        chan *Envelope // simulate the wire
 	reporters *common.HetroRoutines
-	reports   chan meta.Report
+	reports   chan []byte
+	stores    *common.Routines
 	storeLock sync.Mutex
-	toCheck   []string
-	unSent    []meta.Report
+	toCheck   map[string]chan []byte
+	unSent    []*Envelope
 }
 
 // factory
@@ -49,11 +37,10 @@ func newLocal(cfg *Config) (v *_local, err error) {
 		cfg:       cfg,
 		stores:    common.NewRoutines(),
 		reporters: common.NewHetroRoutines(),
-		to:        make(chan []byte, 10),
-		noJSON:    make(chan meta.Report, 10),
-		reports:   make(chan meta.Report, 10),
-		toCheck:   make([]string, 0, 10),
-		unSent:    make([]meta.Report, 0, 10),
+		to:        make(chan *Envelope, 10),
+		reports:   make(chan []byte, 10),
+		toCheck:   make(map[string]chan []byte),
+		unSent:    make([]*Envelope, 0, 10),
 	}
 
 	// Store -> Subscriber
@@ -63,7 +50,7 @@ func newLocal(cfg *Config) (v *_local, err error) {
 	return
 }
 
-func (me *_local) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan meta.Report) {
+func (me *_local) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan *Envelope) {
 	defer func() {
 		done <- 1
 	}()
@@ -77,18 +64,8 @@ func (me *_local) _reporter_routine_(quit <-chan int, done chan<- int, events ch
 				goto cleanup
 			}
 
-			if me.cfg.Local.Bypass_ {
-				me.noJSON <- v
-			} else {
-				body, err := json.Marshal(v)
-				if err != nil {
-					events <- common.NewEventFromError(common.InstT.REPORTER, err)
-					break
-				}
-
-				// send to Store
-				me.to <- body
-			}
+			// send to Store
+			me.to <- v
 		}
 	}
 cleanup:
@@ -97,21 +74,21 @@ cleanup:
 func (me *_local) _store_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event) {
 	defer wait.Done()
 
-	out := func(rep meta.Report) {
+	out := func(enp *Envelope) {
 		me.storeLock.Lock()
 		defer me.storeLock.Unlock()
 
 		found := false
-		for _, v := range me.toCheck {
-			if v == rep.GetId() {
+		for k, v := range me.toCheck {
+			if k == enp.ID.GetID() {
 				found = true
-				me.reports <- rep
+				v <- enp.Body
 				break
 			}
 		}
 
 		if !found {
-			me.unSent = append(me.unSent, rep)
+			me.unSent = append(me.unSent, enp)
 		}
 	}
 
@@ -120,26 +97,6 @@ func (me *_local) _store_routine_(quit <-chan int, wait *sync.WaitGroup, events 
 		case _, _ = <-quit:
 			goto cleanup
 		case v, ok := <-me.to:
-			if !ok {
-				goto cleanup
-			}
-
-			rep, err := meta.UnmarshalReport(v)
-			if err != nil {
-				events <- common.NewEventFromError(common.InstT.STORE, err)
-				break
-			}
-
-			if rep == nil {
-				events <- common.NewEventFromError(
-					common.InstT.STORE,
-					errors.New(fmt.Sprintf("Unable to marshale from %v", v)),
-				)
-				break
-			}
-
-			out(rep)
-		case v, ok := <-me.noJSON:
 			if !ok {
 				goto cleanup
 			}
@@ -167,7 +124,6 @@ func (me *_local) Close() (err error) {
 
 	close(me.reports)
 	close(me.to)
-	close(me.noJSON)
 
 	return
 }
@@ -176,7 +132,7 @@ func (me *_local) Close() (err error) {
 // Reporter
 //
 
-func (me *_local) Report(reports <-chan meta.Report) (id int, err error) {
+func (me *_local) Report(reports <-chan *Envelope) (id int, err error) {
 	quit, done, id := me.reporters.New(0)
 	go me._reporter_routine_(quit, done, me.reporters.Events(), reports)
 
@@ -187,54 +143,48 @@ func (me *_local) Report(reports <-chan meta.Report) (id int, err error) {
 // Store
 //
 
-func (me *_local) Subscribe() (reports <-chan meta.Report, err error) {
-	reports = me.reports
-	return
-}
-
-func (me *_local) Poll(id meta.ID) (err error) {
+func (me *_local) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 	me.storeLock.Lock()
 	defer me.storeLock.Unlock()
 
+	var r chan []byte
+
+	found := false
+	for k, v := range me.toCheck {
+		if k == id.GetID() {
+			found, r = true, v
+		}
+	}
+
+	if !found {
+		r = make(chan []byte, 10)
+		me.toCheck[id.GetID()], reports = r, r
+	}
+
+	// reverse traversing when deleting in slice
 	for i := len(me.unSent) - 1; i >= 0; i-- {
 		v := me.unSent[i]
-		if v.GetId() == id.GetId() {
-			me.reports <- v
+		if v.ID.GetID() == id.GetID() {
+			r <- v.Body
 			// delete this element
 			me.unSent = append(me.unSent[:i], me.unSent[i+1:]...)
 		}
 	}
 
-	found := false
-	for _, v := range me.toCheck {
-		if v == id.GetId() {
-			found = true
-		}
-	}
-
-	if !found {
-		me.toCheck = append(me.toCheck, id.GetId())
-	}
-
 	return
 }
 
-func (me *_local) Done(id meta.ID) (err error) {
+func (me *_local) Done(id transport.Meta) (err error) {
 	me.storeLock.Lock()
 	defer me.storeLock.Unlock()
 
 	// clearing toCheck list
-	for k, v := range me.toCheck {
-		if v == id.GetId() {
-			me.toCheck = append(me.toCheck[:k], me.toCheck[k+1:]...)
-			break
-		}
-	}
+	delete(me.toCheck, id.GetID())
 
 	// clearing unSent
 	for i := len(me.unSent) - 1; i >= 0; i-- {
 		v := me.unSent[i]
-		if v.GetId() == id.GetId() {
+		if v.ID.GetID() == id.GetID() {
 			// delete this element
 			me.unSent = append(me.unSent[:i], me.unSent[i+1:]...)
 		}

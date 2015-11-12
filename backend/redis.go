@@ -1,14 +1,13 @@
 package backend
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/meta"
+	"github.com/mission-liao/dingo/transport"
 )
 
 var _redisResultQueue = "dingo.result"
@@ -31,7 +30,6 @@ type _redis struct {
 	reporters *common.HetroRoutines
 
 	// store
-	reports  chan meta.Report
 	stores   *common.HetroRoutines
 	rids     map[string]int
 	ridsLock sync.Mutex
@@ -40,7 +38,6 @@ type _redis struct {
 func newRedis(cfg *Config) (v *_redis, err error) {
 	v = &_redis{
 		reporters: common.NewHetroRoutines(),
-		reports:   make(chan meta.Report, 10),
 		rids:      make(map[string]int),
 		stores:    common.NewHetroRoutines(),
 		cfg:       cfg,
@@ -75,7 +72,7 @@ func (me *_redis) Close() (err error) {
 // Reporter interface
 //
 
-func (me *_redis) Report(reports <-chan meta.Report) (id int, err error) {
+func (me *_redis) Report(reports <-chan *Envelope) (id int, err error) {
 	quit, done, id := me.reporters.New(0)
 	go me._reporter_routine_(quit, done, me.reporters.Events(), reports)
 
@@ -86,27 +83,25 @@ func (me *_redis) Report(reports <-chan meta.Report) (id int, err error) {
 // Store interface
 //
 
-func (me *_redis) Subscribe() (reports <-chan meta.Report, err error) {
-	return me.reports, nil
-}
-
-func (me *_redis) Poll(id meta.ID) (err error) {
+func (me *_redis) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 	quit, done, idx := me.stores.New(0)
 
 	me.ridsLock.Lock()
 	defer me.ridsLock.Unlock()
-	me.rids[id.GetId()] = idx
+	me.rids[id.GetID()] = idx
 
-	go me._store_routine_(quit, done, me.stores.Events(), me.reports, id)
+	r := make(chan []byte, 10)
+	reports = r
+	go me._store_routine_(quit, done, me.stores.Events(), r, id)
 
 	return
 }
 
-func (me *_redis) Done(id meta.ID) (err error) {
+func (me *_redis) Done(id transport.Meta) (err error) {
 	me.ridsLock.Lock()
 	defer me.ridsLock.Unlock()
 
-	v, ok := me.rids[id.GetId()]
+	v, ok := me.rids[id.GetID()]
 	if !ok {
 		err = errors.New("store id not found")
 		return
@@ -121,31 +116,26 @@ func (me *_redis) Done(id meta.ID) (err error) {
 // routine definition
 //
 
-func (me *_redis) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan meta.Report) {
+func (me *_redis) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan *Envelope) {
+	var (
+		err error
+	)
 	defer func() {
 		done <- 1
 	}()
 
 	conn := me.pool.Get()
 	defer conn.Close()
-
 	for {
 		select {
 		case _, _ = <-quit:
 			goto cleanup
-		case r, ok := <-reports:
+		case e, ok := <-reports:
 			if !ok {
 				goto cleanup
 			}
 
-			// TODO: errs channel
-			body, err := json.Marshal(r)
-			if err != nil {
-				events <- common.NewEventFromError(common.InstT.REPORTER, err)
-				break
-			}
-
-			_, err = conn.Do("LPUSH", getKey(r), body)
+			_, err = conn.Do("LPUSH", getKey(e.ID), e.Body)
 			if err != nil {
 				events <- common.NewEventFromError(common.InstT.REPORTER, err)
 				break
@@ -155,13 +145,7 @@ func (me *_redis) _reporter_routine_(quit <-chan int, done chan<- int, events ch
 cleanup:
 }
 
-func (me *_redis) _store_routine_(
-	quit <-chan int,
-	done chan<- int,
-	events chan<- *common.Event,
-	reports chan<- meta.Report,
-	id meta.ID) {
-
+func (me *_redis) _store_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports chan<- []byte, id transport.Meta) {
 	defer func() {
 		done <- 1
 	}()
@@ -210,12 +194,7 @@ func (me *_redis) _store_routine_(
 				break
 			}
 
-			r, err := meta.UnmarshalReport(b)
-			if err != nil {
-				events <- common.NewEventFromError(common.InstT.STORE, err)
-				break
-			}
-			reports <- r
+			reports <- b
 		}
 	}
 cleanup:
@@ -225,6 +204,6 @@ cleanup:
 // private function
 //
 
-func getKey(id meta.ID) string {
-	return fmt.Sprintf("%v.%d", _redisResultQueue, id.GetId())
+func getKey(id transport.Meta) string {
+	return fmt.Sprintf("%v.%d", _redisResultQueue, id.GetID())
 }

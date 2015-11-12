@@ -2,7 +2,6 @@ package backend
 
 import (
 	// standard
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -12,7 +11,7 @@ import (
 
 	// internal
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/meta"
+	"github.com/mission-liao/dingo/transport"
 )
 
 type _amqpConfig struct {
@@ -29,7 +28,6 @@ type _amqp struct {
 	common.AmqpConnection
 
 	// store
-	reports  chan meta.Report
 	stores   *common.HetroRoutines
 	rids     map[string]int
 	ridsLock sync.Mutex
@@ -44,7 +42,6 @@ func newAmqp(cfg *Config) (v *_amqp, err error) {
 		reporters: common.NewHetroRoutines(),
 		rids:      make(map[string]int),
 		cfg:       cfg,
-		reports:   make(chan meta.Report, 10), // TODO: config
 		stores:    common.NewHetroRoutines(),
 	}
 	err = v.init()
@@ -104,7 +101,7 @@ func (me *_amqp) Close() (err error) {
 // Reporter interface
 //
 
-func (me *_amqp) Report(reports <-chan meta.Report) (id int, err error) {
+func (me *_amqp) Report(reports <-chan *Envelope) (id int, err error) {
 	quit, done, id := me.reporters.New(0)
 	go me._reporter_routine_(quit, done, me.reporters.Events(), reports)
 	return
@@ -114,30 +111,29 @@ func (me *_amqp) Report(reports <-chan meta.Report) (id int, err error) {
 // Store interface
 //
 
-func (me *_amqp) Subscribe() (reports <-chan meta.Report, err error) {
-	return me.reports, nil
-}
-
-func (me *_amqp) Poll(id meta.ID) (err error) {
+func (me *_amqp) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 	// bind to the queue for this task
 	tag, qName, rKey := getConsumerTag(id), getQueueName(id), getRoutingKey(id)
 	quit, done, idx := me.stores.New(0)
 
 	me.ridsLock.Lock()
 	defer me.ridsLock.Unlock()
-	me.rids[id.GetId()] = idx
+	me.rids[id.GetID()] = idx
 
 	// acquire a free channel
 	ci, err := me.AmqpConnection.Channel()
 	if err != nil {
 		return
 	}
-	var dv <-chan amqp.Delivery
+	var (
+		dv <-chan amqp.Delivery
+		r  chan []byte
+	)
 	defer func() {
 		if err != nil {
 			me.AmqpConnection.ReleaseChannel(ci)
 		} else {
-			go me._store_routine_(quit, done, me.stores.Events(), me.reports, ci, dv, id)
+			go me._store_routine_(quit, done, me.stores.Events(), r, ci, dv, id)
 		}
 	}()
 	// declare a queue for this task
@@ -178,14 +174,16 @@ func (me *_amqp) Poll(id meta.ID) (err error) {
 		return
 	}
 
+	r = make(chan []byte, 10)
+	reports = r
 	return
 }
 
-func (me *_amqp) Done(id meta.ID) (err error) {
+func (me *_amqp) Done(id transport.Meta) (err error) {
 	me.ridsLock.Lock()
 	defer me.ridsLock.Unlock()
 
-	v, ok := me.rids[id.GetId()]
+	v, ok := me.rids[id.GetID()]
 	if !ok {
 		err = errors.New("store id not found")
 		return
@@ -198,7 +196,7 @@ func (me *_amqp) Done(id meta.ID) (err error) {
 // routine definition
 //
 
-func (me *_amqp) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan meta.Report) {
+func (me *_amqp) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan *Envelope) {
 	// TODO: keep one AmqpConnection, instead of get/realease for each report.
 	defer func() {
 		done <- 1
@@ -208,28 +206,21 @@ func (me *_amqp) _reporter_routine_(quit <-chan int, done chan<- int, events cha
 		select {
 		case _, _ = <-quit:
 			goto cleanup
-		case r, ok := <-reports:
+		case e, ok := <-reports:
 			if !ok {
 				// reports channel is closed
 				goto cleanup
 			}
 
-			// TODO: errs channel
-			body, err := json.Marshal(r)
-			if err != nil {
-				events <- common.NewEventFromError(common.InstT.REPORTER, err)
-				break
-			}
-
 			// acquire a channel
-			err = func() (err error) {
+			err := func() (err error) {
 				ci, err := me.AmqpConnection.Channel()
 				if err != nil {
 					return
 				}
 				defer me.AmqpConnection.ReleaseChannel(ci)
 
-				qName, rKey := getQueueName(r), getRoutingKey(r)
+				qName, rKey := getQueueName(e.ID), getRoutingKey(e.ID)
 
 				// declare a queue for this task
 				_, err = ci.Channel.QueueDeclare(
@@ -264,7 +255,7 @@ func (me *_amqp) _reporter_routine_(quit <-chan int, done chan<- int, events cha
 					amqp.Publishing{
 						DeliveryMode: amqp.Persistent,
 						ContentType:  "text/json",
-						Body:         body,
+						Body:         e.Body,
 					},
 				)
 				if err != nil {
@@ -296,10 +287,10 @@ func (me *_amqp) _store_routine_(
 	quit <-chan int,
 	done chan<- int,
 	events chan<- *common.Event,
-	reports chan<- meta.Report,
+	reports chan<- []byte,
 	ci *common.AmqpChannel,
 	dv <-chan amqp.Delivery,
-	id meta.ID) {
+	id transport.Meta) {
 
 	var (
 		err            error
@@ -316,6 +307,7 @@ func (me *_amqp) _store_routine_(
 		}
 		done <- 1
 		close(done)
+		close(reports)
 	}()
 
 	for {
@@ -327,18 +319,12 @@ func (me *_amqp) _store_routine_(
 				goto cleanup
 			}
 
-			r, err := meta.UnmarshalReport(d.Body)
-			if err != nil {
-				d.Nack(false, false)
-				events <- common.NewEventFromError(common.InstT.STORE, err)
-				break
-			}
-
-			reports <- r
+			reports <- d.Body
 		}
 	}
 
 cleanup:
+	// TODO: consuming remaining stuffs in queue
 	// cancel consuming
 	err = ci.Channel.Cancel(getConsumerTag(id), false)
 	if err != nil {
@@ -380,16 +366,16 @@ cleanup:
 //
 
 //
-func getQueueName(id meta.ID) string {
-	return fmt.Sprintf("dingo.q.%q", id.GetId())
+func getQueueName(id transport.Meta) string {
+	return fmt.Sprintf("dingo.q.%q", id.GetID())
 }
 
 //
-func getRoutingKey(id meta.ID) string {
-	return fmt.Sprintf("dingo.rkey.%q", id.GetId())
+func getRoutingKey(id transport.Meta) string {
+	return fmt.Sprintf("dingo.rkey.%q", id.GetID())
 }
 
 //
-func getConsumerTag(id meta.ID) string {
-	return fmt.Sprintf("dingo.consumer.%q", id.GetId())
+func getConsumerTag(id transport.Meta) string {
+	return fmt.Sprintf("dingo.consumer.%q", id.GetID())
 }
