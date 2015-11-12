@@ -2,15 +2,13 @@ package broker
 
 import (
 	// standard
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	// open source
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/meta"
+	"github.com/mission-liao/dingo/transport"
 	"github.com/streadway/amqp"
 )
 
@@ -155,13 +153,7 @@ func (me *_amqp) Close() (err error) {
 // Producer interface
 //
 
-func (me *_amqp) Send(t meta.Task) (err error) {
-	// marshaling to json
-	body, err := json.Marshal(t)
-	if err != nil {
-		return
-	}
-
+func (me *_amqp) Send(id transport.Meta, body []byte) (err error) {
 	// acquire a channel
 	ci, err := me.sender.Channel()
 	if err != nil {
@@ -190,15 +182,13 @@ func (me *_amqp) Send(t meta.Task) (err error) {
 
 	// block until amqp.Channel.NotifyPublish
 	select {
-	case cf := <-ci.Confirm:
-		if !cf.Ack {
-			err = errors.New("Unable to publish to server")
+	case cf, ok := <-ci.Confirm:
+		if !ok {
+			err = errors.New(fmt.Sprintf("confirm channel is closed before receiving confirm: %v", id))
 		}
-	case <-time.After(10 * time.Second):
-		// TODO: configuration
-		// TODO: add retry
-		// time out
-		err = errors.New("Server didn't reply 'Cancel' event in 10 seconds")
+		if !cf.Ack {
+			err = errors.New(fmt.Sprintf("Unable to publish to server: %v", id))
+		}
 	}
 
 	return
@@ -208,16 +198,15 @@ func (me *_amqp) Send(t meta.Task) (err error) {
 // Consumer interface
 //
 
-func (me *_amqp) AddListener(receipts <-chan Receipt) (tasks <-chan meta.Task, err error) {
-	t := make(chan meta.Task, 10)
-	quit := me.consumers.New()
-	go me._consumer_routine_(quit, me.consumers.Wait(), me.consumers.Events(), t, receipts)
+func (me *_amqp) AddListener(receipts <-chan *Receipt) (tasks <-chan []byte, err error) {
+	t := make(chan []byte, 10)
+	go me._consumer_routine_(me.consumers.New(), me.consumers.Wait(), me.consumers.Events(), t, receipts)
 
 	tasks = t
 	return
 }
 
-func (me *_amqp) Stop() (err error) {
+func (me *_amqp) StopAllListeners() (err error) {
 	me.consumers.Close()
 	return
 }
@@ -230,8 +219,8 @@ func (me *_amqp) _consumer_routine_(
 	quit <-chan int,
 	wait *sync.WaitGroup,
 	events chan<- *common.Event,
-	tasks chan<- meta.Task,
-	receipts <-chan Receipt,
+	tasks chan<- []byte,
+	receipts <-chan *Receipt,
 ) {
 	defer wait.Done()
 
@@ -270,33 +259,52 @@ func (me *_amqp) _consumer_routine_(
 		select {
 		case d, ok := <-dv:
 			if !ok {
-				goto cleanup
-			}
-			t, err_ := meta.UnmarshalTask(d.Body)
-			if err_ != nil {
-				// an invalid task
-				d.Nack(false, false)
-				events <- common.NewEventFromError(common.InstT.CONSUMER, err_)
-				break
+				goto clean
 			}
 
-			tasks <- t
-			reply, ok := <-receipts
+			ok = func() (ok bool) {
+				var (
+					reply *Receipt
+					err   error
+				)
+				defer func() {
+					if err != nil || !ok {
+						d.Nack(false, false)
+						events <- common.NewEventFromError(common.InstT.CONSUMER, err)
+					} else {
+						d.Ack(false)
+					}
+				}()
+				h, err := transport.DecodeHeader(d.Body)
+				if err != nil {
+					return
+				}
+				tasks <- d.Body
+				// block here for receipts
+				reply, ok = <-receipts
+				if !ok {
+					return
+				}
+
+				if reply.ID != h.ID() {
+					err = errors.New(fmt.Sprintf("expected: %v, received: %v", h, reply))
+					return
+				}
+				if reply.Status == Status.WORKER_NOT_FOUND {
+					err = errors.New(fmt.Sprintf("worker not found: %v", h))
+					return
+				}
+				return
+			}()
 			if !ok {
-				goto cleanup
-			}
-
-			if reply.Status == Status.WORKER_NOT_FOUND {
-				d.Nack(false, false)
-			} else {
-				d.Ack(false)
+				goto clean
 			}
 		case _, _ = <-quit:
-			goto cleanup
+			goto clean
 		}
 	}
 
-cleanup:
+clean:
 	err_ := ci.Channel.Cancel(tag, false)
 	if err_ != nil {
 		events <- common.NewEventFromError(common.InstT.CONSUMER, err_)

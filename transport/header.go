@@ -19,7 +19,6 @@ func (me *Header) MashID() int16  { return me.M }
 
 type Meta interface {
 	ID() string
-	MashID() int16
 }
 
 func DecodeHeader(b []byte) (m *Header, err error) {

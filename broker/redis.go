@@ -1,14 +1,13 @@
 package broker
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/meta"
+	"github.com/mission-liao/dingo/transport"
 )
 
 var _redisTaskQueue = "dingo.tasks"
@@ -66,12 +65,7 @@ func (me *_redis) Close() (err error) {
 // Producer interface
 //
 
-func (me *_redis) Send(t meta.Task) (err error) {
-	body, err := json.Marshal(t)
-	if err != nil {
-		return
-	}
-
+func (me *_redis) Send(id transport.Meta, body []byte) (err error) {
 	conn := me.pool.Get()
 	_, err = conn.Do("LPUSH", _redisTaskQueue, body)
 	if err != nil {
@@ -85,16 +79,15 @@ func (me *_redis) Send(t meta.Task) (err error) {
 // Consumer interface
 //
 
-func (me *_redis) AddListener(receipts <-chan Receipt) (tasks <-chan meta.Task, err error) {
-	t := make(chan meta.Task, 10)
-	quit := me.listeners.New()
-	go me._consumer_routine_(quit, me.listeners.Wait(), me.listeners.Events(), t, receipts)
+func (me *_redis) AddListener(receipts <-chan *Receipt) (tasks <-chan []byte, err error) {
+	t := make(chan []byte, 10)
+	go me._consumer_routine_(me.listeners.New(), me.listeners.Wait(), me.listeners.Events(), t, receipts)
 
 	tasks = t
 	return
 }
 
-func (me *_redis) Stop() (err error) {
+func (me *_redis) StopAllListeners() (err error) {
 	me.listeners.Close()
 	return
 }
@@ -107,8 +100,8 @@ func (me *_redis) _consumer_routine_(
 	quit <-chan int,
 	wait *sync.WaitGroup,
 	events chan<- *common.Event,
-	tasks chan<- meta.Task,
-	receipts <-chan Receipt,
+	tasks chan<- []byte,
+	receipts <-chan *Receipt,
 ) {
 	defer wait.Done()
 
@@ -118,7 +111,7 @@ func (me *_redis) _consumer_routine_(
 	for {
 		select {
 		case _, _ = <-quit:
-			goto cleanup
+			goto clean
 		default:
 			// blocking call on redis server
 			reply, err := conn.Do("BRPOP", _redisTaskQueue, 1) // TODO: configuration, in seconds
@@ -159,15 +152,27 @@ func (me *_redis) _consumer_routine_(
 				break
 			}
 
-			t, err := meta.UnmarshalTask(b)
+			h, err := transport.DecodeHeader(b)
 			if err != nil {
 				events <- common.NewEventFromError(common.InstT.CONSUMER, err)
 				break
 			}
 
-			tasks <- t
+			tasks <- b
+			rcpt, ok := <-receipts
+			if !ok {
+				goto clean
+			}
+
+			if rcpt.ID != h.ID() {
+				events <- common.NewEventFromError(
+					common.InstT.CONSUMER,
+					errors.New(fmt.Sprintf("expected: %v, received: %v", h, rcpt)),
+				)
+				break
+			}
 		}
 	}
-cleanup:
+clean:
 	return
 }

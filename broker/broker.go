@@ -1,7 +1,7 @@
 package broker
 
 import (
-	"github.com/mission-liao/dingo/meta"
+	"github.com/mission-liao/dingo/transport"
 )
 
 //
@@ -12,9 +12,8 @@ type Broker interface {
 
 //
 type Producer interface {
-
 	//
-	Send(meta.Task) error
+	Send(transport.Meta, []byte) error
 }
 
 //
@@ -26,10 +25,10 @@ type Consumer interface {
 	// returns:
 	// - tasks: 'dingo' would consume from this channel for new tasks
 	// - err: any error during initialization
-	AddListener(rcpt <-chan Receipt) (tasks <-chan meta.Task, err error)
+	AddListener(rcpt <-chan *Receipt) (tasks <-chan []byte, err error)
 
 	//
-	Stop() (err error)
+	StopAllListeners() (err error)
 }
 
 var Status = struct {
@@ -41,7 +40,7 @@ var Status = struct {
 }
 
 type Receipt struct {
-	Id      string
+	ID      string
 	Status  int
 	Payload interface{}
 }
