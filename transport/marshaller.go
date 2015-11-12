@@ -2,30 +2,31 @@ package transport
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/gob"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 	"sync/atomic"
 )
 
 var Encode = struct {
-	Default int
-	JSON    int
-	Gob     int
+	Default int16
+	JSON    int16
+	Gob     int16
 }{
 	0, 1, 2,
 }
 
 type _mshFnOpt struct {
-	task, report int
+	task, report int16
 }
 
 // requirement:
 // - each function should be thread-safe
 type Marshaller interface {
+	Prepare(name string, fn interface{}) (err error)
 	EncodeTask(task *Task) (b []byte, err error)
 	DecodeTask(b []byte) (task *Task, err error)
 	EncodeReport(report *Report) (b []byte, err error)
@@ -35,16 +36,16 @@ type Marshaller interface {
 //
 // container of Marshaller
 //
-type marshallers struct {
+type Marshallers struct {
 	msLock     sync.Mutex
 	ms         atomic.Value
 	fn2mshLock sync.Mutex
 	fn2msh     atomic.Value
 }
 
-func NewMarshallers() (m *marshallers, err error) {
-	m = &marshallers{}
-	ms := make(map[int]Marshaller)
+func NewMarshallers() (m *Marshallers) {
+	m = &Marshallers{}
+	ms := make(map[int16]Marshaller)
 
 	// init marshaller map
 	m.msLock.Lock()
@@ -62,17 +63,17 @@ func NewMarshallers() (m *marshallers, err error) {
 	return
 }
 
-func (me *marshallers) Add(id int, m Marshaller) (err error) {
+func (me *Marshallers) Add(id int16, m Marshaller) (err error) {
 	me.msLock.Lock()
 	defer me.msLock.Unlock()
 
-	ms := me.ms.Load().(map[int]Marshaller)
+	ms := me.ms.Load().(map[int16]Marshaller)
 	if v, ok := ms[id]; ok {
 		err = errors.New(fmt.Sprintf("id %v already exists %v", id, v))
 		return
 	}
 
-	nms := make(map[int]Marshaller)
+	nms := make(map[int16]Marshaller)
 	for k := range ms {
 		nms[k] = ms[k]
 	}
@@ -81,35 +82,60 @@ func (me *marshallers) Add(id int, m Marshaller) (err error) {
 	return
 }
 
-func (me *marshallers) Exists(id int) (exists bool) {
-	m := me.ms.Load().(map[int]Marshaller)
+func (me *Marshallers) Exists(id int16) (exists bool) {
+	m := me.ms.Load().(map[int16]Marshaller)
 	_, exists = m[id]
 	return
 }
 
-func (me *marshallers) Register(name string, msTask, msReport int) (err error) {
+func (me *Marshallers) Register(name string, fn interface{}, msTask, msReport int16) (err error) {
 	me.fn2mshLock.Lock()
 	defer me.fn2mshLock.Unlock()
 
-	m := me.fn2msh.Load().(map[string]*_mshFnOpt)
-	if _, ok := m[name]; ok {
+	fns := me.fn2msh.Load().(map[string]*_mshFnOpt)
+	if _, ok := fns[name]; ok {
 		err = errors.New(fmt.Sprintf("name %v already exists", name))
 		return
 	}
 
-	nm := make(map[string]*_mshFnOpt)
-	for k := range m {
-		nm[k] = m[k]
+	// TODO: test case
+	// check existence of those id
+	m := me.ms.Load().(map[int16]Marshaller)
+	chk := func(id int16) (err error) {
+		if v, ok := m[id]; ok {
+			err = v.Prepare(name, fn)
+			if err != nil {
+				return
+			}
+		} else {
+			err = errors.New(fmt.Sprintf("id:%v is not registered", id))
+			return
+		}
+		return
 	}
-	nm[name] = &_mshFnOpt{
+	err = chk(msTask)
+	if err != nil {
+		return
+	}
+	err = chk(msReport)
+	if err != nil {
+		return
+	}
+
+	// insert the newly create record
+	nfns := make(map[string]*_mshFnOpt)
+	for k := range fns {
+		nfns[k] = fns[k]
+	}
+	nfns[name] = &_mshFnOpt{
 		task:   msTask,
 		report: msReport,
 	}
-	me.fn2msh.Store(nm)
+	me.fn2msh.Store(nfns)
 	return
 }
 
-func (me *marshallers) EncodeTask(task *Task) (b []byte, err error) {
+func (me *Marshallers) EncodeTask(task *Task) (b []byte, err error) {
 	// looking for marshaller-option
 	fn := me.fn2msh.Load().(map[string]*_mshFnOpt)
 	opt, ok := fn[task.Name()]
@@ -119,7 +145,7 @@ func (me *marshallers) EncodeTask(task *Task) (b []byte, err error) {
 	}
 
 	// looking for marshaller
-	ms := me.ms.Load().(map[int]Marshaller)
+	ms := me.ms.Load().(map[int16]Marshaller)
 	m, ok := ms[opt.task]
 	if !ok {
 		err = errors.New(fmt.Sprintf("marshaller not found: %v %v", task, opt))
@@ -132,31 +158,28 @@ func (me *marshallers) EncodeTask(task *Task) (b []byte, err error) {
 	}
 
 	// put a head to record which marshaller we use
-	head := make([]byte, 8)
-	binary.PutVarint(head, int64(opt.task))
-	b = append(head, body...)
+	b = append(EncodeHeader(task.ID(), opt.task), body...)
 	return
 }
 
-func (me *marshallers) DecodeTask(b []byte) (task *Task, err error) {
-	ms := me.ms.Load().(map[int]Marshaller)
-	head, body := b[:8], b[8:]
-	which, err := binary.ReadVarint(bytes.NewBuffer(head))
+func (me *Marshallers) DecodeTask(b []byte) (task *Task, err error) {
+	h, err := DecodeHeader(b)
 	if err != nil {
 		return
 	}
 
-	m, ok := ms[int(which)]
+	ms := me.ms.Load().(map[int16]Marshaller)
+	m, ok := ms[h.MashID()]
 	if !ok {
-		err = errors.New(fmt.Sprintf("marshaller not found: %v", which))
+		err = errors.New(fmt.Sprintf("marshaller not found: %v", h))
 		return
 	}
 
-	task, err = m.DecodeTask(body)
+	task, err = m.DecodeTask(b[h.Length():])
 	return
 }
 
-func (me *marshallers) EncodeReport(report *Report) (b []byte, err error) {
+func (me *Marshallers) EncodeReport(report *Report) (b []byte, err error) {
 	// looking for marshaller-option
 	fn := me.fn2msh.Load().(map[string]*_mshFnOpt)
 	opt, ok := fn[report.Name()]
@@ -166,7 +189,7 @@ func (me *marshallers) EncodeReport(report *Report) (b []byte, err error) {
 	}
 
 	// looking for marshaller
-	ms := me.ms.Load().(map[int]Marshaller)
+	ms := me.ms.Load().(map[int16]Marshaller)
 	m, ok := ms[opt.report]
 	if !ok {
 		err = errors.New(fmt.Sprintf("marshaller not found: %v %v", report, opt))
@@ -177,26 +200,24 @@ func (me *marshallers) EncodeReport(report *Report) (b []byte, err error) {
 	if err != nil {
 		return
 	}
-	head := make([]byte, 8)
-	binary.PutVarint(head, int64(opt.report))
-	b = append(head, body...)
+	b = append(EncodeHeader(report.ID(), opt.report), body...)
 	return
 }
 
-func (me *marshallers) DecodeReport(b []byte) (report *Report, err error) {
-	ms := me.ms.Load().(map[int]Marshaller)
-	head, body := b[:8], b[8:]
-	which, err := binary.ReadVarint(bytes.NewBuffer(head))
+func (me *Marshallers) DecodeReport(b []byte) (report *Report, err error) {
+	h, err := DecodeHeader(b)
 	if err != nil {
 		return
 	}
-	m, ok := ms[int(which)]
+
+	ms := me.ms.Load().(map[int16]Marshaller)
+	m, ok := ms[h.MashID()]
 	if !ok {
-		err = errors.New(fmt.Sprintf("marshaller not found: %v", which))
+		err = errors.New(fmt.Sprintf("marshaller not found: %v", h))
 		return
 	}
 
-	report, err = m.DecodeReport(body)
+	report, err = m.DecodeReport(b[h.Length():])
 	return
 }
 
@@ -205,6 +226,10 @@ func (me *marshallers) DecodeReport(b []byte) (report *Report, err error) {
 //
 
 type jsonMarshaller struct {
+}
+
+func (me *jsonMarshaller) Prepare(string, interface{}) (err error) {
+	return
 }
 
 func (me *jsonMarshaller) EncodeTask(task *Task) (b []byte, err error) {
@@ -250,6 +275,42 @@ func (me *jsonMarshaller) DecodeReport(b []byte) (report *Report, err error) {
 //
 
 type gobMarshaller struct {
+}
+
+// Gob needs to register type before encode/decode
+func (me *gobMarshaller) Prepare(name string, fn interface{}) (err error) {
+	fT := reflect.TypeOf(fn)
+	if fT.Kind() != reflect.Func {
+		err = errors.New(fmt.Sprintf("fn is not a function but %v", fn))
+		return
+	}
+
+	reg := func(v reflect.Value) (err error) {
+		if !v.CanInterface() {
+			err = errors.New(fmt.Sprintf("Can't convert to value in input of %v for name:%v", fn, name))
+			return
+		}
+
+		gob.Register(v.Interface())
+		return
+	}
+
+	for i := 0; i < fT.NumIn(); i++ {
+		// create a zero value of the type of parameters
+		err = reg(reflect.Zero(fT.In(i)))
+		if err != nil {
+			return
+		}
+	}
+
+	for i := 0; i < fT.NumOut(); i++ {
+		err = reg(reflect.Zero(fT.Out(i)))
+		if err != nil {
+			return
+		}
+	}
+
+	return
 }
 
 func (me *gobMarshaller) EncodeTask(task *Task) (b []byte, err error) {

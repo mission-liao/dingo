@@ -13,10 +13,11 @@ import (
 //
 
 func TestMarshallers(t *testing.T) {
+
 	ass := assert.New(t)
-	msh, err := NewMarshallers()
-	ass.Nil(err)
-	err = msh.Register("test", Encode.JSON, Encode.Gob)
+	msh := NewMarshallers()
+	nothing := func() {}
+	err := msh.Register("test", nothing, Encode.JSON, Encode.Gob)
 	ass.Nil(err)
 	task, err := NewDefaultInvoker().ComposeTask("test", []interface{}{float64(1)})
 	task.I = "ID"
@@ -27,8 +28,12 @@ func TestMarshallers(t *testing.T) {
 		b, err := msh.EncodeTask(task)
 		ass.Nil(err)
 
+		// get header
+		h, err := DecodeHeader(b)
+		ass.Nil(err)
+
 		// make sure it's json
-		ass.Equal(string(b[8:]), "{\"I\":\"ID\",\"N\":\"test\",\"A\":[1]}")
+		ass.Equal(string(b[h.Length():]), "{\"I\":\"ID\",\"N\":\"test\",\"A\":[1]}")
 
 		// decode by json
 		t, err := msh.DecodeTask(b)
@@ -43,9 +48,14 @@ func TestMarshallers(t *testing.T) {
 
 		// report encoded by gob
 		b, err := msh.EncodeReport(report)
+		ass.Nil(err)
+
+		// get header
+		h, err := DecodeHeader(b)
+		ass.Nil(err)
 
 		// make sure it's gob
-		ass.Equal(string(b[8:]), "4\xff\x91\x03\x01\x01\x06Report\x01\xff\x92\x00\x01\x05\x01\x01I\x01\f\x00\x01\x01N\x01\f\x00\x01\x01S\x01\x04\x00\x01\x01E\x01\xff\x94\x00\x01\x01R\x01\xff\x82\x00\x00\x00\x1f\xff\x93\x03\x01\x01\x05Error\x01\xff\x94\x00\x01\x02\x01\x01C\x01\x04\x00\x01\x01M\x01\f\x00\x00\x00\f\xff\x81\x02\x01\x02\xff\x82\x00\x01\x10\x00\x008\xff\x92\x01\x02ID\x01\x04test\x01\x06\x01\x02\ntest error\x00\x01\x02\x06string\f\x06\x00\x04test\x05int64\x04\x02\x00\x04\x00")
+		ass.Equal(string(b[h.Length():]), "4\xff\x91\x03\x01\x01\x06Report\x01\xff\x92\x00\x01\x05\x01\x01I\x01\f\x00\x01\x01N\x01\f\x00\x01\x01S\x01\x04\x00\x01\x01E\x01\xff\x94\x00\x01\x01R\x01\xff\x82\x00\x00\x00\x1f\xff\x93\x03\x01\x01\x05Error\x01\xff\x94\x00\x01\x02\x01\x01C\x01\x04\x00\x01\x01M\x01\f\x00\x00\x00\f\xff\x81\x02\x01\x02\xff\x82\x00\x01\x10\x00\x008\xff\x92\x01\x02ID\x01\x04test\x01\x06\x01\x02\ntest error\x00\x01\x02\x06string\f\x06\x00\x04test\x05int64\x04\x02\x00\x04\x00")
 
 		// decode by gob
 		r, err := msh.DecodeReport(b)

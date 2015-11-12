@@ -4,10 +4,6 @@ import (
 	"reflect"
 )
 
-type Meta interface {
-	GetID() string
-}
-
 //
 // building block of a task
 //
@@ -20,7 +16,7 @@ type Task struct {
 //
 // getter
 //
-func (t *Task) GetID() string       { return t.I }
+func (t *Task) ID() string          { return t.I }
 func (t *Task) Name() string        { return t.N }
 func (t *Task) Args() []interface{} { return t.A }
 
