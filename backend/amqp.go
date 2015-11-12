@@ -118,7 +118,7 @@ func (me *_amqp) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 
 	me.ridsLock.Lock()
 	defer me.ridsLock.Unlock()
-	me.rids[id.GetID()] = idx
+	me.rids[id.ID()] = idx
 
 	// acquire a free channel
 	ci, err := me.AmqpConnection.Channel()
@@ -183,7 +183,7 @@ func (me *_amqp) Done(id transport.Meta) (err error) {
 	me.ridsLock.Lock()
 	defer me.ridsLock.Unlock()
 
-	v, ok := me.rids[id.GetID()]
+	v, ok := me.rids[id.ID()]
 	if !ok {
 		err = errors.New("store id not found")
 		return
@@ -205,11 +205,11 @@ func (me *_amqp) _reporter_routine_(quit <-chan int, done chan<- int, events cha
 	for {
 		select {
 		case _, _ = <-quit:
-			goto cleanup
+			goto clean
 		case e, ok := <-reports:
 			if !ok {
 				// reports channel is closed
-				goto cleanup
+				goto clean
 			}
 
 			// acquire a channel
@@ -279,7 +279,7 @@ func (me *_amqp) _reporter_routine_(quit <-chan int, done chan<- int, events cha
 		}
 	}
 
-cleanup:
+clean:
 	// TODO: cosume all remaining reports?
 }
 
@@ -313,17 +313,17 @@ func (me *_amqp) _store_routine_(
 	for {
 		select {
 		case _, _ = <-quit:
-			goto cleanup
+			goto clean
 		case d, ok := <-dv:
 			if !ok {
-				goto cleanup
+				goto clean
 			}
 
 			reports <- d.Body
 		}
 	}
 
-cleanup:
+clean:
 	// TODO: consuming remaining stuffs in queue
 	// cancel consuming
 	err = ci.Channel.Cancel(getConsumerTag(id), false)
@@ -367,15 +367,15 @@ cleanup:
 
 //
 func getQueueName(id transport.Meta) string {
-	return fmt.Sprintf("dingo.q.%q", id.GetID())
+	return fmt.Sprintf("dingo.q.%q", id.ID())
 }
 
 //
 func getRoutingKey(id transport.Meta) string {
-	return fmt.Sprintf("dingo.rkey.%q", id.GetID())
+	return fmt.Sprintf("dingo.rkey.%q", id.ID())
 }
 
 //
 func getConsumerTag(id transport.Meta) string {
-	return fmt.Sprintf("dingo.consumer.%q", id.GetID())
+	return fmt.Sprintf("dingo.consumer.%q", id.ID())
 }

@@ -58,17 +58,17 @@ func (me *_local) _reporter_routine_(quit <-chan int, done chan<- int, events ch
 	for {
 		select {
 		case _, _ = <-quit:
-			goto cleanup
+			goto clean
 		case v, ok := <-reports:
 			if !ok {
-				goto cleanup
+				goto clean
 			}
 
 			// send to Store
 			me.to <- v
 		}
 	}
-cleanup:
+clean:
 }
 
 func (me *_local) _store_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event) {
@@ -80,7 +80,7 @@ func (me *_local) _store_routine_(quit <-chan int, wait *sync.WaitGroup, events 
 
 		found := false
 		for k, v := range me.toCheck {
-			if k == enp.ID.GetID() {
+			if k == enp.ID.ID() {
 				found = true
 				v <- enp.Body
 				break
@@ -95,16 +95,16 @@ func (me *_local) _store_routine_(quit <-chan int, wait *sync.WaitGroup, events 
 	for {
 		select {
 		case _, _ = <-quit:
-			goto cleanup
+			goto clean
 		case v, ok := <-me.to:
 			if !ok {
-				goto cleanup
+				goto clean
 			}
 
 			out(v)
 		}
 	}
-cleanup:
+clean:
 }
 
 //
@@ -151,20 +151,20 @@ func (me *_local) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 
 	found := false
 	for k, v := range me.toCheck {
-		if k == id.GetID() {
+		if k == id.ID() {
 			found, r = true, v
 		}
 	}
 
 	if !found {
 		r = make(chan []byte, 10)
-		me.toCheck[id.GetID()], reports = r, r
+		me.toCheck[id.ID()], reports = r, r
 	}
 
 	// reverse traversing when deleting in slice
 	for i := len(me.unSent) - 1; i >= 0; i-- {
 		v := me.unSent[i]
-		if v.ID.GetID() == id.GetID() {
+		if v.ID.ID() == id.ID() {
 			r <- v.Body
 			// delete this element
 			me.unSent = append(me.unSent[:i], me.unSent[i+1:]...)
@@ -179,12 +179,12 @@ func (me *_local) Done(id transport.Meta) (err error) {
 	defer me.storeLock.Unlock()
 
 	// clearing toCheck list
-	delete(me.toCheck, id.GetID())
+	delete(me.toCheck, id.ID())
 
 	// clearing unSent
 	for i := len(me.unSent) - 1; i >= 0; i-- {
 		v := me.unSent[i]
-		if v.ID.GetID() == id.GetID() {
+		if v.ID.ID() == id.ID() {
 			// delete this element
 			me.unSent = append(me.unSent[:i], me.unSent[i+1:]...)
 		}

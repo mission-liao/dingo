@@ -88,7 +88,7 @@ func (me *_redis) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 
 	me.ridsLock.Lock()
 	defer me.ridsLock.Unlock()
-	me.rids[id.GetID()] = idx
+	me.rids[id.ID()] = idx
 
 	r := make(chan []byte, 10)
 	reports = r
@@ -101,7 +101,7 @@ func (me *_redis) Done(id transport.Meta) (err error) {
 	me.ridsLock.Lock()
 	defer me.ridsLock.Unlock()
 
-	v, ok := me.rids[id.GetID()]
+	v, ok := me.rids[id.ID()]
 	if !ok {
 		err = errors.New("store id not found")
 		return
@@ -129,10 +129,10 @@ func (me *_redis) _reporter_routine_(quit <-chan int, done chan<- int, events ch
 	for {
 		select {
 		case _, _ = <-quit:
-			goto cleanup
+			goto clean
 		case e, ok := <-reports:
 			if !ok {
-				goto cleanup
+				goto clean
 			}
 
 			_, err = conn.Do("LPUSH", getKey(e.ID), e.Body)
@@ -142,7 +142,7 @@ func (me *_redis) _reporter_routine_(quit <-chan int, done chan<- int, events ch
 			}
 		}
 	}
-cleanup:
+clean:
 }
 
 func (me *_redis) _store_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports chan<- []byte, id transport.Meta) {
@@ -156,7 +156,7 @@ func (me *_redis) _store_routine_(quit <-chan int, done chan<- int, events chan<
 	for {
 		select {
 		case _, _ = <-quit:
-			goto cleanup
+			goto clean
 		default:
 			// blocking call to redis
 			reply, err := conn.Do("BRPOP", getKey(id), 1) // TODO: configuration, in seconds
@@ -197,7 +197,7 @@ func (me *_redis) _store_routine_(quit <-chan int, done chan<- int, events chan<
 			reports <- b
 		}
 	}
-cleanup:
+clean:
 }
 
 //
@@ -205,5 +205,5 @@ cleanup:
 //
 
 func getKey(id transport.Meta) string {
-	return fmt.Sprintf("%v.%d", _redisResultQueue, id.GetID())
+	return fmt.Sprintf("%v.%d", _redisResultQueue, id.ID())
 }
