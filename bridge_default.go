@@ -2,7 +2,10 @@ package dingo
 
 import (
 	"errors"
+	"fmt"
+	"reflect"
 	"sync"
+	"sync/atomic"
 
 	"github.com/mission-liao/dingo/backend"
 	"github.com/mission-liao/dingo/broker"
@@ -32,6 +35,9 @@ type bridge struct {
 	events         chan *common.Event
 	eventMux       *common.Mux
 	eventConverter *common.Routines
+	invoker        transport.Invoker
+	fnsLock        sync.Mutex
+	fns            atomic.Value
 }
 
 func newDefaultBridge(m *transport.Marshallers) (b *bridge) {
@@ -44,7 +50,10 @@ func newDefaultBridge(m *transport.Marshallers) (b *bridge) {
 		eventConverter: common.NewRoutines(),
 		doners:         make(chan transport.Meta, 10),
 		mash:           m,
+		invoker:        transport.NewDefaultInvoker(),
 	}
+
+	b.fns.Store(make(map[string]interface{}))
 
 	go func(quit <-chan int, wait *sync.WaitGroup, in <-chan *common.MuxOut, out chan *common.Event) {
 		defer wait.Done()
@@ -93,6 +102,30 @@ func (me *bridge) Events() ([]<-chan *common.Event, error) {
 	return []<-chan *common.Event{
 		me.events,
 	}, nil
+}
+
+func (me *bridge) Register(name string, fn interface{}) (err error) {
+	if reflect.TypeOf(fn).Kind() != reflect.Func {
+		err = errors.New(fmt.Sprintf("not a function: %v", fn))
+		return
+	}
+
+	me.fnsLock.Lock()
+	defer me.fnsLock.Unlock()
+
+	m := me.fns.Load().(map[string]interface{})
+	if _, ok := m[name]; ok {
+		err = errors.New(fmt.Sprintf("already registered: %v", name))
+		return
+	}
+
+	m_ := make(map[string]interface{})
+	for k := range m {
+		m_[k] = m[k]
+	}
+	m_[name] = fn
+	me.fns.Store(m_)
+	return
 }
 
 func (me *bridge) SendTask(t *transport.Task) (err error) {
@@ -215,11 +248,11 @@ func (me *bridge) Report(reports <-chan *transport.Report) (err error) {
 			}
 		}
 		for {
-			_ = "breakpoint"
 			select {
 			case _, _ = <-quit:
 				goto cleanup
 			case v, ok := <-input:
+				_ = "breakpoint"
 				if !ok {
 					goto cleanup
 				}
@@ -273,6 +306,25 @@ func (me *bridge) Poll(t *transport.Task) (reports <-chan *transport.Report, err
 				events <- common.NewEventFromError(common.InstT.STORE, err)
 				return
 			}
+			// fix returns
+			if len(r.Return()) > 0 {
+				m := me.fns.Load().(map[string]interface{})
+				f, ok := m[r.Name()]
+				if !ok {
+					events <- common.NewEventFromError(
+						common.InstT.STORE,
+						errors.New(fmt.Sprintf("function pointer is not registered: %v", r)),
+					)
+				} else {
+					ret, err := me.invoker.Return(f, r.Return())
+					if err != nil {
+						events <- common.NewEventFromError(common.InstT.STORE, err)
+					} else {
+						r.R = ret
+					}
+				}
+			}
+
 			outputs <- r
 			done = r.Done()
 			return

@@ -6,6 +6,7 @@ import (
 	"github.com/mission-liao/dingo/backend"
 	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
+	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -52,3 +53,35 @@ func TestBridgeDefaultSuite(t *testing.T) {
 //
 // test cases
 //
+
+func (me *DefaultBridgeTestSuite) TestReturnFix() {
+	// register a function, returning float64
+	me.Nil(me.mash.Register("ReturnFix", func() float64 { return 0 }, transport.Encode.Default, transport.Encode.Default))
+	err := me.bg.Register("ReturnFix", func() float64 { return 0 })
+
+	// compose a task
+	t, err := me.ivk.ComposeTask("ReturnFix", nil)
+	me.Nil(err)
+
+	// compose a corresponding report
+	r, err := t.ComposeReport(transport.Status.Done, []interface{}{int(6)}, nil)
+	me.Nil(err)
+
+	// attach a reporting channel
+	reports := make(chan *transport.Report, 10)
+	me.Nil(me.bg.Report(reports))
+
+	// poll the task
+	outputs, err := me.bg.Poll(t)
+	me.Nil(err)
+
+	reports <- r
+	out, ok := <-outputs
+	me.True(ok)
+	me.Len(out.Return(), 1)
+	if len(out.Return()) > 0 {
+		v, ok := out.Return()[0].(float64)
+		me.True(ok)
+		me.Equal(float64(6), v)
+	}
+}

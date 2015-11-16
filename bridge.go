@@ -12,6 +12,10 @@ type Bridge interface {
 	Events() ([]<-chan *common.Event, error)
 
 	//
+	// Register function pointer for fixing returns
+	Register(name string, fn interface{}) (err error)
+
+	//
 	// proxy for broker.Producer
 	//
 	SendTask(t *transport.Task) (err error)

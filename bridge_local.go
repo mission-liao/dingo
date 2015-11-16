@@ -82,6 +82,10 @@ func (me *localBridge) Close() (err error) {
 	return
 }
 
+func (me *localBridge) Register(name string, fn interface{}) (err error) {
+	return
+}
+
 func (me *localBridge) SendTask(t *transport.Task) (err error) {
 	me.objLock.RLock()
 	defer me.objLock.RUnlock()
@@ -216,6 +220,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 		outF := func(r *transport.Report) (found bool) {
 			o, found := watched[r.ID()]
 			if found {
+				// TODO: fix returns here
 				o <- r
 				if r.Done() {
 					delete(watched, r.ID())
