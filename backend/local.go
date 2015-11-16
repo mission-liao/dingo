@@ -43,10 +43,7 @@ func newLocal(cfg *Config) (v *_local, err error) {
 		unSent:    make([]*Envelope, 0, 10),
 	}
 
-	// Store -> Subscriber
-	quit := v.stores.New()
-	go v._store_routine_(quit, v.stores.Wait(), v.stores.Events())
-
+	go v._store_routine_(v.stores.New(), v.stores.Wait(), v.stores.Events())
 	return
 }
 
@@ -162,13 +159,19 @@ func (me *_local) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 	}
 
 	// reverse traversing when deleting in slice
+	toSent := []*Envelope{}
 	for i := len(me.unSent) - 1; i >= 0; i-- {
 		v := me.unSent[i]
 		if v.ID.ID() == id.ID() {
-			r <- v.Body
+			// prepend
+			toSent = append([]*Envelope{v}, toSent...)
 			// delete this element
 			me.unSent = append(me.unSent[:i], me.unSent[i+1:]...)
 		}
+	}
+
+	for _, v := range toSent {
+		r <- v.Body
 	}
 
 	return
