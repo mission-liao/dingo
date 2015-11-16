@@ -2,6 +2,7 @@ package transport
 
 import (
 	"fmt"
+	"reflect"
 )
 
 type Error struct {
@@ -10,14 +11,15 @@ type Error struct {
 }
 
 func NewErr(code int64, err error) *Error {
-	var msg string
-	if err != nil {
-		msg = err.Error()
+	if err == nil || reflect.ValueOf(err).IsNil() {
+		return &Error{
+			C: code,
+		}
 	}
 
 	return &Error{
 		C: code,
-		M: msg,
+		M: err.Error(),
 	}
 }
 

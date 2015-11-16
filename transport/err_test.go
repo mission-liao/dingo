@@ -20,3 +20,9 @@ func TestErrMarshal(t *testing.T) {
 	ass.Equal(int64(0), e.Code())
 	ass.Equal("test string", e.Msg())
 }
+
+func TestErrNil(t *testing.T) {
+	var e *Error
+	// should not panic
+	NewErr(0, e)
+}
