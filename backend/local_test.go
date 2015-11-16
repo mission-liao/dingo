@@ -40,7 +40,6 @@ func (me *LocalBackendTestSuite) SetupSuite() {
 	)
 
 	cfg := Default()
-	_ = "breakpoint"
 	me._backend, err = New("local", cfg)
 	me.Nil(err)
 	me.BackendTestSuite.SetupSuite()

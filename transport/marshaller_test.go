@@ -38,7 +38,6 @@ func TestMarshallers(t *testing.T) {
 		// decode by json
 		t, err := msh.DecodeTask(b)
 		ass.Nil(err)
-		_ = "breakpoint"
 		ass.True(t.Equal(task))
 	}
 
