@@ -4,7 +4,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/mission-liao/dingo/meta"
+	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -12,7 +12,7 @@ type WorkerTestSuite struct {
 	suite.Suite
 
 	_ws      *_workers
-	_invoker meta.Invoker
+	_invoker transport.Invoker
 }
 
 func TestWorkerSuite(t *testing.T) {
@@ -23,7 +23,7 @@ func (me *WorkerTestSuite) SetupSuite() {
 	var err error
 	me._ws, err = newWorkers()
 	me.Nil(err)
-	me._invoker = meta.NewDefaultInvoker()
+	me._invoker = transport.NewDefaultInvoker()
 }
 
 func (me *WorkerTestSuite) TearDownSuite() {
@@ -41,14 +41,17 @@ func (me *WorkerTestSuite) TestParellelRun() {
 	stepIn := make(chan int, 3)
 	stepOut := make(chan int)
 
-	me._ws.allocate(&StrMatcher{"test"}, func(i int) {
+	reports, remain, err := me._ws.allocate("ParellelRun", func(i int) {
 		stepIn <- i
 		// workers would be blocked here
 		<-stepOut
 	}, 3, 0)
+	me.Nil(err)
+	me.Equal(0, remain)
+	me.Len(reports, 1)
 
 	for i := 0; i < 3; i++ {
-		t, err := me._invoker.ComposeTask("test", i)
+		t, err := me._invoker.ComposeTask("ParellelRun", []interface{}{i})
 		me.Nil(err)
 		if err == nil {
 			me.Nil(me._ws.dispatch(t))

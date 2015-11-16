@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"sync/atomic"
 
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/meta"
-	"github.com/satori/go.uuid"
+	"github.com/mission-liao/dingo/transport"
 )
 
 //
@@ -20,41 +20,15 @@ var (
 )
 
 //
-// Matcher
-//
-
-// 'Matcher' is a role to check if a name belongs to
-// this group of workers
-type Matcher interface {
-
-	//
-	//
-	// parameter:
-	// - patt: the pattern to be checked.
-	// return:
-	// - a boolean to represent 'yes' or 'no'.
-	Match(patt string) bool
-}
-
-type StrMatcher struct {
-	name string
-}
-
-func (me *StrMatcher) Match(patt string) bool {
-	return me.name == patt
-}
-
-//
 // worker
 //
 // a required record for a group of workers
 //
 
 type worker struct {
-	matcher Matcher
-	tasks   chan meta.Task
+	tasks   chan *transport.Task
 	rs      *common.Routines
-	reports []chan meta.Report
+	reports []chan *transport.Report
 	fn      interface{}
 }
 
@@ -63,8 +37,8 @@ type worker struct {
 //
 
 type _workers struct {
-	lock           sync.RWMutex
-	workers        map[string]*worker
+	lock           sync.Mutex
+	workers        atomic.Value
 	events         chan *common.Event
 	eventConverter *common.Routines
 	eventMux       *common.Mux
@@ -79,26 +53,14 @@ type _workers struct {
 // - count: count of workers to be initiated
 // - share: the count of workers sharing one report channel
 // returns:
-// - id: identifier of this group of workers
 // - remain: count of workers remain not initiated
-// - reports: array of channels of 'meta.Report'
+// - reports: array of channels of 'transport.Report'
 // - err: any error
-func (me *_workers) allocate(m Matcher, fn interface{}, count, share int) (id string, reports []<-chan meta.Report, remain int, err error) {
+func (me *_workers) allocate(name string, fn interface{}, count, share int) (reports []<-chan *transport.Report, remain int, err error) {
 	// make sure type of fn is relfect.Func
 	k := reflect.TypeOf(fn).Kind()
 	if k != reflect.Func {
 		err = errors.New(fmt.Sprintf("Invalid function pointer passed: %v", k.String()))
-		return
-	}
-
-	// make sure a valid 'Matcher' instance is assigned
-	if m == nil {
-		err = errors.New(fmt.Sprintf("Need a valid Matcher, not %v", m))
-		return
-	}
-
-	if me.workers == nil {
-		err = errors.New("worker slice is not initialized")
 		return
 	}
 
@@ -108,7 +70,7 @@ func (me *_workers) allocate(m Matcher, fn interface{}, count, share int) (id st
 	)
 	defer func() {
 		if err == nil {
-			remain, reports, err = me.more(id, count, share)
+			remain, reports, err = me.more(name, count, share)
 		}
 
 		if err != nil {
@@ -133,30 +95,34 @@ func (me *_workers) allocate(m Matcher, fn interface{}, count, share int) (id st
 		me.lock.Lock()
 		defer me.lock.Unlock()
 
-		// get an unique id
-		for {
-			id = uuid.NewV4().String()
-			_, ok := me.workers[id]
-			if !ok {
-				break
-			}
+		ws := me.workers.Load().(map[string]*worker)
+
+		if _, ok := ws[name]; ok {
+			err = errors.New(fmt.Sprintf("name %v exists", name))
+			return
 		}
 
 		// initiate controlling channle
 		w = &worker{
-			matcher: m,
-			tasks:   make(chan meta.Task, 10), // TODO: configuration?
+			tasks:   make(chan *transport.Task, 10), // TODO: configuration?
 			rs:      common.NewRoutines(),
 			fn:      fn,
-			reports: make([]chan meta.Report, 0, 10),
+			reports: make([]chan *transport.Report, 0, 10),
 		}
 
-		eid, err = me.eventMux.Register(w.rs.Events(), 1)
+		eid, err = me.eventMux.Register(w.rs.Events(), 0)
 		if err != nil {
 			return
 		}
 
-		me.workers[id] = w
+		// -- this line below should never throw any error --
+
+		nws := make(map[string]*worker)
+		for k := range ws {
+			nws[k] = ws[k]
+		}
+		nws[name] = w
+		me.workers.Store(nws)
 		return
 	}()
 
@@ -166,38 +132,33 @@ func (me *_workers) allocate(m Matcher, fn interface{}, count, share int) (id st
 // allocating more workers
 //
 // parameters:
-// - id: identifier of this group of workers share the same function, matcher...
+// - name: identifier of this group of workers share the same function, matcher...
 // - count: count of workers to be initiated
 // - share: count of workers sharing one report channel
 // returns:
 // - remain: count of workers remain not initiated
 // - err: any error
-func (me *_workers) more(id string, count, share int) (remain int, reports []<-chan meta.Report, err error) {
-	// locking
-	me.lock.Lock()
-	defer me.lock.Unlock()
-
-	reports = make([]<-chan meta.Report, 0, remain)
+func (me *_workers) more(name string, count, share int) (remain int, reports []<-chan *transport.Report, err error) {
+	remain = count
 	if count <= 0 || share < 0 {
 		err = errors.New(fmt.Sprintf("invalid count/share is provided %v", count, share))
 		return
 	}
-	remain = count
 
-	if me.workers == nil {
-		err = errors.New("worker slice is not initialized")
-		return
-	}
+	reports = make([]<-chan *transport.Report, 0, remain)
+
+	// locking
+	ws := me.workers.Load().(map[string]*worker)
 
 	// checking existence of Id
-	w, ok := me.workers[id]
+	w, ok := ws[name]
 	if !ok {
 		err = errors.New(fmt.Sprintf("%d group of worker not found"))
 		return
 	}
 
-	add := func() (r chan meta.Report) {
-		r = make(chan meta.Report, 10)
+	add := func() (r chan *transport.Report) {
+		r = make(chan *transport.Report, 10)
 		reports = append(reports, r)
 		w.reports = append(w.reports, r)
 		return
@@ -210,7 +171,7 @@ func (me *_workers) more(id string, count, share int) (remain int, reports []<-c
 		if share > 0 && remain != count && remain%share == 0 {
 			r = add()
 		}
-		go _worker_routine_(
+		go me._worker_routine_(
 			w.rs.New(),
 			w.rs.Wait(),
 			w.rs.Events(),
@@ -223,31 +184,20 @@ func (me *_workers) more(id string, count, share int) (remain int, reports []<-c
 	return
 }
 
-// dispatching a 'meta.Task'
+// dispatching a 'transport.Task'
 //
 // parameters:
 // - t: the task
 // returns:
 // - err: any error
-func (me *_workers) dispatch(t meta.Task) (err error) {
-	me.lock.RLock()
-	defer me.lock.RUnlock()
-
-	found := false
-	if me.workers != nil {
-		for _, v := range me.workers {
-			if v.matcher.Match(t.GetName()) {
-				v.tasks <- t
-				found = true
-				break
-			}
-		}
+func (me *_workers) dispatch(t *transport.Task) (err error) {
+	ws := me.workers.Load().(map[string]*worker)
+	if v, ok := ws[t.Name()]; ok {
+		v.tasks <- t
+	} else {
+		err = errWorkerNotFound
 	}
-
-	if found {
-		return nil
-	}
-	return errWorkerNotFound
+	return
 }
 
 //
@@ -265,12 +215,14 @@ func (me *_workers) Close() (err error) {
 	defer me.lock.Unlock()
 
 	// stop all workers routine
-	for _, v := range me.workers {
+	ws := me.workers.Load().(map[string]*worker)
+	for _, v := range ws {
 		v.rs.Close()
 		for _, r := range v.reports {
 			close(r)
 		}
 	}
+	me.workers.Store(make(map[string]*worker))
 
 	return
 }
@@ -278,26 +230,29 @@ func (me *_workers) Close() (err error) {
 // factory function
 func newWorkers() (w *_workers, err error) {
 	w = &_workers{
-		workers:        make(map[string]*worker),
 		eventConverter: common.NewRoutines(),
 		events:         make(chan *common.Event, 10),
 		eventMux:       common.NewMux(),
 	}
 
+	w.workers.Store(make(map[string]*worker))
+
+	// a routine to mux multipls event channels from workers,
+	// and output them through a single event channel.
 	go func(quit <-chan int, wait *sync.WaitGroup, in <-chan *common.MuxOut, out chan *common.Event) {
 		defer wait.Done()
 		for {
 			select {
 			case _, _ = <-quit:
-				goto cleanup
+				goto clean
 			case v, ok := <-in:
 				if !ok {
-					goto cleanup
+					goto clean
 				}
 				out <- v.Value.(*common.Event)
 			}
 		}
-	cleanup:
+	clean:
 	}(w.eventConverter.New(), w.eventConverter.Wait(), w.eventMux.Out(), w.events)
 
 	remain, err := w.eventMux.More(1)
@@ -312,73 +267,85 @@ func newWorkers() (w *_workers, err error) {
 // worker routine
 //
 
-func _worker_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, tasks <-chan meta.Task, reports chan<- meta.Report, fn interface{}) {
+func (me *_workers) _worker_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, tasks <-chan *transport.Task, reports chan<- *transport.Report, fn interface{}) {
 	defer wait.Done()
+
 	// TODO: concider a shared, common invoker instance?
-	ivk := meta.NewDefaultInvoker()
+	ivk := transport.NewDefaultInvoker()
+	rep := func(task *transport.Task, status int, payload []interface{}, err error) {
+		var (
+			e    *transport.Error
+			r    *transport.Report
+			err_ error
+		)
+		if err != nil {
+			e = transport.NewErr(0, err)
+		}
+		r, err_ = task.ComposeReport(status, payload, e)
+		if err_ != nil {
+			r, err_ = task.ComposeReport(transport.Status.Fail, nil, transport.NewErr(0, err_))
+			if err_ != nil {
+				events <- common.NewEventFromError(common.InstT.WORKER, err_)
+				return
+			}
+		}
+
+		reports <- r
+	}
+	call := func(t *transport.Task) {
+		var (
+			ret       []interface{}
+			err, err_ error
+			status    int
+		)
+
+		// compose a report -- sent
+		rep(t, transport.Status.Sent, nil, nil)
+
+		// compose a report -- progress
+		rep(t, transport.Status.Progress, nil, nil)
+
+		// call the actuall function, where is the magic
+		ret, err = ivk.Invoke(fn, t.Args())
+
+		// compose a report -- done / fail
+		if err != nil {
+			status = transport.Status.Fail
+			events <- common.NewEventFromError(common.InstT.WORKER, err_)
+		} else {
+			status = transport.Status.Done
+		}
+		rep(t, status, ret, err)
+	}
 
 	for {
 		select {
 		case t, ok := <-tasks:
 			if !ok {
-				goto cleanup
+				goto clean
 			}
 
-			var (
-				r         meta.Report
-				ret       []interface{}
-				err, err_ error
-				status    int
-			)
-
-			// compose a report -- sent
-
-			r, err = t.ComposeReport(meta.Status.Sent, nil, nil)
-			if err != nil {
-				r, err_ = t.ComposeReport(meta.Status.Fail, nil, meta.NewErr(0, err))
-				if err_ != nil {
-					// TODO: log it
-				}
-				return
-			}
-			reports <- r
-
-			// compose a report -- progress
-			r, err = t.ComposeReport(meta.Status.Progress, nil, nil)
-			if err != nil {
-				// TODO: a test case here
-				r, err_ = t.ComposeReport(meta.Status.Fail, nil, meta.NewErr(0, err))
-				if err_ != nil {
-					events <- common.NewEventFromError(common.InstT.WORKER, err_)
-					break
-				}
-				reports <- r
-				break
-			}
-			reports <- r
-
-			// call the actuall function, where is the magic
-			ret, err = ivk.Invoke(fn, t.GetArgs())
-
-			// compose a report -- done / fail
-			if err != nil {
-				status = meta.Status.Fail
-				events <- common.NewEventFromError(common.InstT.WORKER, err_)
-			} else {
-				status = meta.Status.Done
-			}
-
-			r, err_ = t.ComposeReport(status, ret, meta.NewErr(0, err))
-			if err_ != nil {
-				events <- common.NewEventFromError(common.InstT.WORKER, err_)
-				break
-			}
-			reports <- r
-
+			call(t)
 		case _, _ = <-quit:
 			// nothing to clean
-			goto cleanup
+			goto clean
 		}
 	}
-cleanup:
+clean:
+	finished := false
+	for {
+		select {
+		case t, ok := <-tasks:
+			if !ok {
+				finished = true
+				break
+			}
+			call(t)
+		default:
+			finished = true
+		}
+		if finished {
+			break
+		}
+	}
 }
