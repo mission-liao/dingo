@@ -5,7 +5,7 @@ import (
 
 	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/meta"
+	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -13,17 +13,17 @@ type MapperTestSuite struct {
 	suite.Suite
 
 	_mps            *_mappers
-	_invoker        meta.Invoker
-	_tasks          chan meta.Task
+	_invoker        transport.Invoker
+	_tasks          chan *transport.Task
 	_countOfMappers int
 	_receiptsMux    *common.Mux
 }
 
 func TestMapperSuite(t *testing.T) {
 	suite.Run(t, &MapperTestSuite{
-		_tasks:          make(chan meta.Task, 5),
+		_tasks:          make(chan *transport.Task, 5),
 		_countOfMappers: 3,
-		_invoker:        meta.NewDefaultInvoker(),
+		_invoker:        transport.NewDefaultInvoker(),
 		_receiptsMux:    common.NewMux(),
 	})
 }
@@ -35,7 +35,7 @@ func (me *MapperTestSuite) SetupSuite() {
 
 	// allocate 3 mapper routines
 	for remain := me._countOfMappers; remain > 0; remain-- {
-		receipts := make(chan broker.Receipt, 10)
+		receipts := make(chan *broker.Receipt, 10)
 		me._mps.more(me._tasks, receipts)
 		_, err := me._receiptsMux.Register(receipts, 0)
 		me.Nil(err)
@@ -65,7 +65,7 @@ func (me *MapperTestSuite) TestParellelMapping() {
 	count := me._countOfMappers + cap(me._tasks)
 	stepIn := make(chan int, count)
 	stepOut := make(chan int, count)
-	_, reports, remain, err := me._mps.allocateWorkers(&StrMatcher{"test"}, func(i int) {
+	reports, remain, err := me._mps.allocateWorkers("ParellelMapping", func(i int) {
 		stepIn <- i
 		// workers would be blocked here
 		<-stepOut
@@ -77,7 +77,7 @@ func (me *MapperTestSuite) TestParellelMapping() {
 	// send enough tasks to fill mapper routines & tasks channel
 	for i := 0; i < count; i++ {
 		// compose corresponding task
-		t, err := me._invoker.ComposeTask("test", i)
+		t, err := me._invoker.ComposeTask("ParellelMapping", []interface{}{i})
 		me.Nil(err)
 
 		// should not be blocked here

@@ -5,7 +5,7 @@ import (
 
 	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/meta"
+	"github.com/mission-liao/dingo/transport"
 )
 
 //
@@ -20,20 +20,19 @@ type _mappers struct {
 // allocating more mappers
 //
 // parameters:
-// - tasks: input channel for meta.Task
+// - tasks: input channel for transport.Task
 // - receipts: output channel for broker.Receipt
-func (m *_mappers) more(tasks <-chan meta.Task, receipts chan<- broker.Receipt) {
-	quit := m.mappers.New()
-	go m._mapper_routine_(quit, m.mappers.Wait(), m.mappers.Events(), tasks, receipts)
+func (me *_mappers) more(tasks <-chan *transport.Task, receipts chan<- *broker.Receipt) {
+	go me._mapper_routine_(me.mappers.New(), me.mappers.Wait(), me.mappers.Events(), tasks, receipts)
 }
 
 //
 // proxy of _workers
 //
 
-func (me *_mappers) allocateWorkers(m Matcher, fn interface{}, count, share int) (string, []<-chan meta.Report, int, error) {
-	i, r, n, err := me.workers.allocate(m, fn, count, share)
-	return i, r, n, err
+func (me *_mappers) allocateWorkers(name string, fn interface{}, count, share int) ([]<-chan *transport.Report, int, error) {
+	r, n, err := me.workers.allocate(name, fn, count, share)
+	return r, n, err
 }
 
 //
@@ -78,7 +77,13 @@ func newMappers() (m *_mappers, err error) {
 // mapper routine
 //
 
-func (m *_mappers) _mapper_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, tasks <-chan meta.Task, receipts chan<- broker.Receipt) {
+func (m *_mappers) _mapper_routine_(
+	quit <-chan int,
+	wait *sync.WaitGroup,
+	events chan<- *common.Event,
+	tasks <-chan *transport.Task,
+	receipts chan<- *broker.Receipt,
+) {
 	defer wait.Done()
 	for {
 		select {
@@ -112,7 +117,7 @@ func (m *_mappers) _mapper_routine_(quit <-chan int, wait *sync.WaitGroup, event
 					Status: broker.Status.OK,
 				}
 			}
-			receipts <- rpt
+			receipts <- &rpt
 
 		case <-quit:
 			// clean up code below
@@ -120,6 +125,7 @@ func (m *_mappers) _mapper_routine_(quit <-chan int, wait *sync.WaitGroup, event
 		}
 	}
 cleanup:
+	// TODO: cleanup
 	close(receipts)
 	return
 }
