@@ -1,28 +1,27 @@
 package dingo
 
 import (
-	"testing"
 	"time"
 
-	"github.com/mission-liao/dingo/backend"
-	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/meta"
+	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
+
+// TODO: add test case for return-fix
 
 type DingoTestSuite struct {
 	suite.Suite
 
-	app    *_app
 	cfg    *Config
+	app    *_app
 	eid    int
 	events <-chan *common.Event
 }
 
 func (me *DingoTestSuite) SetupSuite() {
 	me.cfg = Default()
-	app, err := NewApp(*me.cfg)
+	app, err := NewApp("")
 	me.Nil(err)
 	me.app = app.(*_app)
 	me.eid, me.events, err = me.app.Listen(common.InstT.ALL, common.ErrLvl.DEBUG, 0)
@@ -64,23 +63,23 @@ func (me *DingoTestSuite) TearDownSuite() {
 func (me *DingoTestSuite) TestBasic() {
 	// register a set of workers
 	called := 0
-	_, remain, err := me.app.Register(&StrMatcher{"test_basic"}, func(n int) int {
+	remain, err := me.app.Register("Basic", func(n int) int {
 		called = n
 		return n + 1
-	}, 1, 1)
+	}, 1, 1, transport.Encode.Default, transport.Encode.Default)
 	me.Equal(0, remain)
 	me.Nil(err)
 
 	// call that function
-	reports, err := me.app.Call("test_basic", nil, 5)
+	reports, err := me.app.Call("Basic", nil, 5)
 	me.Nil(err)
 	me.NotNil(reports)
 
 	// await for reports
 	status := []int{
-		meta.Status.Sent,
-		meta.Status.Progress,
-		meta.Status.Done,
+		transport.Status.Sent,
+		transport.Status.Progress,
+		transport.Status.Done,
 	}
 	for {
 		done := false
@@ -94,15 +93,15 @@ func (me *DingoTestSuite) TestBasic() {
 			// make sure the order of status is right
 			me.True(len(status) > 0)
 			if len(status) > 0 {
-				me.Equal(status[0], v.GetStatus())
+				me.Equal(status[0], v.Status())
 				status = status[1:]
 			}
 
 			if v.Done() {
 				me.Equal(5, called)
-				me.Len(v.GetReturn(), 1)
-				if len(v.GetReturn()) > 0 {
-					ret, ok := v.GetReturn()[0].(int)
+				me.Len(v.Return(), 1)
+				if len(v.Return()) > 0 {
+					ret, ok := v.Return()[0].(int)
 					me.True(ok)
 					me.Equal(called+1, ret)
 				}
@@ -114,143 +113,4 @@ func (me *DingoTestSuite) TestBasic() {
 			break
 		}
 	}
-}
-
-//
-// local(Broker) + local(Backend)
-//
-
-type LocalTestSuite struct {
-	DingoTestSuite
-}
-
-func (me *LocalTestSuite) SetupSuite() {
-	me.DingoTestSuite.SetupSuite()
-
-	me.cfg.Broker().Local.Bypass(false)
-	me.cfg.Backend().Local.Bypass(false)
-
-	// broker
-	{
-		v, err := broker.New("local", me.cfg.Broker())
-		me.Nil(err)
-		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
-		me.Nil(err)
-		me.Equal(common.InstT.PRODUCER|common.InstT.CONSUMER, used)
-	}
-
-	// backend
-	{
-		v, err := backend.New("local", me.cfg.Backend())
-		me.Nil(err)
-		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
-		me.Nil(err)
-		me.Equal(common.InstT.REPORTER|common.InstT.STORE, used)
-	}
-}
-
-func TestDingoLocalSuite(t *testing.T) {
-	suite.Run(t, &LocalTestSuite{})
-}
-
-//
-// Amqp(Broker) + Amqp(Backend)
-//
-
-type AmqpTestSuite struct {
-	DingoTestSuite
-}
-
-func (me *AmqpTestSuite) SetupSuite() {
-	me.DingoTestSuite.SetupSuite()
-
-	// broker
-	{
-		v, err := broker.New("amqp", me.cfg.Broker())
-		me.Nil(err)
-		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
-		me.Nil(err)
-		me.Equal(common.InstT.PRODUCER|common.InstT.CONSUMER, used)
-	}
-
-	// backend
-	{
-		v, err := backend.New("amqp", me.cfg.Backend())
-		me.Nil(err)
-		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
-		me.Nil(err)
-		me.Equal(common.InstT.REPORTER|common.InstT.STORE, used)
-	}
-}
-
-func TestDingoAmqpSuite(t *testing.T) {
-	suite.Run(t, &AmqpTestSuite{})
-}
-
-//
-// Redis(Broker) + Redis(Backend)
-//
-
-type RedisTestSuite struct {
-	DingoTestSuite
-}
-
-func (me *RedisTestSuite) SetupSuite() {
-	me.DingoTestSuite.SetupSuite()
-
-	// broker
-	{
-		v, err := broker.New("redis", me.cfg.Broker())
-		me.Nil(err)
-		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
-		me.Nil(err)
-		me.Equal(common.InstT.PRODUCER|common.InstT.CONSUMER, used)
-	}
-
-	// backend
-	{
-		v, err := backend.New("redis", me.cfg.Backend())
-		me.Nil(err)
-		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
-		me.Nil(err)
-		me.Equal(common.InstT.REPORTER|common.InstT.STORE, used)
-	}
-}
-
-func TestDingoRedisSuite(t *testing.T) {
-	suite.Run(t, &RedisTestSuite{})
-}
-
-//
-// Amqp(Broker) + Redis(Backend)
-//
-
-type AmqpRedisTestSuite struct {
-	DingoTestSuite
-}
-
-func (me *AmqpRedisTestSuite) SetupSuite() {
-	me.DingoTestSuite.SetupSuite()
-
-	// broker
-	{
-		v, err := broker.New("amqp", me.cfg.Broker())
-		me.Nil(err)
-		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
-		me.Nil(err)
-		me.Equal(common.InstT.PRODUCER|common.InstT.CONSUMER, used)
-	}
-
-	// backend
-	{
-		v, err := backend.New("redis", me.cfg.Backend())
-		me.Nil(err)
-		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
-		me.Nil(err)
-		me.Equal(common.InstT.REPORTER|common.InstT.STORE, used)
-	}
-}
-
-func TestDingoAmqpRedisSuite(t *testing.T) {
-	suite.Run(t, &AmqpRedisTestSuite{})
 }

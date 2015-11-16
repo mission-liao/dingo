@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,7 +13,7 @@ import (
 	"github.com/mission-liao/dingo/backend"
 	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
-	"github.com/mission-liao/dingo/meta"
+	"github.com/mission-liao/dingo/transport"
 )
 
 type _eventListener struct {
@@ -29,17 +28,16 @@ type App interface {
 	// hire a set of workers for a pattern
 	//
 	// parameters ->
-	// - match: tasks in dingo are recoginized by a 'name', this function decides
-	//          which task to accept by returning true.
+	// - name: name of tasks
 	// - fn: the function that actually perform the task.
 	// - count: count of workers to be initialized.
 	// - share: the count of workers sharing one report channel
+	// - taskEnc, reportEnc: id of encoding method for 'transport.Task' and 'transport.Report'
 	//
 	// returns ->
-	// - id: identifier of this group of workers
 	// - remain: remaining count of workers that not initialized.
 	// - err: any error produced
-	Register(m Matcher, fn interface{}, count, share int) (id string, remain int, err error)
+	Register(name string, fn interface{}, count, share int, taskEnc, reportEnc int16) (remain int, err error)
 
 	// attach an instance, instance could be any instance implementing
 	// backend.Reporter, backend.Backend, broker.Producer, broker.Consumer.
@@ -52,9 +50,12 @@ type App interface {
 	// - err: errors
 	Use(obj interface{}, types int) (id int, used int, err error)
 
+	//
+	Init(cfg Config) (err error)
+
 	// send a task
 	//
-	Call(name string, opt *meta.Option, args ...interface{}) (<-chan meta.Report, error)
+	Call(name string, opt *transport.Option, args ...interface{}) (<-chan *transport.Report, error)
 
 	// get the channel to receive events from 'dingo', based on the id of requested object
 	//
@@ -75,35 +76,34 @@ type _object struct {
 }
 
 type _app struct {
-	invoker meta.Invoker
+	invoker transport.Invoker
 
 	cfg          Config
 	objsLock     sync.RWMutex
 	objs         map[int]*_object
-	producer     broker.Producer
-	consumer     broker.Consumer
-	store        backend.Store
-	reporter     backend.Reporter
 	eventMux     *common.Mux
 	eventOut     atomic.Value
 	eventOutLock sync.Mutex
+	b            Bridge
+	mash         *transport.Marshallers
 
 	// internal routines
-	mappers  *_mappers
-	monitors *_monitors
-	events   *common.Routines
+	mappers *_mappers
+	events  *common.Routines
 }
 
+//
 // factory function
 //
-func NewApp(c Config) (App, error) {
+func NewApp(nameOfBridge string) (app App, err error) {
 	v := &_app{
 		objs:     make(map[int]*_object),
-		invoker:  meta.NewDefaultInvoker(),
-		cfg:      c,
+		invoker:  transport.NewDefaultInvoker(),
 		eventMux: common.NewMux(),
 		events:   common.NewRoutines(),
+		mash:     transport.NewMarshallers(),
 	}
+	v.b = NewBridge(nameOfBridge, v.mash)
 
 	// refer to 'ReadMostly' example in sync/atomic
 	v.eventOut.Store(make(map[int]*_eventListener))
@@ -114,14 +114,28 @@ func NewApp(c Config) (App, error) {
 	go v._event_routine_(v.events.New(), v.events.Wait(), v.eventMux.Out())
 
 	remain, err := v.eventMux.More(1)
-	if err == nil && remain != 0 {
+	if err != nil || remain != 0 {
 		err = errors.New(fmt.Sprintf("Unable to allocate mux routine: %v", remain))
 	}
 
-	return v, err
+	// init mappers
+	v.mappers, err = newMappers()
+	if err != nil {
+		return
+	}
+	err = v.attachEvents(v.mappers)
+	if err != nil {
+		return
+	}
+
+	app = v
+	return
 }
 
 //
+// private
+//
+
 func (me *_app) _event_routine_(quit <-chan int, wait *sync.WaitGroup, events <-chan *common.MuxOut) {
 	defer wait.Done()
 	for {
@@ -152,6 +166,41 @@ func (me *_app) _event_routine_(quit <-chan int, wait *sync.WaitGroup, events <-
 		}
 	}
 cleanup:
+}
+
+func (me *_app) attachEvents(obj common.Object) (err error) {
+	if obj == nil {
+		return
+	}
+
+	eids := []int{}
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		for _, id := range eids {
+			_, err_ := me.eventMux.Unregister(id)
+			if err_ != nil {
+				// TODO: log it
+			}
+		}
+	}()
+
+	events, err := obj.Events()
+	if err != nil {
+		return
+	}
+
+	for _, e := range events {
+		id, err_ := me.eventMux.Register(e, 0)
+		if err_ != nil {
+			err = err_
+			break
+		}
+		eids = append(eids, id)
+	}
+	return
 }
 
 //
@@ -186,12 +235,6 @@ func (me *_app) Close() (err error) {
 		me.mappers = nil
 	}
 
-	// shutdown monitors
-	if me.monitors != nil {
-		chk(me.monitors.Close())
-		me.monitors = nil
-	}
-
 	// shutdown the monitor of error channels
 	me.events.Close()
 	me.eventMux.Close()
@@ -210,41 +253,37 @@ func (me *_app) Close() (err error) {
 	return
 }
 
-func (me *_app) Register(m Matcher, fn interface{}, count, share int) (id string, remain int, err error) {
+func (me *_app) Register(name string, fn interface{}, count, share int, mshTask, mshReport int16) (remain int, err error) {
 	me.objsLock.RLock()
 	defer me.objsLock.RUnlock()
 
-	var reports []<-chan meta.Report
+	var reports []<-chan *transport.Report
 
-	remain = count
-	if me.mappers == nil || me.monitors == nil || me.reporter == nil {
-		err = errors.New("no reporter/monitors/mappers available.")
+	// set encoder/decoder
+	err = me.mash.Register(name, fn, mshTask, mshReport)
+	if err != nil {
 		return
 	}
 
-	if me.mappers != nil {
-		id, reports, remain, err = me.mappers.allocateWorkers(m, fn, count, share)
+	err = me.b.Register(name, fn)
+	if err != nil {
+		return
+	}
+
+	if me.b.Exists(common.InstT.CONSUMER) {
+		reports, remain, err = me.mappers.allocateWorkers(name, fn, count, share)
 		if err != nil {
 			return
 		}
-
 		for _, v := range reports {
 			// id of report channel is ignored
-			_, err = me.reporter.Report(v)
+			err = me.b.Report(v)
 			if err != nil {
 				return
 			}
 		}
 	}
 
-	// TODO: add test case the makes monitors and mappers sync
-
-	if me.monitors != nil {
-		err = me.monitors.register(m, fn)
-		if err != nil {
-			return
-		}
-	}
 	return
 }
 
@@ -257,45 +296,20 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 		consumer broker.Consumer
 		store    backend.Store
 		reporter backend.Reporter
-		mns      *_monitors
-		mps      *_mappers
 		ok       bool
-		eids     []int = []int{}
 	)
 
+	for {
+		id = rand.Int()
+		if _, ok := me.objs[id]; !ok {
+			break
+		}
+	}
+
 	defer func() {
-		if err == nil {
-			return
-		}
-
-		// clean up
-		for _, v := range eids {
-			_, err_ := me.eventMux.Unregister(v)
-			if err_ != nil {
-				// TODO: log it
-			}
-		}
-
-		if mns != nil {
-			err_ := mns.Close()
-			if err_ != nil {
-				// TODO: log it
-			}
-		}
-
-		if mps != nil {
-			err_ := mps.Close()
-			if err_ != nil {
-				// TODO: log it
-			}
-		}
-
-		v, ok := obj.(common.Object)
-		if ok {
-			err_ := v.Close()
-			if err_ != nil {
-				// TODO: log it
-			}
+		me.objs[id] = &_object{
+			used: used,
+			obj:  obj,
 		}
 	}()
 
@@ -335,164 +349,83 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 		}
 	}
 
-	// do not overwrite existing objects
-	if me.producer != nil {
-		producer = nil
-	}
-	if me.consumer != nil {
-		consumer = nil
-	}
-	if me.reporter != nil {
-		reporter = nil
-	}
-	if me.store != nil {
-		store = nil
-	}
-
-	if consumer != nil {
-		mps, err = newMappers()
-		if err != nil {
-			return
-		}
-
-		for remain := me.cfg.Mappers_; remain > 0; remain-- {
-			// TODO: handle events channel
-			receipts := make(chan broker.Receipt, 10)
-			tasks, err_ := consumer.AddListener(receipts)
-			if err_ != nil && err == nil {
-				err = err_
-				return
-			}
-
-			mps.more(tasks, receipts)
-			if err != nil {
-				return
-			}
-		}
-	}
-
-	if store != nil {
-		mns, err = newMonitors(store)
-		if err != nil {
-			return
-		}
-
-		var remain int
-		remain, err = mns.more(me.cfg.Monitors_)
-		if err != nil {
-			return
-		}
-
-		if remain > 0 {
-			err = errors.New(fmt.Sprintf("Unable to allocate monitors %v", remain))
-			return
-		}
-	}
-
-	// get an id
-	for {
-		id = rand.Int()
-		if _, ok := me.objs[id]; !ok {
-			break
-		}
-	}
-
-	attach_event := func(in []int, o interface{}) (out []int, err error) {
-		out = in
-		if reflect.ValueOf(o).IsNil() {
-			return
-		}
-
-		v, ok := o.(common.Object)
-		if !ok {
-			return
-		}
-
-		events, err := v.Events()
-		if err != nil {
-			return
-		}
-
-		var eid int
-		for _, e := range events {
-			eid, err = me.eventMux.Register(e, 0)
-			if err != nil {
-				return
-			}
-			out = append(out, eid)
-		}
-		return
-	}
-
-	eids, err = attach_event(eids, obj)
-	if err != nil {
-		return
-	}
-	eids, err = attach_event(eids, mps)
-	if err != nil {
-		return
-	}
-	eids, err = attach_event(eids, mns)
-	if err != nil {
-		return
-	}
-
-	// --- nothing should throw error below ---
-
-	// attach objects to app
 	if producer != nil {
-		me.producer = producer
+		err = me.b.AttachProducer(producer)
+		if err != nil && types != common.InstT.DEFAULT {
+			return
+		}
 		used |= common.InstT.PRODUCER
 	}
 	if consumer != nil {
-		me.mappers = mps
-		me.consumer = consumer
+		err = me.b.AttachConsumer(consumer)
+		if err != nil && types != common.InstT.DEFAULT {
+			return
+		}
 		used |= common.InstT.CONSUMER
 	}
 	if reporter != nil {
-		me.reporter = reporter
+		err = me.b.AttachReporter(reporter)
+		if err != nil && types != common.InstT.DEFAULT {
+			return
+		}
 		used |= common.InstT.REPORTER
 	}
 	if store != nil {
-		me.monitors = mns
-		me.store = store
+		err = me.b.AttachStore(store)
+		if err != nil && types != common.InstT.DEFAULT {
+			return
+		}
 		used |= common.InstT.STORE
-	}
-
-	me.objs[id] = &_object{
-		used: used,
-		obj:  obj,
 	}
 
 	return
 }
 
-func (me *_app) Call(name string, opt *meta.Option, args ...interface{}) (reports <-chan meta.Report, err error) {
+func (me *_app) Init(cfg Config) (err error) {
+	var (
+		remain int
+		tasks  <-chan *transport.Task
+	)
+	// integrate mappers and broker.Consumer
+	if me.b.Exists(common.InstT.CONSUMER) {
+		for remain = cfg.Mappers_; remain > 0; remain-- {
+			receipts := make(chan *broker.Receipt, 10)
+			tasks, err = me.b.AddListener(receipts)
+			if err != nil {
+				return
+			}
+
+			me.mappers.more(tasks, receipts)
+		}
+	}
+
+	if me.b.Exists(common.InstT.REPORTER) {
+	}
+
+	return
+}
+
+func (me *_app) Call(name string, opt *transport.Option, args ...interface{}) (reports <-chan *transport.Report, err error) {
 	me.objsLock.RLock()
 	defer me.objsLock.RUnlock()
 
-	// TODO: attach Option to meta.Task
-	if me.producer == nil {
-		err = errors.New("producer is not initialized")
-		return
-	}
-
-	t, err := me.invoker.ComposeTask(name, args...)
+	// TODO: attach Option to transport.Task
+	t, err := me.invoker.ComposeTask(name, args)
 	if err != nil {
 		return
 	}
 
-	// blocking call
-	err = me.producer.Send(t)
+	// a blocking call
+	err = me.b.SendTask(t)
 	if err != nil {
 		return
 	}
 
-	if opt != nil && opt.IgnoreReport_ || me.monitors == nil {
+	if opt != nil && opt.IgnoreReport_ {
 		return
 	}
 
-	reports, err = me.monitors.check(t)
+	reports, err = me.b.Poll(t)
 	if err != nil {
 		return
 	}

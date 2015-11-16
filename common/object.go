@@ -9,6 +9,7 @@ var InstT = struct {
 	MONITOR  int
 	MAPPER   int
 	WORKER   int
+	BRIDGE   int
 	ALL      int
 }{
 	0,
@@ -19,6 +20,7 @@ var InstT = struct {
 	(1 << 4),
 	(1 << 5),
 	(1 << 6),
+	(1 << 7),
 	int(^uint(0) >> 1), // Max int
 }
 

@@ -25,9 +25,11 @@ type Event struct {
 }
 
 var ErrCode = struct {
-	Generic int
+	Generic             int
+	TaskDeliveryFailure int
+	DuplicatedPolling   int
 }{
-	0,
+	0, 1, 2,
 }
 
 func NewEvent(orig, lvl, code int, payload interface{}) *Event {
