@@ -64,4 +64,17 @@ func TestHeader(t *testing.T) {
 		ass.Equal(mashID, m.MashID())
 		ass.Equal(id, m.ID())
 	}
+
+	// wrong version
+	{
+		id := ""
+		name := ""
+		mashID := int16(23145)
+
+		b := EncodeHeader(id, name, mashID)
+		b[0] ^= 0xff
+		m, err := DecodeHeader(b)
+		ass.NotNil(err)
+		ass.Nil(m)
+	}
 }
