@@ -391,7 +391,7 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 		}
 		used |= common.InstT.PRODUCER
 	}
-	if consumer != nil {
+	if consumer != nil || namedConsumer != nil {
 		err = me.b.AttachConsumer(consumer, namedConsumer)
 		if err != nil && types != common.InstT.DEFAULT {
 			return

@@ -22,7 +22,7 @@ func (me *RedisTestSuite) SetupSuite() {
 
 	// broker
 	{
-		v, err := broker.New("redis", me.cfg.Broker())
+		v, err := broker.NewNamed("redis", me.cfg.Broker())
 		me.Nil(err)
 		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
 		me.Nil(err)

@@ -15,7 +15,6 @@ func TestHeader(t *testing.T) {
 		name := "test"
 		mashID := int16(19)
 
-		_ = "breakpoint"
 		b := EncodeHeader(id, name, mashID)
 		m, err := DecodeHeader(b)
 		ass.Nil(err)

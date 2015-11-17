@@ -255,7 +255,8 @@ func _worker_routine_(
 	tasks <-chan *transport.Task,
 	receipts chan<- *broker.Receipt,
 	reports chan<- *transport.Report,
-	fn interface{}) {
+	fn interface{},
+) {
 	defer wait.Done()
 
 	// TODO: concider a shared, common invoker instance?

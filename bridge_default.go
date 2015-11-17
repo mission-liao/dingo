@@ -237,7 +237,6 @@ func (me *bridge) Report(reports <-chan *transport.Report) (err error) {
 			case _, _ = <-quit:
 				goto cleanup
 			case v, ok := <-input:
-				_ = "breakpoint"
 				if !ok {
 					goto cleanup
 				}

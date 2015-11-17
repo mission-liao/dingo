@@ -49,7 +49,6 @@ func (me *BrokerTestSuite) StopAllListeners() (err error) {
 //
 
 func (me *BrokerTestSuite) TestBasic() {
-	_ = "breakpoint"
 	var (
 		tasks <-chan []byte
 	)
