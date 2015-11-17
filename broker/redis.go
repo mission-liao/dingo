@@ -67,7 +67,9 @@ func (me *_redis) Close() (err error) {
 
 func (me *_redis) Send(id transport.Meta, body []byte) (err error) {
 	conn := me.pool.Get()
-	_, err = conn.Do("LPUSH", _redisTaskQueue, body)
+	defer conn.Close()
+
+	_, err = conn.Do("LPUSH", fmt.Sprintf("%v.%v", _redisTaskQueue, id.Name()), body)
 	if err != nil {
 		return
 	}
@@ -79,9 +81,9 @@ func (me *_redis) Send(id transport.Meta, body []byte) (err error) {
 // Consumer interface
 //
 
-func (me *_redis) AddListener(receipts <-chan *Receipt) (tasks <-chan []byte, err error) {
+func (me *_redis) AddListener(name string, receipts <-chan *Receipt) (tasks <-chan []byte, err error) {
 	t := make(chan []byte, 10)
-	go me._consumer_routine_(me.listeners.New(), me.listeners.Wait(), me.listeners.Events(), t, receipts)
+	go me._consumer_routine_(me.listeners.New(), me.listeners.Wait(), me.listeners.Events(), t, receipts, name)
 
 	tasks = t
 	return
@@ -102,11 +104,14 @@ func (me *_redis) _consumer_routine_(
 	events chan<- *common.Event,
 	tasks chan<- []byte,
 	receipts <-chan *Receipt,
+	name string,
 ) {
 	defer wait.Done()
 
 	conn := me.pool.Get()
 	defer conn.Close()
+
+	qn := fmt.Sprintf("%v.%v", _redisTaskQueue, name)
 
 	for {
 		select {
@@ -114,7 +119,7 @@ func (me *_redis) _consumer_routine_(
 			goto clean
 		default:
 			// blocking call on redis server
-			reply, err := conn.Do("BRPOP", _redisTaskQueue, 1) // TODO: configuration, in seconds
+			reply, err := conn.Do("BRPOP", qn, 1) // TODO: configuration, in seconds
 			if err != nil {
 				events <- common.NewEventFromError(common.InstT.CONSUMER, err)
 				break

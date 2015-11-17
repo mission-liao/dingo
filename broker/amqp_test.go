@@ -14,8 +14,10 @@ func (me *AmqpBrokerTestSuite) SetupSuite() {
 	var err error
 
 	me.BrokerTestSuite.SetupSuite()
-	me._broker, err = New("amqp", Default())
+	obj, err := NewNamed("amqp", Default())
 	me.Nil(err)
+	me._namedConsumer = obj.(NamedConsumer)
+	me._producer = obj.(Producer)
 }
 
 func (me *AmqpBrokerTestSuite) TearDownSuite() {

@@ -85,38 +85,6 @@ func (me *_amqp) init() (err error) {
 		return
 	}
 
-	// init queue
-	_, err = ci.Channel.QueueDeclare(
-		"dingo.q.task", // name of queue
-		true,           // durable
-		false,          // auto-delete
-		false,          // exclusive
-		false,          // noWait
-		nil,            // args
-	)
-	if err != nil {
-		return
-	}
-
-	// bind queue to exchange
-	// TODO: configurable name?
-	err = ci.Channel.QueueBind(
-		"dingo.q.task",
-		"",
-		"dingo.x.task",
-		false, // noWait
-		nil,   // args
-	)
-	if err != nil {
-		return
-	}
-
-	// init qos
-	err = ci.Channel.Qos(3, 0, true)
-	if err != nil {
-		return
-	}
-
 	// TODO: get number from MaxChannel
 	me.consumerTags = make(chan int, 200)
 	for i := 0; i < 200; i++ {
@@ -159,15 +127,11 @@ func (me *_amqp) Send(id transport.Meta, body []byte) (err error) {
 	if err != nil {
 		return
 	}
-
-	defer func(ci *common.AmqpChannel) {
-		// release it when leaving this function
-		me.sender.ReleaseChannel(ci)
-	}(ci)
+	defer me.sender.ReleaseChannel(ci)
 
 	err = ci.Channel.Publish(
 		"dingo.x.task", // name of exchange
-		"",             // routing key
+		id.Name(),      // routing key
 		false,          // mandatory
 		false,          // immediate
 		amqp.Publishing{
@@ -198,11 +162,57 @@ func (me *_amqp) Send(id transport.Meta, body []byte) (err error) {
 // Consumer interface
 //
 
-func (me *_amqp) AddListener(receipts <-chan *Receipt) (tasks <-chan []byte, err error) {
-	t := make(chan []byte, 10)
-	go me._consumer_routine_(me.consumers.New(), me.consumers.Wait(), me.consumers.Events(), t, receipts)
+func (me *_amqp) AddListener(name string, receipts <-chan *Receipt) (tasks <-chan []byte, err error) {
+	ci, err := me.receiver.Channel()
+	if err != nil {
+		return
+	}
+	qn := fmt.Sprintf("dingo.q.task.%v", name)
 
-	tasks = t
+	// remember to return channel to pool
+	defer func() {
+		if err != nil {
+			me.receiver.ReleaseChannel(ci)
+		} else {
+			t := make(chan []byte, 10)
+			go me._consumer_routine_(me.consumers.New(), me.consumers.Wait(), me.consumers.Events(), t, receipts, ci, qn)
+
+			tasks = t
+		}
+	}()
+
+	// init queue
+	_, err = ci.Channel.QueueDeclare(
+		qn,    // name of queue
+		true,  // durable
+		false, // auto-delete
+		false, // exclusive
+		false, // noWait
+		nil,   // args
+	)
+	if err != nil {
+		return
+	}
+
+	// bind queue to exchange
+	// TODO: configurable name?
+	err = ci.Channel.QueueBind(
+		qn,
+		name,
+		"dingo.x.task",
+		false, // noWait
+		nil,   // args
+	)
+	if err != nil {
+		return
+	}
+
+	// init qos
+	err = ci.Channel.Qos(3, 0, true)
+	if err != nil {
+		return
+	}
+
 	return
 }
 
@@ -221,8 +231,11 @@ func (me *_amqp) _consumer_routine_(
 	events chan<- *common.Event,
 	tasks chan<- []byte,
 	receipts <-chan *Receipt,
+	ci *common.AmqpChannel,
+	queueName string,
 ) {
 	defer wait.Done()
+	defer me.receiver.ReleaseChannel(ci)
 
 	// acquire an tag
 	id := <-me.consumerTags
@@ -233,16 +246,8 @@ func (me *_amqp) _consumer_routine_(
 		me.consumerTags <- id
 	}(id)
 
-	// acquire a channel
-	ci, err := me.receiver.Channel()
-	if err != nil {
-		events <- common.NewEventFromError(common.InstT.CONSUMER, err)
-		return
-	}
-	defer me.receiver.ReleaseChannel(ci)
-
 	dv, err := ci.Channel.Consume(
-		"dingo.q.task",
+		queueName,
 		tag,   // consumer Tag
 		false, // autoAck
 		false, // exclusive

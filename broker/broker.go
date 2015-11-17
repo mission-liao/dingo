@@ -13,6 +13,12 @@ type Broker interface {
 }
 
 //
+type NamedBroker interface {
+	Producer
+	NamedConsumer
+}
+
+//
 type Producer interface {
 	//
 	Send(transport.Meta, []byte) error
@@ -60,15 +66,21 @@ type Receipt struct {
 	Payload interface{}
 }
 
-func New(name string, cfg *Config) (b Broker, err error) {
+func NewNamed(name string, cfg *Config) (b NamedBroker, err error) {
 	switch name {
-	case "local":
-		b, err = newLocal(cfg)
 	case "amqp":
 		b, err = newAmqp(cfg)
 	case "redis":
 		b, err = newRedis(cfg)
 	}
 
+	return
+}
+
+func New(name string, cfg *Config) (b Broker, err error) {
+	switch name {
+	case "local":
+		b, err = newLocal(cfg)
+	}
 	return
 }

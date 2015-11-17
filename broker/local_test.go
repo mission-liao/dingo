@@ -18,8 +18,10 @@ func (me *LocalBrokerTestSuite) SetupSuite() {
 	var err error
 
 	me.BrokerTestSuite.SetupSuite()
-	me._broker, err = New("local", Default())
+	obj, err := New("local", Default())
 	me.Nil(err)
+	me._producer = obj.(Producer)
+	me._consumer = obj.(Consumer)
 }
 
 func (me *LocalBrokerTestSuite) TearDownSuite() {

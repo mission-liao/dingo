@@ -14,8 +14,10 @@ func (me *RedisBrokerTestSuite) SetupSuite() {
 	var err error
 
 	me.BrokerTestSuite.SetupSuite()
-	me._broker, err = New("redis", Default())
+	obj, err := NewNamed("redis", Default())
 	me.Nil(err)
+	me._producer = obj.(Producer)
+	me._namedConsumer = obj.(NamedConsumer)
 }
 
 func (me *RedisBrokerTestSuite) TearDownSuite() {
