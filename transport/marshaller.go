@@ -89,6 +89,11 @@ func (me *Marshallers) Exists(id int16) (exists bool) {
 }
 
 func (me *Marshallers) Register(name string, fn interface{}, msTask, msReport int16) (err error) {
+	if uint16(len(name)) >= ^uint16(0) {
+		err = errors.New(fmt.Sprintf("length of name exceeds maximum: %v", len(name)))
+		return
+	}
+
 	me.fn2mshLock.Lock()
 	defer me.fn2mshLock.Unlock()
 
@@ -158,7 +163,7 @@ func (me *Marshallers) EncodeTask(task *Task) (b []byte, err error) {
 	}
 
 	// put a head to record which marshaller we use
-	b = append(EncodeHeader(task.ID(), opt.task), body...)
+	b = append(EncodeHeader(task.ID(), task.Name(), opt.task), body...)
 	return
 }
 
@@ -200,7 +205,7 @@ func (me *Marshallers) EncodeReport(report *Report) (b []byte, err error) {
 	if err != nil {
 		return
 	}
-	b = append(EncodeHeader(report.ID(), opt.report), body...)
+	b = append(EncodeHeader(report.ID(), report.Name(), opt.report), body...)
 	return
 }
 
