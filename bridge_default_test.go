@@ -26,7 +26,7 @@ func (me *DefaultBridgeTestSuite) SetupTest() {
 	me.brk, err = broker.New("local", broker.Default())
 	me.Nil(err)
 	me.Nil(me.bg.AttachProducer(me.brk.(broker.Producer)))
-	me.Nil(me.bg.AttachConsumer(me.brk.(broker.Consumer)))
+	me.Nil(me.bg.AttachConsumer(me.brk.(broker.Consumer), nil))
 
 	// backend
 	me.bkd, err = backend.New("local", backend.Default())

@@ -1,16 +1,17 @@
 package common
 
 var InstT = struct {
-	DEFAULT  int
-	REPORTER int
-	STORE    int
-	PRODUCER int
-	CONSUMER int
-	MONITOR  int
-	MAPPER   int
-	WORKER   int
-	BRIDGE   int
-	ALL      int
+	DEFAULT        int
+	REPORTER       int
+	STORE          int
+	PRODUCER       int
+	CONSUMER       int
+	MONITOR        int
+	MAPPER         int
+	WORKER         int
+	BRIDGE         int
+	NAMED_CONSUMER int
+	ALL            int
 }{
 	0,
 	(1 << 0),
@@ -21,6 +22,7 @@ var InstT = struct {
 	(1 << 5),
 	(1 << 6),
 	(1 << 7),
+	(1 << 8),
 	int(^uint(0) >> 1), // Max int
 }
 

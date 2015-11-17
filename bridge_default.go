@@ -18,14 +18,15 @@ import (
 //
 
 type bridge struct {
-	producerLock sync.RWMutex
-	producer     broker.Producer
-	consumerLock sync.RWMutex
-	consumer     broker.Consumer
-	reporterLock sync.RWMutex
-	reporter     backend.Reporter
-	storeLock    sync.RWMutex
-	store        backend.Store
+	producerLock  sync.RWMutex
+	producer      broker.Producer
+	consumerLock  sync.RWMutex
+	consumer      broker.Consumer
+	namedConsumer broker.NamedConsumer
+	reporterLock  sync.RWMutex
+	reporter      backend.Reporter
+	storeLock     sync.RWMutex
+	store         backend.Store
 
 	listeners      *common.Routines
 	reporters      *common.Routines
@@ -146,6 +147,26 @@ func (me *bridge) SendTask(t *transport.Task) (err error) {
 	return
 }
 
+func (me *bridge) AddNamedListener(name string, receipts <-chan *broker.Receipt) (tasks <-chan *transport.Task, err error) {
+	me.consumerLock.RLock()
+	defer me.consumerLock.RUnlock()
+
+	if me.namedConsumer == nil {
+		err = errors.New("named-consumer is not attached")
+		return
+	}
+
+	ts, err := me.namedConsumer.AddListener(name, receipts)
+	if err != nil {
+		return
+	}
+
+	tasks2 := make(chan *transport.Task, 10)
+	tasks = tasks2
+	go me._listener_routines_(me.listeners.New(), me.listeners.Wait(), me.events, ts, tasks2)
+	return
+}
+
 func (me *bridge) AddListener(rcpt <-chan *broker.Receipt) (tasks <-chan *transport.Task, err error) {
 	me.consumerLock.RLock()
 	defer me.consumerLock.RUnlock()
@@ -162,43 +183,7 @@ func (me *bridge) AddListener(rcpt <-chan *broker.Receipt) (tasks <-chan *transp
 
 	tasks2 := make(chan *transport.Task, 10)
 	tasks = tasks2
-	go func(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, input <-chan []byte, output chan<- *transport.Task) {
-		defer func() {
-			close(output)
-			wait.Done()
-		}()
-		out := func(b []byte) {
-			t, err := me.mash.DecodeTask(b)
-			if err != nil {
-				events <- common.NewEventFromError(common.InstT.BRIDGE, err)
-				return
-			}
-			output <- t
-		}
-		for {
-			select {
-			case _, _ = <-quit:
-				goto cleanup
-			case v, ok := <-ts:
-				if !ok {
-					goto cleanup
-				}
-				out(v)
-			}
-		}
-	cleanup:
-		for {
-			select {
-			case v, ok := <-ts:
-				if !ok {
-					return
-				}
-				out(v)
-			default:
-				return
-			}
-		}
-	}(me.listeners.New(), me.listeners.Wait(), me.events, ts, tasks2)
+	go me._listener_routines_(me.listeners.New(), me.listeners.Wait(), me.events, ts, tasks2)
 	return
 }
 
@@ -374,6 +359,11 @@ func (me *bridge) AttachReporter(r backend.Reporter) (err error) {
 		return
 	}
 
+	if r == nil {
+		err = errors.New("no reporter provided")
+		return
+	}
+
 	me.reporter = r
 	return
 }
@@ -384,6 +374,11 @@ func (me *bridge) AttachStore(s backend.Store) (err error) {
 
 	if me.store != nil {
 		err = errors.New("store is already attached.")
+		return
+	}
+
+	if s == nil {
+		err = errors.New("no store provided")
 		return
 	}
 
@@ -400,20 +395,32 @@ func (me *bridge) AttachProducer(p broker.Producer) (err error) {
 		return
 	}
 
+	if p == nil {
+		err = errors.New("no producer provided")
+		return
+	}
 	me.producer = p
 	return
 }
 
-func (me *bridge) AttachConsumer(c broker.Consumer) (err error) {
+func (me *bridge) AttachConsumer(c broker.Consumer, nc broker.NamedConsumer) (err error) {
 	me.consumerLock.Lock()
 	defer me.consumerLock.Unlock()
 
-	if me.consumer != nil {
+	if me.consumer != nil || me.namedConsumer != nil {
 		err = errors.New("consumer is already attached.")
 		return
 	}
 
-	me.consumer = c
+	if nc != nil {
+		me.namedConsumer = nc
+	} else if c != nil {
+		me.consumer = c
+	} else {
+		err = errors.New("no consumer provided")
+		return
+	}
+
 	return
 }
 
@@ -447,7 +454,62 @@ func (me *bridge) Exists(it int) (ext bool) {
 
 			ext = me.store != nil
 		}()
+	case common.InstT.NAMED_CONSUMER:
+		func() {
+			me.consumerLock.RLock()
+			defer me.consumerLock.RUnlock()
+
+			ext = me.namedConsumer != nil
+		}()
 	}
 
 	return
+}
+
+//
+// routines
+//
+
+func (me *bridge) _listener_routines_(
+	quit <-chan int,
+	wait *sync.WaitGroup,
+	events chan<- *common.Event,
+	input <-chan []byte,
+	output chan<- *transport.Task,
+) {
+	defer func() {
+		close(output)
+		wait.Done()
+	}()
+	out := func(b []byte) {
+		t, err := me.mash.DecodeTask(b)
+		if err != nil {
+			events <- common.NewEventFromError(common.InstT.BRIDGE, err)
+			return
+		}
+		output <- t
+	}
+	for {
+		select {
+		case _, _ = <-quit:
+			goto cleanup
+		case v, ok := <-input:
+			if !ok {
+				goto cleanup
+			}
+			out(v)
+		}
+	}
+cleanup:
+	for {
+		select {
+		case v, ok := <-input:
+			if !ok {
+				return
+			}
+			out(v)
+		default:
+			return
+		}
+	}
 }

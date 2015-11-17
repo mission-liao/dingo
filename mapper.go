@@ -1,7 +1,10 @@
 package dingo
 
 import (
+	"errors"
+	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
@@ -15,6 +18,8 @@ import (
 type _mappers struct {
 	workers *_workers
 	mappers *common.Routines
+	toLock  sync.Mutex
+	to      atomic.Value
 }
 
 // allocating more mappers
@@ -26,12 +31,46 @@ func (me *_mappers) more(tasks <-chan *transport.Task, receipts chan<- *broker.R
 	go me._mapper_routine_(me.mappers.New(), me.mappers.Wait(), me.mappers.Events(), tasks, receipts)
 }
 
+// dispatching a 'transport.Task'
+//
+// parameters:
+// - t: the task
+// returns:
+// - err: any error
+func (me *_mappers) dispatch(t *transport.Task) (err error) {
+	all := me.to.Load().(map[string]chan *transport.Task)
+	if out, ok := all[t.Name()]; ok {
+		out <- t
+	} else {
+		err = errWorkerNotFound
+	}
+	return
+}
+
 //
 // proxy of _workers
 //
 
 func (me *_mappers) allocateWorkers(name string, fn interface{}, count, share int) ([]<-chan *transport.Report, int, error) {
-	r, n, err := me.workers.allocate(name, fn, count, share)
+	me.toLock.Lock()
+	defer me.toLock.Unlock()
+
+	all := me.to.Load().(map[string]chan *transport.Task)
+	if _, ok := all[name]; ok {
+		return nil, count, errors.New(fmt.Sprintf("already registered: %v", name))
+	}
+	t := make(chan *transport.Task, 10)
+	r, n, err := me.workers.allocate(name, fn, t, nil, count, share)
+	if err != nil {
+		return r, n, err
+	}
+
+	alln := make(map[string]chan *transport.Task)
+	for k := range all {
+		alln[k] = all[k]
+	}
+	alln[name] = t
+	me.to.Store(alln)
 	return r, n, err
 }
 
@@ -52,6 +91,16 @@ func (me *_mappers) Events() (ret []<-chan *common.Event, err error) {
 func (m *_mappers) Close() (err error) {
 	m.mappers.Close()
 	err = m.workers.Close()
+
+	m.toLock.Lock()
+	defer m.toLock.Unlock()
+
+	all := m.to.Load().(map[string]chan *transport.Task)
+	for _, v := range all {
+		close(v)
+	}
+	m.to.Store(make(map[string]chan *transport.Task))
+
 	return
 }
 
@@ -70,6 +119,8 @@ func newMappers() (m *_mappers, err error) {
 		workers: w,
 		mappers: common.NewRoutines(),
 	}
+
+	m.to.Store(make(map[string]chan *transport.Task))
 	return
 }
 
@@ -94,7 +145,7 @@ func (m *_mappers) _mapper_routine_(
 			}
 
 			// find registered worker
-			err := m.workers.dispatch(t)
+			err := m.dispatch(t)
 
 			// compose a receipt
 			var rpt broker.Receipt

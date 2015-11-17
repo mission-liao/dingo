@@ -99,6 +99,11 @@ func (me *localBridge) SendTask(t *transport.Task) (err error) {
 	return
 }
 
+func (me *localBridge) AddNamedListener(name string, rcpt <-chan *broker.Receipt) (tasks <-chan *transport.Task, err error) {
+	err = errors.New("named consumer is not supported by local-bridge")
+	return
+}
+
 func (me *localBridge) AddListener(rcpt <-chan *broker.Receipt) (tasks <-chan *transport.Task, err error) {
 	me.objLock.RLock()
 	defer me.objLock.RUnlock()
@@ -349,7 +354,7 @@ func (me *localBridge) AttachProducer(p broker.Producer) (err error) {
 	return
 }
 
-func (me *localBridge) AttachConsumer(c broker.Consumer) (err error) {
+func (me *localBridge) AttachConsumer(c broker.Consumer, nc broker.NamedConsumer) (err error) {
 	me.needed |= common.InstT.CONSUMER
 	return
 }

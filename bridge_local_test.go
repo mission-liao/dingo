@@ -13,7 +13,7 @@ type LocalBridgeTestSuite struct {
 func (me *LocalBridgeTestSuite) SetupTest() {
 	me.BridgeTestSuite.SetupTest()
 	me.Nil(me.bg.AttachProducer(nil))
-	me.Nil(me.bg.AttachConsumer(nil))
+	me.Nil(me.bg.AttachConsumer(nil, nil))
 	me.Nil(me.bg.AttachReporter(nil))
 	me.Nil(me.bg.AttachStore(nil))
 }

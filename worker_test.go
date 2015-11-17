@@ -40,21 +40,22 @@ func (me *WorkerTestSuite) TestParellelRun() {
 
 	stepIn := make(chan int, 3)
 	stepOut := make(chan int)
+	tasks := make(chan *transport.Task)
 
-	reports, remain, err := me._ws.allocate("ParellelRun", func(i int) {
+	reports, remain, err := me._ws.allocate("", func(i int) {
 		stepIn <- i
 		// workers would be blocked here
 		<-stepOut
-	}, 3, 0)
+	}, tasks, nil, 3, 0)
 	me.Nil(err)
 	me.Equal(0, remain)
 	me.Len(reports, 1)
 
 	for i := 0; i < 3; i++ {
-		t, err := me._invoker.ComposeTask("ParellelRun", []interface{}{i})
+		t, err := me._invoker.ComposeTask("", []interface{}{i})
 		me.Nil(err)
 		if err == nil {
-			me.Nil(me._ws.dispatch(t))
+			tasks <- t
 		}
 	}
 

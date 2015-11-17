@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
@@ -26,10 +27,11 @@ var (
 //
 
 type worker struct {
-	tasks   chan *transport.Task
-	rs      *common.Routines
-	reports []chan *transport.Report
-	fn      interface{}
+	receipts chan<- *broker.Receipt
+	tasks    <-chan *transport.Task
+	rs       *common.Routines
+	reports  []chan *transport.Report
+	fn       interface{}
 }
 
 //
@@ -37,7 +39,7 @@ type worker struct {
 //
 
 type _workers struct {
-	lock           sync.Mutex
+	workersLock    sync.Mutex
 	workers        atomic.Value
 	events         chan *common.Event
 	eventConverter *common.Routines
@@ -50,13 +52,21 @@ type _workers struct {
 // - id: identifier of this group of workers share the same function, matcher...
 // - match: matcher of this group of workers
 // - fn: the function that worker should called when receiving tasks (named by what recoginible by 'Matcher')
+// - tasks: input channel
+// - receipts: output 'broker.Receipt' channel
 // - count: count of workers to be initiated
 // - share: the count of workers sharing one report channel
 // returns:
 // - remain: count of workers remain not initiated
 // - reports: array of channels of 'transport.Report'
 // - err: any error
-func (me *_workers) allocate(name string, fn interface{}, count, share int) (reports []<-chan *transport.Report, remain int, err error) {
+func (me *_workers) allocate(
+	name string,
+	fn interface{},
+	tasks <-chan *transport.Task,
+	receipts chan<- *broker.Receipt,
+	count, share int,
+) (reports []<-chan *transport.Report, remain int, err error) {
 	// make sure type of fn is relfect.Func
 	k := reflect.TypeOf(fn).Kind()
 	if k != reflect.Func {
@@ -86,14 +96,13 @@ func (me *_workers) allocate(name string, fn interface{}, count, share int) (rep
 				if err_ != nil {
 					// TODO: log it?
 				}
-				close(w.tasks)
 			}
 		}
 	}()
 
 	err = func() (err error) {
-		me.lock.Lock()
-		defer me.lock.Unlock()
+		me.workersLock.Lock()
+		defer me.workersLock.Unlock()
 
 		ws := me.workers.Load().(map[string]*worker)
 
@@ -104,10 +113,11 @@ func (me *_workers) allocate(name string, fn interface{}, count, share int) (rep
 
 		// initiate controlling channle
 		w = &worker{
-			tasks:   make(chan *transport.Task, 10), // TODO: configuration?
-			rs:      common.NewRoutines(),
-			fn:      fn,
-			reports: make([]chan *transport.Report, 0, 10),
+			receipts: receipts,
+			tasks:    tasks,
+			rs:       common.NewRoutines(),
+			fn:       fn,
+			reports:  make([]chan *transport.Report, 0, 10),
 		}
 
 		eid, err = me.eventMux.Register(w.rs.Events(), 0)
@@ -171,32 +181,17 @@ func (me *_workers) more(name string, count, share int) (remain int, reports []<
 		if share > 0 && remain != count && remain%share == 0 {
 			r = add()
 		}
-		go me._worker_routine_(
+		go _worker_routine_(
 			w.rs.New(),
 			w.rs.Wait(),
 			w.rs.Events(),
 			w.tasks,
+			w.receipts,
 			r,
 			w.fn,
 		)
 	}
 
-	return
-}
-
-// dispatching a 'transport.Task'
-//
-// parameters:
-// - t: the task
-// returns:
-// - err: any error
-func (me *_workers) dispatch(t *transport.Task) (err error) {
-	ws := me.workers.Load().(map[string]*worker)
-	if v, ok := ws[t.Name()]; ok {
-		v.tasks <- t
-	} else {
-		err = errWorkerNotFound
-	}
 	return
 }
 
@@ -211,8 +206,8 @@ func (me *_workers) Events() ([]<-chan *common.Event, error) {
 }
 
 func (me *_workers) Close() (err error) {
-	me.lock.Lock()
-	defer me.lock.Unlock()
+	me.workersLock.Lock()
+	defer me.workersLock.Unlock()
 
 	// stop all workers routine
 	ws := me.workers.Load().(map[string]*worker)
@@ -239,21 +234,7 @@ func newWorkers() (w *_workers, err error) {
 
 	// a routine to mux multipls event channels from workers,
 	// and output them through a single event channel.
-	go func(quit <-chan int, wait *sync.WaitGroup, in <-chan *common.MuxOut, out chan *common.Event) {
-		defer wait.Done()
-		for {
-			select {
-			case _, _ = <-quit:
-				goto clean
-			case v, ok := <-in:
-				if !ok {
-					goto clean
-				}
-				out <- v.Value.(*common.Event)
-			}
-		}
-	clean:
-	}(w.eventConverter.New(), w.eventConverter.Wait(), w.eventMux.Out(), w.events)
+	go w._event_convert_routine_(w.eventConverter.New(), w.eventConverter.Wait(), w.eventMux.Out(), w.events)
 
 	remain, err := w.eventMux.More(1)
 	if err == nil && remain != 0 {
@@ -267,7 +248,14 @@ func newWorkers() (w *_workers, err error) {
 // worker routine
 //
 
-func (me *_workers) _worker_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, tasks <-chan *transport.Task, reports chan<- *transport.Report, fn interface{}) {
+func _worker_routine_(
+	quit <-chan int,
+	wait *sync.WaitGroup,
+	events chan<- *common.Event,
+	tasks <-chan *transport.Task,
+	receipts chan<- *broker.Receipt,
+	reports chan<- *transport.Report,
+	fn interface{}) {
 	defer wait.Done()
 
 	// TODO: concider a shared, common invoker instance?
@@ -325,6 +313,13 @@ func (me *_workers) _worker_routine_(quit <-chan int, wait *sync.WaitGroup, even
 				goto clean
 			}
 
+			if receipts != nil {
+				receipts <- &broker.Receipt{
+					ID:     t.ID(),
+					Status: broker.Status.OK,
+				}
+			}
+
 			call(t)
 		case _, _ = <-quit:
 			// nothing to clean
@@ -348,4 +343,20 @@ clean:
 			break
 		}
 	}
+}
+
+func (me *_workers) _event_convert_routine_(quit <-chan int, wait *sync.WaitGroup, in <-chan *common.MuxOut, out chan *common.Event) {
+	defer wait.Done()
+	for {
+		select {
+		case _, _ = <-quit:
+			goto clean
+		case v, ok := <-in:
+			if !ok {
+				goto clean
+			}
+			out <- v.Value.(*common.Event)
+		}
+	}
+clean:
 }

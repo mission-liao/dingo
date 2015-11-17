@@ -89,6 +89,7 @@ type _app struct {
 
 	// internal routines
 	mappers *_mappers
+	workers *_workers
 	events  *common.Routines
 }
 
@@ -124,6 +125,16 @@ func NewApp(nameOfBridge string) (app App, err error) {
 		return
 	}
 	err = v.attachEvents(v.mappers)
+	if err != nil {
+		return
+	}
+
+	// init workers
+	v.workers, err = newWorkers()
+	if err != nil {
+		return
+	}
+	err = v.attachEvents(v.workers)
 	if err != nil {
 		return
 	}
@@ -257,7 +268,10 @@ func (me *_app) Register(name string, fn interface{}, count, share int, mshTask,
 	me.objsLock.RLock()
 	defer me.objsLock.RUnlock()
 
-	var reports []<-chan *transport.Report
+	var (
+		tasks   <-chan *transport.Task
+		reports []<-chan *transport.Report
+	)
 
 	// set encoder/decoder
 	err = me.mash.Register(name, fn, mshTask, mshReport)
@@ -270,17 +284,28 @@ func (me *_app) Register(name string, fn interface{}, count, share int, mshTask,
 		return
 	}
 
-	if me.b.Exists(common.InstT.CONSUMER) {
+	if me.b.Exists(common.InstT.NAMED_CONSUMER) {
+		receipts := make(chan *broker.Receipt, 10)
+		tasks, err = me.b.AddNamedListener(name, receipts)
+		if err != nil {
+			return
+		}
+		reports, remain, err = me.workers.allocate(name, fn, tasks, receipts, count, share)
+		if err != nil {
+			return
+		}
+	} else if me.b.Exists(common.InstT.CONSUMER) {
 		reports, remain, err = me.mappers.allocateWorkers(name, fn, count, share)
 		if err != nil {
 			return
 		}
-		for _, v := range reports {
-			// id of report channel is ignored
-			err = me.b.Report(v)
-			if err != nil {
-				return
-			}
+	}
+
+	for _, v := range reports {
+		// id of report channel is ignored
+		err = me.b.Report(v)
+		if err != nil {
+			return
 		}
 	}
 
@@ -292,11 +317,12 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 	defer me.objsLock.Unlock()
 
 	var (
-		producer broker.Producer
-		consumer broker.Consumer
-		store    backend.Store
-		reporter backend.Reporter
-		ok       bool
+		producer      broker.Producer
+		consumer      broker.Consumer
+		namedConsumer broker.NamedConsumer
+		store         backend.Store
+		reporter      backend.Reporter
+		ok            bool
 	)
 
 	for {
@@ -316,6 +342,7 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 	if types == common.InstT.DEFAULT {
 		producer, _ = obj.(broker.Producer)
 		consumer, _ = obj.(broker.Consumer)
+		namedConsumer, _ = obj.(broker.NamedConsumer)
 		store, _ = obj.(backend.Store)
 		reporter, _ = obj.(backend.Reporter)
 	} else {
@@ -327,10 +354,18 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 			}
 		}
 		if types&common.InstT.CONSUMER == common.InstT.CONSUMER {
-			consumer, ok = obj.(broker.Consumer)
+			namedConsumer, ok = obj.(broker.NamedConsumer)
 			if !ok {
-				err = errors.New("consumer is not found")
-				return
+				consumer, ok = obj.(broker.Consumer)
+				if !ok {
+					err = errors.New("consumer is not found")
+					return
+				}
+			}
+		}
+		if types&common.InstT.NAMED_CONSUMER == common.InstT.NAMED_CONSUMER {
+			namedConsumer, ok = obj.(broker.NamedConsumer)
+			if !ok {
 			}
 		}
 		if types&common.InstT.STORE == common.InstT.STORE {
@@ -357,7 +392,7 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 		used |= common.InstT.PRODUCER
 	}
 	if consumer != nil {
-		err = me.b.AttachConsumer(consumer)
+		err = me.b.AttachConsumer(consumer, namedConsumer)
 		if err != nil && types != common.InstT.DEFAULT {
 			return
 		}
@@ -397,9 +432,6 @@ func (me *_app) Init(cfg Config) (err error) {
 
 			me.mappers.more(tasks, receipts)
 		}
-	}
-
-	if me.b.Exists(common.InstT.REPORTER) {
 	}
 
 	return

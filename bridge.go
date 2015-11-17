@@ -23,6 +23,7 @@ type Bridge interface {
 	//
 	// proxy for broker.Consumer
 	//
+	AddNamedListener(name string, receipts <-chan *broker.Receipt) (tasks <-chan *transport.Task, err error)
 	AddListener(rcpt <-chan *broker.Receipt) (tasks <-chan *transport.Task, err error)
 	StopAllListeners() (err error)
 
@@ -42,7 +43,7 @@ type Bridge interface {
 	AttachReporter(r backend.Reporter) (err error)
 	AttachStore(s backend.Store) (err error)
 	AttachProducer(p broker.Producer) (err error)
-	AttachConsumer(c broker.Consumer) (err error)
+	AttachConsumer(c broker.Consumer, nc broker.NamedConsumer) (err error)
 
 	//
 	// existence checker
