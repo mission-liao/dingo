@@ -56,11 +56,15 @@ func TestBridgeDefaultSuite(t *testing.T) {
 
 func (me *DefaultBridgeTestSuite) TestReturnFix() {
 	// register a function, returning float64
-	me.Nil(me.mash.Register("ReturnFix", func() float64 { return 0 }, transport.Encode.Default, transport.Encode.Default))
-	err := me.bg.Register("ReturnFix", func() float64 { return 0 })
+	me.Nil(me.trans.Register(
+		"ReturnFix",
+		func() float64 { return 0 },
+		transport.Encode.Default, transport.Encode.Default,
+		transport.Invoke.Default, transport.Invoke.Default,
+	))
 
 	// compose a task
-	t, err := me.ivk.ComposeTask("ReturnFix", nil)
+	t, err := transport.ComposeTask("ReturnFix", nil)
 	me.Nil(err)
 
 	// compose a corresponding report

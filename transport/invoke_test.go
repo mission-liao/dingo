@@ -107,7 +107,7 @@ type InvokeJsonTestSuite struct {
 func TestInvokeJsonSuite(t *testing.T) {
 	suite.Run(t, &InvokeJsonTestSuite{
 		InvokeTestSuite{
-			ivk:     NewDefaultInvoker(),
+			ivk:     &_genericInvoker{},
 			convert: ioJSON,
 		},
 	})
@@ -149,7 +149,7 @@ func TestInvokeGobSuite(t *testing.T) {
 
 	suite.Run(t, &InvokeGobTestSuite{
 		InvokeTestSuite{
-			ivk:     NewDefaultInvoker(),
+			ivk:     &_genericInvoker{},
 			convert: ioGOB,
 		},
 	})
@@ -190,7 +190,7 @@ func (s *InvokeTestSuite) TestFloat64() {
 		s.Nil(err)
 		s.NotNil(param)
 		if param != nil {
-			ret, err := s.ivk.Invoke(chk, param)
+			ret, err := s.ivk.Call(chk, param)
 			s.Nil(err)
 			s.Len(ret, 2)
 
@@ -223,7 +223,7 @@ func (s *InvokeTestSuite) TestInt64() {
 		s.Nil(err)
 		s.NotNil(param)
 		if param != nil {
-			ret, err := s.ivk.Invoke(chk, param)
+			ret, err := s.ivk.Call(chk, param)
 			s.Nil(err)
 			s.Len(ret, 2)
 			if ret != nil && len(ret) > 0 {
@@ -251,7 +251,7 @@ func (s *InvokeTestSuite) TestInt() {
 		s.Nil(err)
 		s.NotNil(param)
 		if param != nil {
-			ret, err := s.ivk.Invoke(chk, param)
+			ret, err := s.ivk.Call(chk, param)
 			s.Nil(err)
 			s.Len(ret, 2)
 			if ret != nil && len(ret) > 0 {
@@ -278,7 +278,7 @@ func (s *InvokeTestSuite) TestString() {
 		s.Nil(err)
 		s.NotNil(param)
 		if param != nil {
-			ret, err := s.ivk.Invoke(chk, param)
+			ret, err := s.ivk.Call(chk, param)
 			s.Nil(err)
 			s.Len(ret, 2)
 			if ret != nil && len(ret) > 0 {
@@ -307,7 +307,7 @@ func (s *InvokeTestSuite) TestStruct() {
 		s.Nil(err)
 		s.NotNil(param)
 		if param != nil {
-			ret, err := s.ivk.Invoke(chk, param)
+			ret, err := s.ivk.Call(chk, param)
 			s.Nil(err)
 			s.Len(ret, 2)
 			if ret != nil && len(ret) > 0 {
@@ -344,7 +344,7 @@ func (s *InvokeTestSuite) TestStruct() {
 			s.Nil(err)
 			s.NotNil(param)
 			if param != nil {
-				ret, err := s.ivk.Invoke(chk, param)
+				ret, err := s.ivk.Call(chk, param)
 				s.Nil(err)
 				s.Len(ret, 2)
 				if ret != nil && len(ret) > 0 {
@@ -367,7 +367,7 @@ func (s *InvokeTestSuite) TestStruct() {
 			s.Nil(err)
 			s.NotNil(param)
 			if param != nil {
-				ret, err := s.ivk.Invoke(chk, param)
+				ret, err := s.ivk.Call(chk, param)
 				s.Nil(err)
 				s.Len(ret, 2)
 				if ret != nil && len(ret) > 0 {
@@ -402,7 +402,7 @@ func (s *InvokeTestSuite) TestEmbed() {
 		s.Nil(err)
 		s.NotNil(param)
 		if param != nil {
-			ret, err := s.ivk.Invoke(chk, param)
+			ret, err := s.ivk.Call(chk, param)
 			s.Nil(err)
 			s.Len(ret, 2)
 			if ret != nil && len(ret) > 0 {
@@ -453,7 +453,7 @@ func (s *InvokeTestSuite) TestEmbedWithCollision() {
 		s.Nil(err)
 		s.NotNil(param)
 		if param != nil {
-			ret, err := s.ivk.Invoke(chk, param)
+			ret, err := s.ivk.Call(chk, param)
 			s.Nil(err)
 			s.Len(ret, 2)
 			if ret != nil && len(ret) > 0 {
@@ -489,7 +489,7 @@ func (s *InvokeTestSuite) TestMap() {
 	s.Nil(err)
 	s.NotNil(param)
 	if param != nil {
-		ret, err := s.ivk.Invoke(chk, param)
+		ret, err := s.ivk.Call(chk, param)
 		s.Nil(err)
 		s.Len(ret, 2)
 		if ret != nil && len(ret) > 0 {
@@ -522,7 +522,7 @@ func (s *InvokeTestSuite) _testMap2Struct(v map[string]*Struct) {
 	s.Nil(err)
 	s.NotNil(param)
 	if param != nil {
-		ret, err := s.ivk.Invoke(chk, param)
+		ret, err := s.ivk.Call(chk, param)
 		s.Nil(err)
 		s.Len(ret, 2)
 		if ret != nil && len(ret) > 0 {
@@ -552,7 +552,7 @@ func (s *InvokeTestSuite) TestSlice() {
 	s.Nil(err)
 	s.NotNil(param)
 	if param != nil {
-		ret, err := s.ivk.Invoke(chk, param)
+		ret, err := s.ivk.Call(chk, param)
 		s.Nil(err)
 		s.Len(ret, 2)
 		if ret != nil && len(ret) > 0 {
@@ -583,7 +583,7 @@ func (s *InvokeTestSuite) _testSliceOfStruct(v []*Struct) {
 	s.Nil(err)
 	s.NotNil(param)
 	if param != nil {
-		ret, err := s.ivk.Invoke(chk, param)
+		ret, err := s.ivk.Call(chk, param)
 		s.Nil(err)
 		s.Len(ret, 2)
 		if ret != nil && len(ret) > 0 {

@@ -14,17 +14,14 @@ type BridgeTestSuite struct {
 
 	name     string
 	bg       Bridge
-	ivk      transport.Invoker
-	mash     *transport.Marshallers
+	trans    *transport.Mgr
 	events   []*common.Event
 	eventMux *common.Mux
 }
 
 func (me *BridgeTestSuite) SetupSuite() {
 	me.eventMux = common.NewMux()
-	me.mash = transport.NewMarshallers()
-	me.ivk = transport.NewDefaultInvoker()
-
+	me.trans = transport.NewMgr()
 }
 
 func (me *BridgeTestSuite) TearDownSuite() {
@@ -32,7 +29,7 @@ func (me *BridgeTestSuite) TearDownSuite() {
 
 func (me *BridgeTestSuite) SetupTest() {
 	// prepare Bridge
-	me.bg = NewBridge(me.name, me.mash)
+	me.bg = NewBridge(me.name, me.trans)
 
 	// bind event channel
 	es, err := me.bg.Events()
@@ -66,7 +63,12 @@ func (me *BridgeTestSuite) TearDownTest() {
 //
 
 func (me *BridgeTestSuite) _TestSendTask() {
-	me.mash.Register("SendTask", func() {}, transport.Encode.Default, transport.Encode.Default)
+	me.trans.Register(
+		"SendTask",
+		func() {},
+		transport.Encode.Default, transport.Encode.Default,
+		transport.Invoke.Default, transport.Invoke.Default,
+	)
 
 	// add listener
 	receipts := make(chan *broker.Receipt, 0)
@@ -74,7 +76,7 @@ func (me *BridgeTestSuite) _TestSendTask() {
 	me.Nil(err)
 
 	// compose a task
-	t, err := me.ivk.ComposeTask("SendTask", nil)
+	t, err := transport.ComposeTask("SendTask", nil)
 	me.Nil(err)
 
 	// send that task
@@ -93,7 +95,12 @@ func (me *BridgeTestSuite) _TestSendTask() {
 }
 
 func (me *BridgeTestSuite) _TestAddListener() {
-	me.mash.Register("AddListener", func() {}, transport.Encode.Default, transport.Encode.Default)
+	me.trans.Register(
+		"AddListener",
+		func() {},
+		transport.Encode.Default, transport.Encode.Default,
+		transport.Invoke.Default, transport.Invoke.Default,
+	)
 
 	// prepare listeners
 	r1 := make(chan *broker.Receipt, 0)
@@ -108,7 +115,7 @@ func (me *BridgeTestSuite) _TestAddListener() {
 	me.Nil(err)
 
 	// compose a task, and send it
-	t, err := me.ivk.ComposeTask("AddListener", nil)
+	t, err := transport.ComposeTask("AddListener", nil)
 	me.Nil(err)
 	me.Nil(me.bg.SendTask(t))
 
@@ -153,14 +160,19 @@ func (me *BridgeTestSuite) TestMultipleClose() {
 }
 
 func (me *BridgeTestSuite) _TestReport() {
-	me.Nil(me.mash.Register("Report", func() {}, transport.Encode.Default, transport.Encode.Default))
+	me.Nil(me.trans.Register(
+		"Report",
+		func() {},
+		transport.Encode.Default, transport.Encode.Default,
+		transport.Invoke.Default, transport.Invoke.Default,
+	))
 
 	// attach reporter channel
 	reports := make(chan *transport.Report, 10)
 	me.Nil(me.bg.Report(reports))
 
 	// a sample task
-	t, err := me.ivk.ComposeTask("Report", nil)
+	t, err := transport.ComposeTask("Report", nil)
 	me.Nil(err)
 	outputs, err := me.bg.Poll(t)
 	me.Nil(err)
@@ -190,7 +202,12 @@ func (me *BridgeTestSuite) _TestReport() {
 }
 
 func (me *BridgeTestSuite) _TestPoll() {
-	me.Nil(me.mash.Register("Poll", func() {}, transport.Encode.Default, transport.Encode.Default))
+	me.Nil(me.trans.Register(
+		"Poll",
+		func() {},
+		transport.Encode.Default, transport.Encode.Default,
+		transport.Invoke.Default, transport.Invoke.Default,
+	))
 	count := 1
 
 	// multiple reports channel
@@ -206,10 +223,10 @@ func (me *BridgeTestSuite) _TestPoll() {
 	// - t5 -> r3
 	ts := []*transport.Task{}
 	for i := 0; i < count; i++ {
-		t, err := me.ivk.ComposeTask("Poll", []interface{}{fmt.Sprintf("t%d", 2*i)})
+		t, err := transport.ComposeTask("Poll", []interface{}{fmt.Sprintf("t%d", 2*i)})
 		me.Nil(err)
 		ts = append(ts, t)
-		t, err = me.ivk.ComposeTask("Poll", []interface{}{fmt.Sprintf("t%d", 2*i+1)})
+		t, err = transport.ComposeTask("Poll", []interface{}{fmt.Sprintf("t%d", 2*i+1)})
 		me.Nil(err)
 		ts = append(ts, t)
 	}

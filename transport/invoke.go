@@ -5,35 +5,34 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-
-	"github.com/satori/go.uuid"
 )
 
-//
-// errors
-//
+var Invoke = struct {
+	Default int16
+	Generic int16
+}{
+	0, 1,
+}
 
+//
+// interface of invokers
+//
 type Invoker interface {
-	Invoke(f interface{}, param []interface{}) ([]interface{}, error)
+	Call(f interface{}, param []interface{}) ([]interface{}, error)
 	Return(f interface{}, returns []interface{}) ([]interface{}, error)
-	ComposeTask(name string, args []interface{}) (*Task, error)
-}
-
-type _invoker struct {
 }
 
 //
-// factory function
+// Default Invoker
 //
-func NewDefaultInvoker() Invoker {
-	return &_invoker{}
+type _genericInvoker struct {
 }
 
 //
 // private function
 //
 
-func (vk *_invoker) convert2slice(v, r reflect.Value, rt reflect.Type) (err error) {
+func (vk *_genericInvoker) convert2slice(v, r reflect.Value, rt reflect.Type) (err error) {
 	if v.Kind() != reflect.Slice {
 		err = errors.New(fmt.Sprintf("Only Slice not %v convertible to slice", v.Kind().String()))
 		return
@@ -53,7 +52,7 @@ func (vk *_invoker) convert2slice(v, r reflect.Value, rt reflect.Type) (err erro
 	return
 }
 
-func (vk *_invoker) convert2map(v, r reflect.Value, rt reflect.Type) (err error) {
+func (vk *_genericInvoker) convert2map(v, r reflect.Value, rt reflect.Type) (err error) {
 	if v.Kind() != reflect.Map {
 		err = errors.New(fmt.Sprintf("Only Map not %v convertible to map", v.Kind().String()))
 		return
@@ -77,7 +76,7 @@ func (vk *_invoker) convert2map(v, r reflect.Value, rt reflect.Type) (err error)
 	return
 }
 
-func (vk *_invoker) convert2struct(v, r reflect.Value, rt reflect.Type) (err error) {
+func (vk *_genericInvoker) convert2struct(v, r reflect.Value, rt reflect.Type) (err error) {
 	kind := v.Kind()
 
 	if !(kind == reflect.Map || kind == reflect.Struct) {
@@ -133,7 +132,7 @@ func (vk *_invoker) convert2struct(v, r reflect.Value, rt reflect.Type) (err err
 	return err
 }
 
-func (vk *_invoker) convert(v reflect.Value, t reflect.Type) (reflect.Value, error) {
+func (vk *_genericInvoker) convert(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 	var err error
 
 	if v.IsValid() {
@@ -193,7 +192,7 @@ func (vk *_invoker) convert(v reflect.Value, t reflect.Type) (reflect.Value, err
 //
 // helper function for converting a value based on a type
 //
-func (vk *_invoker) from(val interface{}, t reflect.Type) (reflect.Value, error) {
+func (vk *_genericInvoker) from(val interface{}, t reflect.Type) (reflect.Value, error) {
 	if val == nil {
 		var err error
 
@@ -215,7 +214,7 @@ func (vk *_invoker) from(val interface{}, t reflect.Type) (reflect.Value, error)
 // reference implementation
 //	  https://github.com/codegangsta/inject/blob/master/inject.go
 //
-func (vk *_invoker) Invoke(f interface{}, param []interface{}) ([]interface{}, error) {
+func (vk *_genericInvoker) Call(f interface{}, param []interface{}) ([]interface{}, error) {
 	var err error
 
 	funcT := reflect.TypeOf(f)
@@ -261,7 +260,7 @@ func (vk *_invoker) Invoke(f interface{}, param []interface{}) ([]interface{}, e
 // - returns: the array of returns
 // returns:
 // converted return array and error
-func (vk *_invoker) Return(f interface{}, returns []interface{}) ([]interface{}, error) {
+func (vk *_genericInvoker) Return(f interface{}, returns []interface{}) ([]interface{}, error) {
 	funcT := reflect.TypeOf(f)
 
 	// make sure parameter matched
@@ -291,10 +290,5 @@ func (vk *_invoker) Return(f interface{}, returns []interface{}) ([]interface{},
 }
 
 //
-func (vk *_invoker) ComposeTask(name string, args []interface{}) (*Task, error) {
-	return &Task{
-		I: uuid.NewV4().String(),
-		N: name,
-		A: args,
-	}, nil
-}
+// TODO: Bypass Invoker
+//

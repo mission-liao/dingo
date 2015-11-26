@@ -13,8 +13,8 @@ type MapperTestSuite struct {
 	suite.Suite
 
 	_mps            *_mappers
-	_invoker        transport.Invoker
 	_tasks          chan *transport.Task
+	_trans          *transport.Mgr
 	_countOfMappers int
 	_receiptsMux    *common.Mux
 	_receipts       chan *broker.Receipt
@@ -22,9 +22,9 @@ type MapperTestSuite struct {
 
 func TestMapperSuite(t *testing.T) {
 	suite.Run(t, &MapperTestSuite{
+		_trans:          transport.NewMgr(),
 		_tasks:          make(chan *transport.Task, 5),
 		_countOfMappers: 3,
-		_invoker:        transport.NewDefaultInvoker(),
 		_receiptsMux:    common.NewMux(),
 		_receipts:       make(chan *broker.Receipt, 1),
 	})
@@ -32,7 +32,7 @@ func TestMapperSuite(t *testing.T) {
 
 func (me *MapperTestSuite) SetupSuite() {
 	var err error
-	me._mps, err = newMappers()
+	me._mps, err = newMappers(me._trans)
 	me.Nil(err)
 
 	// allocate 3 mapper routines
@@ -72,11 +72,18 @@ func (me *MapperTestSuite) TestParellelMapping() {
 	count := me._countOfMappers + cap(me._tasks)
 	stepIn := make(chan int, count)
 	stepOut := make(chan int, count)
-	reports, remain, err := me._mps.allocateWorkers("ParellelMapping", func(i int) {
+	fn := func(i int) {
 		stepIn <- i
 		// workers would be blocked here
 		<-stepOut
-	}, 1, 0)
+	}
+	me.Nil(me._trans.Register(
+		"ParellelMapping", fn,
+		transport.Encode.Default, transport.Encode.Default,
+		transport.Invoke.Default, transport.Invoke.Default,
+	))
+
+	reports, remain, err := me._mps.allocateWorkers("ParellelMapping", 1, 0)
 	me.Nil(err)
 	me.Equal(0, remain)
 	me.Len(reports, 1)
@@ -84,7 +91,7 @@ func (me *MapperTestSuite) TestParellelMapping() {
 	// send enough tasks to fill mapper routines & tasks channel
 	for i := 0; i < count; i++ {
 		// compose corresponding task
-		t, err := me._invoker.ComposeTask("ParellelMapping", []interface{}{i})
+		t, err := transport.ComposeTask("ParellelMapping", []interface{}{i})
 		me.Nil(err)
 
 		// should not be blocked here

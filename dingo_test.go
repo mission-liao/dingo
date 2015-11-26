@@ -63,10 +63,14 @@ func (me *DingoTestSuite) TearDownSuite() {
 func (me *DingoTestSuite) TestBasic() {
 	// register a set of workers
 	called := 0
-	remain, err := me.app.Register("Basic", func(n int) int {
-		called = n
-		return n + 1
-	}, 1, 1, transport.Encode.Default, transport.Encode.Default)
+	remain, err := me.app.Register("Basic",
+		func(n int) int {
+			called = n
+			return n + 1
+		}, 1, 1,
+		transport.Encode.Default, transport.Encode.Default,
+		transport.Invoke.Default, transport.Invoke.Default,
+	)
 	me.Equal(0, remain)
 	me.Nil(err)
 
@@ -76,7 +80,7 @@ func (me *DingoTestSuite) TestBasic() {
 	me.NotNil(reports)
 
 	// await for reports
-	status := []int{
+	status := []int16{
 		transport.Status.Sent,
 		transport.Status.Progress,
 		transport.Status.Done,

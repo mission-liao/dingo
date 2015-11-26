@@ -11,8 +11,8 @@ import (
 type WorkerTestSuite struct {
 	suite.Suite
 
-	_ws      *_workers
-	_invoker transport.Invoker
+	_ws    *_workers
+	_trans *transport.Mgr
 }
 
 func TestWorkerSuite(t *testing.T) {
@@ -21,9 +21,9 @@ func TestWorkerSuite(t *testing.T) {
 
 func (me *WorkerTestSuite) SetupSuite() {
 	var err error
-	me._ws, err = newWorkers()
+	me._trans = transport.NewMgr()
+	me._ws, err = newWorkers(me._trans)
 	me.Nil(err)
-	me._invoker = transport.NewDefaultInvoker()
 }
 
 func (me *WorkerTestSuite) TearDownSuite() {
@@ -41,18 +41,23 @@ func (me *WorkerTestSuite) TestParellelRun() {
 	stepIn := make(chan int, 3)
 	stepOut := make(chan int)
 	tasks := make(chan *transport.Task)
-
-	reports, remain, err := me._ws.allocate("", func(i int) {
+	fn := func(i int) {
 		stepIn <- i
 		// workers would be blocked here
 		<-stepOut
-	}, tasks, nil, 3, 0)
+	}
+	me._trans.Register(
+		"", fn,
+		transport.Encode.Default, transport.Encode.Default,
+		transport.Invoke.Default, transport.Invoke.Default,
+	)
+	reports, remain, err := me._ws.allocate("", tasks, nil, 3, 0)
 	me.Nil(err)
 	me.Equal(0, remain)
 	me.Len(reports, 1)
 
 	for i := 0; i < 3; i++ {
-		t, err := me._invoker.ComposeTask("", []interface{}{i})
+		t, err := transport.ComposeTask("", []interface{}{i})
 		me.Nil(err)
 		if err == nil {
 			tasks <- t

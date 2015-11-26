@@ -9,15 +9,12 @@ import (
 type BrokerTestSuite struct {
 	suite.Suite
 
-	_invoker       transport.Invoker
 	_producer      Producer
 	_consumer      Consumer
 	_namedConsumer NamedConsumer
 }
 
 func (me *BrokerTestSuite) SetupSuite() {
-	me._invoker = transport.NewDefaultInvoker()
-	me.NotNil(me._invoker)
 }
 
 func (me *BrokerTestSuite) TearDownSuite() {
@@ -62,7 +59,7 @@ func (me *BrokerTestSuite) TestBasic() {
 	}
 
 	// compose a task
-	t, err := me._invoker.ComposeTask("", []interface{}{})
+	t, err := transport.ComposeTask("", []interface{}{})
 	me.Nil(err)
 	me.NotNil(t)
 	if t == nil {

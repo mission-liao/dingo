@@ -10,7 +10,6 @@ type BackendTestSuite struct {
 	suite.Suite
 
 	_msh      *transport.Marshallers
-	_invoker  transport.Invoker
 	_backend  Backend
 	_reporter Reporter
 	_store    Store
@@ -22,7 +21,6 @@ func (me *BackendTestSuite) SetupSuite() {
 
 	me.NotNil(me._backend)
 	me._msh = transport.NewMarshallers()
-	me._invoker = transport.NewDefaultInvoker()
 	me._reports = make(chan *Envelope, 10)
 	me._reporter, me._store = me._backend.(Reporter), me._backend.(Store)
 	me.NotNil(me._reporter)
@@ -44,7 +42,7 @@ func (me *BackendTestSuite) TestBasic() {
 	err := me._msh.Register("basic", func() {}, transport.Encode.Default, transport.Encode.Default)
 
 	// compose a dummy task
-	task, err := me._invoker.ComposeTask("basic", []interface{}{})
+	task, err := transport.ComposeTask("basic", []interface{}{})
 	me.Nil(err)
 
 	// send a report

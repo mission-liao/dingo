@@ -2,6 +2,8 @@ package transport
 
 import (
 	"reflect"
+
+	"github.com/satori/go.uuid"
 )
 
 //
@@ -11,6 +13,14 @@ type Task struct {
 	I string // dingo-generated id
 	N string // function name
 	A []interface{}
+}
+
+func ComposeTask(name string, args []interface{}) (*Task, error) {
+	return &Task{
+		I: uuid.NewV4().String(),
+		N: name,
+		A: args,
+	}, nil
 }
 
 //
@@ -23,7 +33,7 @@ func (t *Task) Args() []interface{} { return t.A }
 //
 // APIs
 //
-func (t *Task) ComposeReport(s int, r []interface{}, err interface{}) (*Report, error) {
+func (t *Task) ComposeReport(s int16, r []interface{}, err interface{}) (*Report, error) {
 	var err_ *Error
 	if err != nil {
 		switch v := err.(type) {

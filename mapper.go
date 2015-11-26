@@ -51,7 +51,7 @@ func (me *_mappers) dispatch(t *transport.Task) (err error) {
 // proxy of _workers
 //
 
-func (me *_mappers) allocateWorkers(name string, fn interface{}, count, share int) ([]<-chan *transport.Report, int, error) {
+func (me *_mappers) allocateWorkers(name string, count, share int) ([]<-chan *transport.Report, int, error) {
 	me.toLock.Lock()
 	defer me.toLock.Unlock()
 
@@ -60,7 +60,7 @@ func (me *_mappers) allocateWorkers(name string, fn interface{}, count, share in
 		return nil, count, errors.New(fmt.Sprintf("already registered: %v", name))
 	}
 	t := make(chan *transport.Task, 10)
-	r, n, err := me.workers.allocate(name, fn, t, nil, count, share)
+	r, n, err := me.workers.allocate(name, t, nil, count, share)
 	if err != nil {
 		return r, n, err
 	}
@@ -109,8 +109,8 @@ func (m *_mappers) Close() (err error) {
 // - tasks: input channel
 // returns:
 // ...
-func newMappers() (m *_mappers, err error) {
-	w, err := newWorkers()
+func newMappers(trans *transport.Mgr) (m *_mappers, err error) {
+	w, err := newWorkers(trans)
 	if err != nil {
 		return
 	}

@@ -25,19 +25,20 @@ type App interface {
 	//
 	Close() error
 
-	// hire a set of workers for a pattern
+	// register a function
 	//
 	// parameters ->
 	// - name: name of tasks
 	// - fn: the function that actually perform the task.
 	// - count: count of workers to be initialized.
 	// - share: the count of workers sharing one report channel
-	// - taskEnc, reportEnc: id of encoding method for 'transport.Task' and 'transport.Report'
+	// - taskMash, reportMash: id of transport.Marshaller for 'transport.Task' and 'transport.Report'
+	// - taskIvok, reportIvok: id of transport.Invoker for 'transport.Task' and 'transport.Report'
 	//
 	// returns ->
 	// - remain: remaining count of workers that not initialized.
 	// - err: any error produced
-	Register(name string, fn interface{}, count, share int, taskEnc, reportEnc int16) (remain int, err error)
+	Register(name string, fn interface{}, count, share int, taskMash, reportMash int16, taskIvok, reportIvok int16) (remain int, err error)
 
 	// attach an instance, instance could be any instance implementing
 	// backend.Reporter, backend.Backend, broker.Producer, broker.Consumer.
@@ -76,8 +77,6 @@ type _object struct {
 }
 
 type _app struct {
-	invoker transport.Invoker
-
 	cfg          Config
 	objsLock     sync.RWMutex
 	objs         map[int]*_object
@@ -85,7 +84,7 @@ type _app struct {
 	eventOut     atomic.Value
 	eventOutLock sync.Mutex
 	b            Bridge
-	mash         *transport.Marshallers
+	trans        *transport.Mgr
 
 	// internal routines
 	mappers *_mappers
@@ -98,11 +97,10 @@ type _app struct {
 func NewApp(nameOfBridge string) (app App, err error) {
 	v := &_app{
 		objs:     make(map[int]*_object),
-		invoker:  transport.NewDefaultInvoker(),
 		eventMux: common.NewMux(),
-		mash:     transport.NewMarshallers(),
+		trans:    transport.NewMgr(),
 	}
-	v.b = NewBridge(nameOfBridge, v.mash)
+	v.b = NewBridge(nameOfBridge, v.trans)
 
 	// refer to 'ReadMostly' example in sync/atomic
 	v.eventOut.Store(make(map[int]*_eventListener))
@@ -131,7 +129,7 @@ func NewApp(nameOfBridge string) (app App, err error) {
 	}
 
 	// init mappers
-	v.mappers, err = newMappers()
+	v.mappers, err = newMappers(v.trans)
 	if err != nil {
 		return
 	}
@@ -141,7 +139,7 @@ func NewApp(nameOfBridge string) (app App, err error) {
 	}
 
 	// init workers
-	v.workers, err = newWorkers()
+	v.workers, err = newWorkers(v.trans)
 	if err != nil {
 		return
 	}
@@ -242,7 +240,7 @@ func (me *_app) Close() (err error) {
 	return
 }
 
-func (me *_app) Register(name string, fn interface{}, count, share int, mshTask, mshReport int16) (remain int, err error) {
+func (me *_app) Register(name string, fn interface{}, count, share int, taskMash, reportMash, taskIvok, reportIvok int16) (remain int, err error) {
 	me.objsLock.RLock()
 	defer me.objsLock.RUnlock()
 
@@ -252,12 +250,7 @@ func (me *_app) Register(name string, fn interface{}, count, share int, mshTask,
 	)
 
 	// set encoder/decoder
-	err = me.mash.Register(name, fn, mshTask, mshReport)
-	if err != nil {
-		return
-	}
-
-	err = me.b.Register(name, fn)
+	err = me.trans.Register(name, fn, taskMash, reportMash, taskIvok, reportIvok)
 	if err != nil {
 		return
 	}
@@ -268,12 +261,12 @@ func (me *_app) Register(name string, fn interface{}, count, share int, mshTask,
 		if err != nil {
 			return
 		}
-		reports, remain, err = me.workers.allocate(name, fn, tasks, receipts, count, share)
+		reports, remain, err = me.workers.allocate(name, tasks, receipts, count, share)
 		if err != nil {
 			return
 		}
 	} else if me.b.Exists(common.InstT.CONSUMER) {
-		reports, remain, err = me.mappers.allocateWorkers(name, fn, count, share)
+		reports, remain, err = me.mappers.allocateWorkers(name, count, share)
 		if err != nil {
 			return
 		}
@@ -420,7 +413,7 @@ func (me *_app) Call(name string, opt *transport.Option, args ...interface{}) (r
 	defer me.objsLock.RUnlock()
 
 	// TODO: attach Option to transport.Task
-	t, err := me.invoker.ComposeTask(name, args)
+	t, err := transport.ComposeTask(name, args)
 	if err != nil {
 		return
 	}

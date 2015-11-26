@@ -3,7 +3,6 @@ package dingo
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"sync"
 	"sync/atomic"
 
@@ -31,7 +30,6 @@ type worker struct {
 	tasks    <-chan *transport.Task
 	rs       *common.Routines
 	reports  []chan *transport.Report
-	fn       interface{}
 }
 
 //
@@ -43,6 +41,7 @@ type _workers struct {
 	workers     atomic.Value
 	events      chan *common.Event
 	eventMux    *common.Mux
+	trans       *transport.Mgr
 }
 
 // allocating a new group of workers
@@ -50,7 +49,6 @@ type _workers struct {
 // parameters:
 // - id: identifier of this group of workers share the same function, matcher...
 // - match: matcher of this group of workers
-// - fn: the function that worker should called when receiving tasks (named by what recoginible by 'Matcher')
 // - tasks: input channel
 // - receipts: output 'broker.Receipt' channel
 // - count: count of workers to be initiated
@@ -61,18 +59,10 @@ type _workers struct {
 // - err: any error
 func (me *_workers) allocate(
 	name string,
-	fn interface{},
 	tasks <-chan *transport.Task,
 	receipts chan<- *broker.Receipt,
 	count, share int,
 ) (reports []<-chan *transport.Report, remain int, err error) {
-	// make sure type of fn is relfect.Func
-	k := reflect.TypeOf(fn).Kind()
-	if k != reflect.Func {
-		err = errors.New(fmt.Sprintf("Invalid function pointer passed: %v", k.String()))
-		return
-	}
-
 	var (
 		w   *worker
 		eid int
@@ -115,7 +105,6 @@ func (me *_workers) allocate(
 			receipts: receipts,
 			tasks:    tasks,
 			rs:       common.NewRoutines(),
-			fn:       fn,
 			reports:  make([]chan *transport.Report, 0, 10),
 		}
 
@@ -180,14 +169,13 @@ func (me *_workers) more(name string, count, share int) (remain int, reports []<
 		if share > 0 && remain != count && remain%share == 0 {
 			r = add()
 		}
-		go _worker_routine_(
+		go me._worker_routine_(
 			w.rs.New(),
 			w.rs.Wait(),
 			w.rs.Events(),
 			w.tasks,
 			w.receipts,
 			r,
-			w.fn,
 		)
 	}
 
@@ -222,10 +210,11 @@ func (me *_workers) Close() (err error) {
 }
 
 // factory function
-func newWorkers() (w *_workers, err error) {
+func newWorkers(trans *transport.Mgr) (w *_workers, err error) {
 	w = &_workers{
 		events:   make(chan *common.Event, 10),
 		eventMux: common.NewMux(),
+		trans:    trans,
 	}
 
 	w.workers.Store(make(map[string]*worker))
@@ -245,20 +234,16 @@ func newWorkers() (w *_workers, err error) {
 // worker routine
 //
 
-func _worker_routine_(
+func (me *_workers) _worker_routine_(
 	quit <-chan int,
 	wait *sync.WaitGroup,
 	events chan<- *common.Event,
 	tasks <-chan *transport.Task,
 	receipts chan<- *broker.Receipt,
 	reports chan<- *transport.Report,
-	fn interface{},
 ) {
 	defer wait.Done()
-
-	// TODO: concider a shared, common invoker instance?
-	ivk := transport.NewDefaultInvoker()
-	rep := func(task *transport.Task, status int, payload []interface{}, err error) {
+	rep := func(task *transport.Task, status int16, payload []interface{}, err error) {
 		var (
 			e    *transport.Error
 			r    *transport.Report
@@ -282,7 +267,7 @@ func _worker_routine_(
 		var (
 			ret       []interface{}
 			err, err_ error
-			status    int
+			status    int16
 		)
 
 		// compose a report -- sent
@@ -292,7 +277,7 @@ func _worker_routine_(
 		rep(t, transport.Status.Progress, nil, nil)
 
 		// call the actuall function, where is the magic
-		ret, err = ivk.Invoke(fn, t.Args())
+		ret, err = me.trans.Call(t)
 
 		// compose a report -- done / fail
 		if err != nil {

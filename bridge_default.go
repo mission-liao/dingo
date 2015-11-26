@@ -2,10 +2,7 @@ package dingo
 
 import (
 	"errors"
-	"fmt"
-	"reflect"
 	"sync"
-	"sync/atomic"
 
 	"github.com/mission-liao/dingo/backend"
 	"github.com/mission-liao/dingo/broker"
@@ -32,15 +29,12 @@ type bridge struct {
 	reporters *common.Routines
 	storers   *common.Routines
 	doners    chan transport.Meta
-	mash      *transport.Marshallers
 	events    chan *common.Event
 	eventMux  *common.Mux
-	invoker   transport.Invoker
-	fnsLock   sync.Mutex
-	fns       atomic.Value
+	trans     *transport.Mgr
 }
 
-func newDefaultBridge(m *transport.Marshallers) (b *bridge) {
+func newDefaultBridge(trans *transport.Mgr) (b *bridge) {
 	b = &bridge{
 		listeners: common.NewRoutines(),
 		reporters: common.NewRoutines(),
@@ -48,11 +42,9 @@ func newDefaultBridge(m *transport.Marshallers) (b *bridge) {
 		events:    make(chan *common.Event, 10),
 		eventMux:  common.NewMux(),
 		doners:    make(chan transport.Meta, 10),
-		mash:      m,
-		invoker:   transport.NewDefaultInvoker(),
+		trans:     trans,
 	}
 
-	b.fns.Store(make(map[string]interface{}))
 	b.eventMux.Handle(func(val interface{}, _ int) {
 		b.events <- val.(*common.Event)
 	})
@@ -84,30 +76,6 @@ func (me *bridge) Events() ([]<-chan *common.Event, error) {
 	}, nil
 }
 
-func (me *bridge) Register(name string, fn interface{}) (err error) {
-	if reflect.TypeOf(fn).Kind() != reflect.Func {
-		err = errors.New(fmt.Sprintf("not a function: %v", fn))
-		return
-	}
-
-	me.fnsLock.Lock()
-	defer me.fnsLock.Unlock()
-
-	m := me.fns.Load().(map[string]interface{})
-	if _, ok := m[name]; ok {
-		err = errors.New(fmt.Sprintf("already registered: %v", name))
-		return
-	}
-
-	m_ := make(map[string]interface{})
-	for k := range m {
-		m_[k] = m[k]
-	}
-	m_[name] = fn
-	me.fns.Store(m_)
-	return
-}
-
 func (me *bridge) SendTask(t *transport.Task) (err error) {
 	me.producerLock.RLock()
 	defer me.producerLock.RUnlock()
@@ -117,7 +85,7 @@ func (me *bridge) SendTask(t *transport.Task) (err error) {
 		return
 	}
 
-	b, err := me.mash.EncodeTask(t)
+	b, err := me.trans.EncodeTask(t)
 	if err != nil {
 		return
 	}
@@ -201,7 +169,7 @@ func (me *bridge) Report(reports <-chan *transport.Report) (err error) {
 	go func(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, input <-chan *transport.Report, output chan<- *backend.Envelope) {
 		defer wait.Done()
 		out := func(r *transport.Report) {
-			b, err := me.mash.EncodeReport(r)
+			b, err := me.trans.EncodeReport(r)
 			if err != nil {
 				events <- common.NewEventFromError(common.InstT.BRIDGE, err)
 				return
@@ -264,27 +232,16 @@ func (me *bridge) Poll(t *transport.Task) (reports <-chan *transport.Report, err
 	) {
 		defer wait.Done()
 		out := func(b []byte) (done bool) {
-			r, err := me.mash.DecodeReport(b)
+			r, err := me.trans.DecodeReport(b)
 			if err != nil {
 				events <- common.NewEventFromError(common.InstT.STORE, err)
 				return
 			}
 			// fix returns
 			if len(r.Return()) > 0 {
-				m := me.fns.Load().(map[string]interface{})
-				f, ok := m[r.Name()]
-				if !ok {
-					events <- common.NewEventFromError(
-						common.InstT.STORE,
-						errors.New(fmt.Sprintf("function pointer is not registered: %v", r)),
-					)
-				} else {
-					ret, err := me.invoker.Return(f, r.Return())
-					if err != nil {
-						events <- common.NewEventFromError(common.InstT.STORE, err)
-					} else {
-						r.R = ret
-					}
+				err := me.trans.Return(r)
+				if err != nil {
+					events <- common.NewEventFromError(common.InstT.STORE, err)
 				}
 			}
 
@@ -460,7 +417,7 @@ func (me *bridge) _listener_routines_(
 		wait.Done()
 	}()
 	out := func(b []byte) {
-		t, err := me.mash.DecodeTask(b)
+		t, err := me.trans.DecodeTask(b)
 		if err != nil {
 			events <- common.NewEventFromError(common.InstT.BRIDGE, err)
 			return
