@@ -18,44 +18,29 @@ type poller struct {
 }
 
 type localBridge struct {
-	objLock        sync.RWMutex
-	needed         int
-	broker         chan *transport.Task
-	listeners      *common.Routines
-	reporters      *common.Routines
-	pollers        chan *poller
-	events         chan *common.Event
-	eventMux       *common.Mux
-	eventConverter *common.Routines
+	objLock   sync.RWMutex
+	needed    int
+	broker    chan *transport.Task
+	listeners *common.Routines
+	reporters *common.Routines
+	pollers   chan *poller
+	events    chan *common.Event
+	eventMux  *common.Mux
 }
 
 func newLocalBridge(args ...interface{}) (b *localBridge) {
 	b = &localBridge{
-		events:         make(chan *common.Event, 10),
-		eventMux:       common.NewMux(),
-		eventConverter: common.NewRoutines(),
-		listeners:      common.NewRoutines(),
-		reporters:      common.NewRoutines(),
-		broker:         make(chan *transport.Task, 10),
-		pollers:        make(chan *poller, 10),
+		events:    make(chan *common.Event, 10),
+		eventMux:  common.NewMux(),
+		listeners: common.NewRoutines(),
+		reporters: common.NewRoutines(),
+		broker:    make(chan *transport.Task, 10),
+		pollers:   make(chan *poller, 10),
 	}
 
-	go func(quit <-chan int, wait *sync.WaitGroup, in <-chan *common.MuxOut, out chan *common.Event) {
-		defer wait.Done()
-		for {
-			select {
-			case _, _ = <-quit:
-				goto clean
-			case v, ok := <-in:
-				if !ok {
-					goto clean
-				}
-				out <- v.Value.(*common.Event)
-			}
-		}
-	clean:
-		// TODO: consuming remaining events
-	}(b.eventConverter.New(), b.eventConverter.Wait(), b.eventMux.Out(), b.events)
+	b.eventMux.Handle(func(val interface{}, _ int) {
+		b.events <- val.(*common.Event)
+	})
 
 	return
 }
@@ -72,10 +57,6 @@ func (me *localBridge) Close() (err error) {
 
 	err = me.listeners.Close()
 	me.eventMux.Close()
-	err2 := me.eventConverter.Close()
-	if err == nil {
-		err = err2
-	}
 
 	close(me.broker)
 	me.broker = make(chan *transport.Task, 10)

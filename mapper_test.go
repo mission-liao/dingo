@@ -17,6 +17,7 @@ type MapperTestSuite struct {
 	_tasks          chan *transport.Task
 	_countOfMappers int
 	_receiptsMux    *common.Mux
+	_receipts       chan *broker.Receipt
 }
 
 func TestMapperSuite(t *testing.T) {
@@ -25,6 +26,7 @@ func TestMapperSuite(t *testing.T) {
 		_countOfMappers: 3,
 		_invoker:        transport.NewDefaultInvoker(),
 		_receiptsMux:    common.NewMux(),
+		_receipts:       make(chan *broker.Receipt, 1),
 	})
 }
 
@@ -43,12 +45,17 @@ func (me *MapperTestSuite) SetupSuite() {
 	remain, err := me._receiptsMux.More(3)
 	me.Equal(0, remain)
 	me.Nil(err)
+
+	me._receiptsMux.Handle(func(val interface{}, _ int) {
+		me._receipts <- val.(*broker.Receipt)
+	})
 }
 
 func (me *MapperTestSuite) TearDownSuite() {
 	me.Nil(me._mps.Close())
 	close(me._tasks)
 	me._receiptsMux.Close()
+	close(me._receipts)
 }
 
 //
@@ -89,7 +96,7 @@ func (me *MapperTestSuite) TestParellelMapping() {
 	rets := []int{}
 	for i := 0; i < count; i++ {
 		// consume 1 receipts
-		<-me._receiptsMux.Out()
+		<-me._receipts
 
 		// consume 2 report
 		<-reports[0]

@@ -2,7 +2,6 @@ package dingo
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
@@ -13,17 +12,15 @@ import (
 type BridgeTestSuite struct {
 	suite.Suite
 
-	name         string
-	bg           Bridge
-	ivk          transport.Invoker
-	mash         *transport.Marshallers
-	events       []*common.Event
-	eventMux     *common.Mux
-	eventWatcher *common.Routines
+	name     string
+	bg       Bridge
+	ivk      transport.Invoker
+	mash     *transport.Marshallers
+	events   []*common.Event
+	eventMux *common.Mux
 }
 
 func (me *BridgeTestSuite) SetupSuite() {
-	me.eventWatcher = common.NewRoutines()
 	me.eventMux = common.NewMux()
 	me.mash = transport.NewMarshallers()
 	me.ivk = transport.NewDefaultInvoker()
@@ -31,7 +28,6 @@ func (me *BridgeTestSuite) SetupSuite() {
 }
 
 func (me *BridgeTestSuite) TearDownSuite() {
-	me.Nil(me.eventWatcher.Close())
 }
 
 func (me *BridgeTestSuite) SetupTest() {
@@ -48,43 +44,13 @@ func (me *BridgeTestSuite) SetupTest() {
 
 	// reset event array
 	me.events = make([]*common.Event, 0, 10)
-
-	go func(quit <-chan int, wait *sync.WaitGroup, inputs <-chan *common.MuxOut) {
-		defer wait.Done()
-		for {
-			select {
-			case _, _ = <-quit:
-				goto clean
-			case v, ok := <-inputs:
-				if !ok {
-					goto clean
-				}
-				me.events = append(me.events, v.Value.(*common.Event))
-			}
-		}
-	clean:
-		finished := false
-		for {
-			select {
-			case v, ok := <-inputs:
-				if !ok {
-					finished = true
-					break
-				}
-				me.events = append(me.events, v.Value.(*common.Event))
-			default:
-				finished = true
-			}
-			if finished {
-				break
-			}
-		}
-	}(me.eventWatcher.New(), me.eventWatcher.Wait(), me.eventMux.Out())
+	me.eventMux.Handle(func(val interface{}, _ int) {
+		me.events = append(me.events, val.(*common.Event))
+	})
 }
 
 func (me *BridgeTestSuite) TearDownTest() {
 	me.Nil(me.bg.Close())
-	me.Nil(me.eventWatcher.Close())
 
 	for _, v := range me.events {
 		if v.Level == common.ErrLvl.ERROR {

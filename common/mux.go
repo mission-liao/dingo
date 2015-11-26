@@ -2,7 +2,7 @@ package common
 
 //
 // 'mux' is a n-to-1 multiplexer for a slice of 'receiving' channels.
-// output is a "chan<- interface{}".
+// Users can add handler function to handle those input values.
 //
 // the original use case in 'dingo' is muxing from chan<-task.TaskInfo from
 // brokers and chan<-task.Report from backends.
@@ -14,8 +14,10 @@ package common
 //     m := &Mux{}
 //     m.Init()
 //       ...
-//     out, err := m.Out()
-//     v, ok := <-out
+//     m.Handle(func(v interface{}, idx int) {
+//         // output it to another channel
+//         out <- v.(string)
+//     })
 //
 
 import (
@@ -34,35 +36,26 @@ type _newChannel struct {
 	v  interface{}
 }
 
-// output of mux
-type MuxOut struct {
-	// the 'id' returned from Mux.Register
-	Id    int
-	Value interface{}
-}
-
 type Mux struct {
 	rs      *Routines
 	changed []chan time.Time
 	rsLock  sync.Mutex
 
 	// check for new condition
-	rw        sync.RWMutex
-	cases     atomic.Value
-	casesLock sync.Mutex
-
-	// output channel
-	_out chan *MuxOut
+	cases        atomic.Value
+	casesLock    sync.Mutex
+	handlersLock sync.Mutex
+	handlers     atomic.Value
 }
 
 func NewMux() (m *Mux) {
 	m = &Mux{
 		rs:      NewRoutines(),
 		changed: make([]chan time.Time, 0, 10),
-		_out:    make(chan *MuxOut, 10),
 	}
 
 	m.cases.Store(make(map[int]interface{}))
+	m.handlers.Store(make([]func(interface{}, int), 0, 10))
 	return
 }
 
@@ -72,7 +65,7 @@ func (me *Mux) More(count int) (remain int, err error) {
 	for ; remain > 0; remain-- {
 		c := make(chan time.Time, 10)
 		me.changed = append(me.changed, c)
-		go me._mux_routine_(me.rs.New(), me.rs.Wait(), c, me._out)
+		go me._mux_routine_(me.rs.New(), me.rs.Wait(), c)
 	}
 	return
 }
@@ -90,12 +83,13 @@ func (me *Mux) Close() {
 		me.changed = make([]chan time.Time, 0, 10)
 	}()
 
-	close(me._out)
-	me._out = make(chan *MuxOut, 10)
-
 	me.casesLock.Lock()
 	defer me.casesLock.Unlock()
 	me.cases.Store(make(map[int]interface{}))
+
+	me.handlersLock.Lock()
+	defer me.handlersLock.Unlock()
+	me.handlers.Store(make([]func(interface{}, int), 0, 10))
 }
 
 //
@@ -163,27 +157,35 @@ func (me *Mux) Unregister(id int) (ch interface{}, err error) {
 	return
 }
 
-//
-func (m *Mux) Out() <-chan *MuxOut {
-	return m._out
+func (me *Mux) Handle(handler func(interface{}, int)) {
+	func() {
+		me.handlersLock.Lock()
+		defer me.handlersLock.Unlock()
+
+		m := me.handlers.Load().([]func(interface{}, int))
+		m_ := make([]func(interface{}, int), 0, len(m)+1)
+		copy(m_, m)
+		m_ = append(m_, handler)
+		me.handlers.Store(m_)
+	}()
+
+	me.rsLock.Lock()
+	defer me.rsLock.Unlock()
+
+	touched := time.Now()
+	for _, v := range me.changed {
+		v <- touched
+	}
 }
 
-func (me *Mux) _mux_routine_(quit <-chan int, wait *sync.WaitGroup, changed <-chan time.Time, output chan<- *MuxOut) {
+func (me *Mux) _mux_routine_(quit <-chan int, wait *sync.WaitGroup, changed <-chan time.Time) {
 	defer wait.Done()
 	var (
 		cond       []reflect.SelectCase
+		handlers   []func(interface{}, int)
 		keys       []int
 		lenOfcases int
 	)
-
-	out := func(value *reflect.Value, chosen int) {
-		if value.CanInterface() {
-			output <- &MuxOut{
-				Id:    keys[chosen],
-				Value: value.Interface(),
-			}
-		}
-	}
 
 	del := func(chosen int) {
 		cond = append(cond[:chosen], cond[chosen+1:]...)
@@ -220,6 +222,9 @@ func (me *Mux) _mux_routine_(quit <-chan int, wait *sync.WaitGroup, changed <-ch
 		})
 
 		lenOfcases = len(m)
+
+		// update handlers
+		handlers = me.handlers.Load().([]func(interface{}, int))
 	}
 
 	update()
@@ -263,8 +268,10 @@ func (me *Mux) _mux_routine_(quit <-chan int, wait *sync.WaitGroup, changed <-ch
 
 		// other registered channels
 		default:
-			// send to output channel
-			out(&value, chosen)
+			// send to handlers
+			for _, v := range handlers {
+				v(value.Interface(), keys[chosen])
+			}
 		}
 	}
 cleanup:
@@ -292,7 +299,9 @@ cleanup:
 		case len(cond) - 1:
 			return
 		default:
-			out(&value, chosen)
+			for _, v := range handlers {
+				v(value.Interface(), keys[chosen])
+			}
 		}
 	}
 }

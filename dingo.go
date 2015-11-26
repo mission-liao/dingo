@@ -90,7 +90,6 @@ type _app struct {
 	// internal routines
 	mappers *_mappers
 	workers *_workers
-	events  *common.Routines
 }
 
 //
@@ -101,18 +100,30 @@ func NewApp(nameOfBridge string) (app App, err error) {
 		objs:     make(map[int]*_object),
 		invoker:  transport.NewDefaultInvoker(),
 		eventMux: common.NewMux(),
-		events:   common.NewRoutines(),
 		mash:     transport.NewMarshallers(),
 	}
 	v.b = NewBridge(nameOfBridge, v.mash)
 
 	// refer to 'ReadMostly' example in sync/atomic
 	v.eventOut.Store(make(map[int]*_eventListener))
+	v.eventMux.Handle(func(val interface{}, _ int) {
+		e := val.(*common.Event)
+		m := v.eventOut.Load().(map[int]*_eventListener)
+		// to the channel containing everythin errors
+		for _, eln := range m {
+			if (eln.targets&e.Origin) == 0 || eln.level > e.Level {
+				continue
+			}
 
-	// should only initiate 1 routine for errors,
-	// or the order of reported errors would not be
-	// preserved.
-	go v._event_routine_(v.events.New(), v.events.Wait(), v.eventMux.Out())
+			// non-blocking channel sending
+			select {
+			case eln.events <- e:
+			default:
+				// drop this event
+				// TODO: log it?
+			}
+		}
+	})
 
 	remain, err := v.eventMux.More(1)
 	if err != nil || remain != 0 {
@@ -146,38 +157,6 @@ func NewApp(nameOfBridge string) (app App, err error) {
 //
 // private
 //
-
-func (me *_app) _event_routine_(quit <-chan int, wait *sync.WaitGroup, events <-chan *common.MuxOut) {
-	defer wait.Done()
-	for {
-		select {
-		case _, _ = <-quit:
-			goto cleanup
-		case v, ok := <-events:
-			if !ok {
-				goto cleanup
-			}
-
-			e := v.Value.(*common.Event)
-			m := me.eventOut.Load().(map[int]*_eventListener)
-			// to the channel containing everythin errors
-			for _, eln := range m {
-				if (eln.targets&e.Origin) == 0 || eln.level > e.Level {
-					continue
-				}
-
-				// non-blocking channel sending
-				select {
-				case eln.events <- e:
-				default:
-					// drop this event
-					// TODO: log it?
-				}
-			}
-		}
-	}
-cleanup:
-}
 
 func (me *_app) attachEvents(obj common.Object) (err error) {
 	if obj == nil {
@@ -247,7 +226,6 @@ func (me *_app) Close() (err error) {
 	}
 
 	// shutdown the monitor of error channels
-	me.events.Close()
 	me.eventMux.Close()
 	func() {
 		me.eventOutLock.Lock()

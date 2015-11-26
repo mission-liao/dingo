@@ -28,50 +28,34 @@ type bridge struct {
 	storeLock     sync.RWMutex
 	store         backend.Store
 
-	listeners      *common.Routines
-	reporters      *common.Routines
-	storers        *common.Routines
-	doners         chan transport.Meta
-	mash           *transport.Marshallers
-	events         chan *common.Event
-	eventMux       *common.Mux
-	eventConverter *common.Routines
-	invoker        transport.Invoker
-	fnsLock        sync.Mutex
-	fns            atomic.Value
+	listeners *common.Routines
+	reporters *common.Routines
+	storers   *common.Routines
+	doners    chan transport.Meta
+	mash      *transport.Marshallers
+	events    chan *common.Event
+	eventMux  *common.Mux
+	invoker   transport.Invoker
+	fnsLock   sync.Mutex
+	fns       atomic.Value
 }
 
 func newDefaultBridge(m *transport.Marshallers) (b *bridge) {
 	b = &bridge{
-		listeners:      common.NewRoutines(),
-		reporters:      common.NewRoutines(),
-		storers:        common.NewRoutines(),
-		events:         make(chan *common.Event, 10),
-		eventMux:       common.NewMux(),
-		eventConverter: common.NewRoutines(),
-		doners:         make(chan transport.Meta, 10),
-		mash:           m,
-		invoker:        transport.NewDefaultInvoker(),
+		listeners: common.NewRoutines(),
+		reporters: common.NewRoutines(),
+		storers:   common.NewRoutines(),
+		events:    make(chan *common.Event, 10),
+		eventMux:  common.NewMux(),
+		doners:    make(chan transport.Meta, 10),
+		mash:      m,
+		invoker:   transport.NewDefaultInvoker(),
 	}
 
 	b.fns.Store(make(map[string]interface{}))
-
-	go func(quit <-chan int, wait *sync.WaitGroup, in <-chan *common.MuxOut, out chan *common.Event) {
-		defer wait.Done()
-		for {
-			select {
-			case _, _ = <-quit:
-				goto clean
-			case v, ok := <-in:
-				if !ok {
-					goto clean
-				}
-				out <- v.Value.(*common.Event)
-			}
-		}
-	clean:
-		// TODO: consuming remaining events
-	}(b.eventConverter.New(), b.eventConverter.Wait(), b.eventMux.Out(), b.events)
+	b.eventMux.Handle(func(val interface{}, _ int) {
+		b.events <- val.(*common.Event)
+	})
 
 	return
 }
@@ -88,11 +72,6 @@ func (me *bridge) Close() (err error) {
 	}
 
 	me.eventMux.Close()
-	err2 = me.eventConverter.Close()
-	if err == nil {
-		err = err2
-	}
-
 	close(me.events)
 	me.events = make(chan *common.Event, 10)
 

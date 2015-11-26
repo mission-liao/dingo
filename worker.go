@@ -39,11 +39,10 @@ type worker struct {
 //
 
 type _workers struct {
-	workersLock    sync.Mutex
-	workers        atomic.Value
-	events         chan *common.Event
-	eventConverter *common.Routines
-	eventMux       *common.Mux
+	workersLock sync.Mutex
+	workers     atomic.Value
+	events      chan *common.Event
+	eventMux    *common.Mux
 }
 
 // allocating a new group of workers
@@ -225,21 +224,19 @@ func (me *_workers) Close() (err error) {
 // factory function
 func newWorkers() (w *_workers, err error) {
 	w = &_workers{
-		eventConverter: common.NewRoutines(),
-		events:         make(chan *common.Event, 10),
-		eventMux:       common.NewMux(),
+		events:   make(chan *common.Event, 10),
+		eventMux: common.NewMux(),
 	}
 
 	w.workers.Store(make(map[string]*worker))
-
-	// a routine to mux multipls event channels from workers,
-	// and output them through a single event channel.
-	go w._event_convert_routine_(w.eventConverter.New(), w.eventConverter.Wait(), w.eventMux.Out(), w.events)
 
 	remain, err := w.eventMux.More(1)
 	if err == nil && remain != 0 {
 		err = errors.New(fmt.Sprintf("Unable to allocate mux routine:%v"))
 	}
+	w.eventMux.Handle(func(val interface{}, _ int) {
+		w.events <- val.(*common.Event)
+	})
 
 	return
 }
@@ -344,20 +341,4 @@ clean:
 			break
 		}
 	}
-}
-
-func (me *_workers) _event_convert_routine_(quit <-chan int, wait *sync.WaitGroup, in <-chan *common.MuxOut, out chan *common.Event) {
-	defer wait.Done()
-	for {
-		select {
-		case _, _ = <-quit:
-			goto clean
-		case v, ok := <-in:
-			if !ok {
-				goto clean
-			}
-			out <- v.Value.(*common.Event)
-		}
-	}
-clean:
 }

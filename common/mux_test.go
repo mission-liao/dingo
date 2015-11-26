@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,35 +32,44 @@ func TestMuxDifferentType(t *testing.T) {
 	ass.Nil(err)
 	ass.NotEqual(0, iInt)
 
-	o := m.Out()
+	// add a handler
+	oStr := make(chan string, 1)
+	oInt := make(chan int, 1)
+	m.Handle(func(val interface{}, idx int) {
+		switch idx {
+		case iStr:
+			oStr <- val.(string)
+		case iInt:
+			oInt <- val.(int)
+		default:
+			ass.Fail(fmt.Sprintf("unknown index: %v", idx))
+		}
+	})
 
 	// send a string
 	cStr <- "test string"
-	v, ok := <-o
-	if ok {
-		s, ok := v.Value.(string)
+	{
+		v, ok := <-oStr
 		ass.True(ok)
 		if ok {
-			ass.Equal("test string", s)
+			ass.Equal("test string", v)
 		}
-		ass.Equal(v.Id, iStr)
 	}
 
 	// send an integer
 	cInt <- 55
-	v, ok = <-o
-	ass.True(ok)
-	if ok {
-		i, ok := v.Value.(int)
+	{
+		v, ok := <-oInt
 		ass.True(ok)
 		if ok {
-			ass.Equal(55, i)
+			ass.Equal(55, v)
 		}
-		ass.Equal(v.Id, iInt)
 	}
 
 	close(cStr)
 	close(cInt)
+	close(oStr)
+	close(oInt)
 }
 
 func TestMuxChannelClose(t *testing.T) {
@@ -74,34 +84,25 @@ func TestMuxChannelClose(t *testing.T) {
 	ch := make(chan string, 2)
 	ch <- "test string 1"
 	ch <- "test string 2"
+	// close before registering
 	close(ch)
 
-	// close before registering
 	id, err := m.Register(ch, 0)
 	ass.Nil(err)
 
-	o := m.Out()
-	v, ok := <-o
-	ass.True(ok)
-	if ok {
-		s, ok := v.Value.(string)
-		ass.True(ok)
-		if ok {
-			ass.Equal("test string 1", s)
+	seq := 0
+	m.Handle(func(val interface{}, idx int) {
+		ass.Equal(id, idx)
+		switch seq {
+		case 0:
+			ass.Equal("test string 1", val.(string))
+		case 1:
+			ass.Equal("test string 2", val.(string))
+		default:
+			ass.Fail(fmt.Sprintf("unknown index: %v", seq))
 		}
-		ass.Equal(v.Id, id)
-	}
-
-	v, ok = <-o
-	ass.True(ok)
-	if ok {
-		s, ok := v.Value.(string)
-		ass.True(ok)
-		if ok {
-			ass.Equal("test string 2", s)
-		}
-		ass.Equal(id, v.Id)
-	}
+		seq++
+	})
 }
 
 func TestMuxOutputClose(t *testing.T) {
@@ -116,28 +117,25 @@ func TestMuxOutputClose(t *testing.T) {
 	id, err := m.Register(ch, 0)
 	ass.Nil(err)
 
-	ch <- 66
-	o := m.Out()
+	o := make(chan int, 1)
+	m.Handle(func(val interface{}, idx int) {
+		ass.Equal(id, idx)
+		o <- int(val.(int))
+	})
 
-	// close now, output channel is closed
+	ch <- 66
+
+	// close now
 	m.Close()
 
 	v, ok := <-o
 	ass.True(ok)
 	if ok {
-		i, ok := v.Value.(int)
-		ass.True(ok)
-		if ok {
-			ass.Equal(66, i)
-		}
-		ass.Equal(v.Id, id)
+		ass.Equal(66, v)
 	}
 
-	// the second time should be failed
-	v, ok = <-o
-	ass.False(ok)
-
 	close(ch)
+	close(o)
 }
 
 func TestMuxIdGeneration(t *testing.T) {
