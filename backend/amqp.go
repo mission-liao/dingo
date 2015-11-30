@@ -91,15 +91,9 @@ func (me *_amqp) Events() ([]<-chan *common.Event, error) {
 }
 
 func (me *_amqp) Close() (err error) {
-	err = me.reporters.Close()
-	err2 := me.stores.Close()
-	if err == nil {
-		err = err2
-	}
-	err2 = me.AmqpConnection.Close()
-	if err == nil {
-		err = err2
-	}
+	me.reporters.Close()
+	me.stores.Close()
+	err = me.AmqpConnection.Close()
 	return
 }
 

@@ -53,15 +53,9 @@ func newDefaultBridge(trans *transport.Mgr) (b *bridge) {
 }
 
 func (me *bridge) Close() (err error) {
-	err = me.listeners.Close()
-	err2 := me.reporters.Close()
-	if err == nil {
-		err = err2
-	}
-	err2 = me.storers.Close()
-	if err == nil {
-		err = err2
-	}
+	me.listeners.Close()
+	me.reporters.Close()
+	me.storers.Close()
 
 	me.eventMux.Close()
 	close(me.events)

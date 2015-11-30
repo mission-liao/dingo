@@ -122,12 +122,8 @@ func (me *_local) Events() ([]<-chan *common.Event, error) {
 }
 
 func (me *_local) Close() (err error) {
-	err = me.brk.Close()
-	err_ := me.listeners.Close()
-	if err == nil {
-		err = err_
-	}
-
+	me.brk.Close()
+	me.listeners.Close()
 	close(me.to)
 	me.to = make(chan []byte, 10)
 	return

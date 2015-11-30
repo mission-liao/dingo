@@ -51,7 +51,7 @@ func (me *Routines) Events() chan *Event {
 
 // stop/release all allocated routines,
 // this function should be safe from multiple calls.
-func (me *Routines) Close() (err error) {
+func (me *Routines) Close() {
 	me.qLock.Lock()
 	defer me.qLock.Unlock()
 
@@ -64,8 +64,6 @@ func (me *Routines) Close() (err error) {
 
 	close(me.events)
 	me.events = make(chan *Event, 10)
-
-	return
 }
 
 // Heterogeneous Routines
@@ -135,7 +133,7 @@ func (me *HetroRoutines) Events() chan *Event {
 	return me.events
 }
 
-func (me *HetroRoutines) Close() (err error) {
+func (me *HetroRoutines) Close() {
 	me.ctrlsLock.Lock()
 	defer me.ctrlsLock.Unlock()
 
@@ -151,7 +149,6 @@ func (me *HetroRoutines) Close() (err error) {
 	}
 
 	me.ctrls = make(map[int]*_control)
-	return
 }
 
 func init() {

@@ -55,7 +55,7 @@ func (me *localBridge) Close() (err error) {
 	me.objLock.Lock()
 	defer me.objLock.Unlock()
 
-	err = me.listeners.Close()
+	me.listeners.Close()
 	me.eventMux.Close()
 
 	close(me.broker)
