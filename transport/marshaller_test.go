@@ -33,7 +33,8 @@ func (me *MarshallerTestSuite) TestTask() {
 
 		// decode
 		if err == nil {
-			t, err := me.m.DecodeTask(nil, b)
+			// provide a fake function as a reference of fingerprint
+			t, err := me.m.DecodeTask(nil, func(float64, string, string) {}, b)
 			me.Nil(err)
 			me.NotNil(t)
 			if t != nil {
@@ -71,7 +72,8 @@ func (me *MarshallerTestSuite) TestReport() {
 
 		// decode
 		if err == nil {
-			r, err := me.m.DecodeReport(nil, b)
+			// provide a fake function as a reference of fingerprint
+			r, err := me.m.DecodeReport(nil, func() (a int64, b float64, c, d string) { return }, b)
 			me.Nil(err)
 			me.NotNil(r)
 			if r != nil {

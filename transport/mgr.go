@@ -34,7 +34,7 @@ func NewMgr() (c *Mgr) {
 	}{}
 	ms[Encode.GOB] = &struct {
 		GobMarshaller
-		GenericInvoker
+		LazyInvoker
 	}{}
 	ms[Encode.Default] = ms[Encode.JSON]
 	c.ms.Store(ms)
@@ -168,7 +168,7 @@ func (me *Mgr) DecodeTask(b []byte) (task *Task, err error) {
 		return
 	}
 
-	task, err = m.DecodeTask(h, b)
+	task, err = m.DecodeTask(h, opt.fn, b)
 	return
 }
 
@@ -215,7 +215,7 @@ func (me *Mgr) DecodeReport(b []byte) (report *Report, err error) {
 		return
 	}
 
-	report, err = m.DecodeReport(h, b)
+	report, err = m.DecodeReport(h, opt.fn, b)
 	return
 }
 

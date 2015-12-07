@@ -22,9 +22,9 @@ var Encode = struct {
 type Marshaller interface {
 	Prepare(name string, fn interface{}) (err error)
 	EncodeTask(task *Task) (b []byte, err error)
-	DecodeTask(h *Header, b []byte) (task *Task, err error)
+	DecodeTask(h *Header, fn interface{}, b []byte) (task *Task, err error)
 	EncodeReport(report *Report) (b []byte, err error)
-	DecodeReport(h *Header, b []byte) (report *Report, err error)
+	DecodeReport(h *Header, fn interface{}, b []byte) (report *Report, err error)
 }
 
 //
@@ -60,7 +60,7 @@ func (me *JsonMarshaller) EncodeTask(task *Task) (b []byte, err error) {
 	return
 }
 
-func (me *JsonMarshaller) DecodeTask(h *Header, b []byte) (task *Task, err error) {
+func (me *JsonMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *Task, err error) {
 	// decode header
 	if h == nil {
 		h, err = DecodeHeader(b)
@@ -104,7 +104,7 @@ func (me *JsonMarshaller) EncodeReport(report *Report) (b []byte, err error) {
 	return
 }
 
-func (me *JsonMarshaller) DecodeReport(h *Header, b []byte) (report *Report, err error) {
+func (me *JsonMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (report *Report, err error) {
 	var payloads reportPayload
 
 	// decode header
@@ -191,7 +191,7 @@ func (me *GobMarshaller) EncodeTask(task *Task) (b []byte, err error) {
 	return
 }
 
-func (me *GobMarshaller) DecodeTask(h *Header, b []byte) (task *Task, err error) {
+func (me *GobMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *Task, err error) {
 	// decode header
 	if h == nil {
 		h, err = DecodeHeader(b)
@@ -233,7 +233,7 @@ func (me *GobMarshaller) EncodeReport(report *Report) (b []byte, err error) {
 	return
 }
 
-func (me *GobMarshaller) DecodeReport(h *Header, b []byte) (report *Report, err error) {
+func (me *GobMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (report *Report, err error) {
 	// decode header
 	if h == nil {
 		h, err = DecodeHeader(b)

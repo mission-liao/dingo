@@ -7,19 +7,7 @@ import (
 	"strings"
 )
 
-//
-// interface of invokers
-//
-type Invoker interface {
-	Call(f interface{}, param []interface{}) ([]interface{}, error)
-	Return(f interface{}, returns []interface{}) ([]interface{}, error)
-}
-
-//
-// Default Invoker
-//
-type GenericInvoker struct {
-}
+type GenericInvoker struct{}
 
 //
 // private function
@@ -165,6 +153,7 @@ func (vk *GenericInvoker) convert(v reflect.Value, t reflect.Type) (reflect.Valu
 	case reflect.Map:
 		err = vk.convert2map(v, elm, t)
 	case reflect.Slice:
+		// TODO: special case for []byte
 		err = vk.convert2slice(v, elm, t)
 	default:
 		err = errors.New(fmt.Sprintf("Unsupported Element Type: %v", elm.Kind().String()))
@@ -244,15 +233,6 @@ func (vk *GenericInvoker) Call(f interface{}, param []interface{}) ([]interface{
 	return out, nil
 }
 
-// when marshal/unmarshal with json, some type information would be lost.
-// this function helps to convert those returns with correct type info provided
-// by function's reflection.
-//
-// parameters:
-// - f: the function
-// - returns: the array of returns
-// returns:
-// converted return array and error
 func (vk *GenericInvoker) Return(f interface{}, returns []interface{}) ([]interface{}, error) {
 	funcT := reflect.TypeOf(f)
 
@@ -281,7 +261,3 @@ func (vk *GenericInvoker) Return(f interface{}, returns []interface{}) ([]interf
 
 	return out, nil
 }
-
-//
-// TODO: Bypass Invoker
-//
