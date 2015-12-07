@@ -177,7 +177,7 @@ func (me *localBridge) StopAllListeners() (err error) {
 		return
 	}
 
-	err = me.listeners.Close()
+	me.listeners.Close()
 	return
 }
 

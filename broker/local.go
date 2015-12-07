@@ -151,6 +151,6 @@ func (me *_local) AddListener(receipts <-chan *Receipt) (tasks <-chan []byte, er
 }
 
 func (me *_local) StopAllListeners() (err error) {
-	err = me.listeners.Close()
+	me.listeners.Close()
 	return
 }

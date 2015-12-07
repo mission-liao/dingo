@@ -81,10 +81,7 @@ func (me *_workers) allocate(
 			}
 
 			if w != nil {
-				err_ := w.rs.Close()
-				if err_ != nil {
-					// TODO: log it?
-				}
+				w.rs.Close()
 			}
 		}
 	}()
