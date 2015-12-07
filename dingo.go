@@ -33,12 +33,11 @@ type App interface {
 	// - count: count of workers to be initialized.
 	// - share: the count of workers sharing one report channel
 	// - taskMash, reportMash: id of transport.Marshaller for 'transport.Task' and 'transport.Report'
-	// - taskIvok, reportIvok: id of transport.Invoker for 'transport.Task' and 'transport.Report'
 	//
 	// returns ->
 	// - remain: remaining count of workers that not initialized.
 	// - err: any error produced
-	Register(name string, fn interface{}, count, share int, taskMash, reportMash int16, taskIvok, reportIvok int16) (remain int, err error)
+	Register(name string, fn interface{}, count, share int, taskMash, reportMash int16) (remain int, err error)
 
 	// attach an instance, instance could be any instance implementing
 	// backend.Reporter, backend.Backend, broker.Producer, broker.Consumer.
@@ -240,7 +239,7 @@ func (me *_app) Close() (err error) {
 	return
 }
 
-func (me *_app) Register(name string, fn interface{}, count, share int, taskMash, reportMash, taskIvok, reportIvok int16) (remain int, err error) {
+func (me *_app) Register(name string, fn interface{}, count, share int, taskMash, reportMash int16) (remain int, err error) {
 	me.objsLock.RLock()
 	defer me.objsLock.RUnlock()
 
@@ -250,7 +249,7 @@ func (me *_app) Register(name string, fn interface{}, count, share int, taskMash
 	)
 
 	// set encoder/decoder
-	err = me.trans.Register(name, fn, taskMash, reportMash, taskIvok, reportIvok)
+	err = me.trans.Register(name, fn, taskMash, reportMash)
 	if err != nil {
 		return
 	}

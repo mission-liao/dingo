@@ -11,10 +11,12 @@ func TestReportMarshal(t *testing.T) {
 	ass := assert.New(t)
 
 	body, err := json.Marshal(&Report{
-		I: "test_id",
-		S: 101,
-		E: &Error{102, "test error"},
-		R: nil,
+		H: NewHeader("test_id", "test_name"),
+		P: &reportPayload{
+			S: 101,
+			E: &Error{102, "test error"},
+			R: nil,
+		},
 	})
 	ass.Nil(err)
 

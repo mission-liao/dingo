@@ -11,9 +11,9 @@ func TestMarshallers(t *testing.T) {
 	ass := assert.New(t)
 	trans := NewMgr()
 	nothing := func() {}
-	ass.Nil(trans.Register("test", nothing, Encode.JSON, Encode.GOB, Invoke.Generic, Invoke.Generic))
+	ass.Nil(trans.Register("test", nothing, Encode.JSON, Encode.GOB))
 	task, err := ComposeTask("test", []interface{}{float64(1)})
-	task.I = "ID"
+	task.H.I = "a2a2da60-9cba-11e5-b690-0002a5d5c51b"
 	ass.Nil(err)
 
 	{
@@ -26,7 +26,7 @@ func TestMarshallers(t *testing.T) {
 		ass.Nil(err)
 
 		// make sure it's json
-		ass.Equal(string(b[h.Length():]), "{\"I\":\"ID\",\"N\":\"test\",\"A\":[1]}")
+		ass.Equal("[1]", string(b[h.Length():]))
 
 		// decode by json
 		t, err := trans.DecodeTask(b)
@@ -47,8 +47,7 @@ func TestMarshallers(t *testing.T) {
 		ass.Nil(err)
 
 		// make sure it's gob
-		ass.Equal(string(b[h.Length():]), "4\xff\x91\x03\x01\x01\x06Report\x01\xff\x92\x00\x01\x05\x01\x01I\x01\f\x00\x01\x01N\x01\f\x00\x01\x01S\x01\x04\x00\x01\x01E\x01\xff\x94\x00\x01\x01R\x01\xff\x82\x00\x00\x00\x1f\xff\x93\x03\x01\x01\x05Error\x01\xff\x94\x00\x01\x02\x01\x01C\x01\x04\x00\x01\x01M\x01\f\x00\x00\x00\f\xff\x81\x02\x01\x02\xff\x82\x00\x01\x10\x00\x008\xff\x92\x01\x02ID\x01\x04test\x01\x06\x01\x02\ntest error\x00\x01\x02\x06string\f\x06\x00\x04test\x05int64\x04\x02\x00\x04\x00")
-
+		ass.Equal("/\xff\x91\x03\x01\x01\rreportPayload\x01\xff\x92\x00\x01\x03\x01\x01S\x01\x04\x00\x01\x01E\x01\xff\x94\x00\x01\x01R\x01\xff\x82\x00\x00\x00\x1f\xff\x93\x03\x01\x01\x05Error\x01\xff\x94\x00\x01\x02\x01\x01C\x01\x04\x00\x01\x01M\x01\f\x00\x00\x00\f\xff\x81\x02\x01\x02\xff\x82\x00\x01\x10\x00\x00.\xff\x92\x01\x06\x01\x02\ntest error\x00\x01\x02\x06string\f\x06\x00\x04test\x05int64\x04\x02\x00\x04\x00", string(b[h.Length():]))
 		// decode by gob
 		r, err := trans.DecodeReport(b)
 		ass.Nil(err)
@@ -65,7 +64,7 @@ func TestInvokers(t *testing.T) {
 
 	ass := assert.New(t)
 	trans := NewMgr()
-	ass.Nil(trans.Register("TestInvokers", fn, Encode.JSON, Encode.JSON, Invoke.Generic, Invoke.Generic))
+	ass.Nil(trans.Register("TestInvokers", fn, Encode.JSON, Encode.JSON))
 
 	// compose a task, with wrong type of input
 	task, err := ComposeTask("TestInvokers", []interface{}{int32(3)})

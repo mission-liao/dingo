@@ -7,13 +7,6 @@ import (
 	"strings"
 )
 
-var Invoke = struct {
-	Default int16
-	Generic int16
-}{
-	0, 1,
-}
-
 //
 // interface of invokers
 //
@@ -25,14 +18,14 @@ type Invoker interface {
 //
 // Default Invoker
 //
-type _genericInvoker struct {
+type GenericInvoker struct {
 }
 
 //
 // private function
 //
 
-func (vk *_genericInvoker) convert2slice(v, r reflect.Value, rt reflect.Type) (err error) {
+func (vk *GenericInvoker) convert2slice(v, r reflect.Value, rt reflect.Type) (err error) {
 	if v.Kind() != reflect.Slice {
 		err = errors.New(fmt.Sprintf("Only Slice not %v convertible to slice", v.Kind().String()))
 		return
@@ -52,7 +45,7 @@ func (vk *_genericInvoker) convert2slice(v, r reflect.Value, rt reflect.Type) (e
 	return
 }
 
-func (vk *_genericInvoker) convert2map(v, r reflect.Value, rt reflect.Type) (err error) {
+func (vk *GenericInvoker) convert2map(v, r reflect.Value, rt reflect.Type) (err error) {
 	if v.Kind() != reflect.Map {
 		err = errors.New(fmt.Sprintf("Only Map not %v convertible to map", v.Kind().String()))
 		return
@@ -76,7 +69,7 @@ func (vk *_genericInvoker) convert2map(v, r reflect.Value, rt reflect.Type) (err
 	return
 }
 
-func (vk *_genericInvoker) convert2struct(v, r reflect.Value, rt reflect.Type) (err error) {
+func (vk *GenericInvoker) convert2struct(v, r reflect.Value, rt reflect.Type) (err error) {
 	kind := v.Kind()
 
 	if !(kind == reflect.Map || kind == reflect.Struct) {
@@ -132,7 +125,7 @@ func (vk *_genericInvoker) convert2struct(v, r reflect.Value, rt reflect.Type) (
 	return err
 }
 
-func (vk *_genericInvoker) convert(v reflect.Value, t reflect.Type) (reflect.Value, error) {
+func (vk *GenericInvoker) convert(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 	var err error
 
 	if v.IsValid() {
@@ -192,7 +185,7 @@ func (vk *_genericInvoker) convert(v reflect.Value, t reflect.Type) (reflect.Val
 //
 // helper function for converting a value based on a type
 //
-func (vk *_genericInvoker) from(val interface{}, t reflect.Type) (reflect.Value, error) {
+func (vk *GenericInvoker) from(val interface{}, t reflect.Type) (reflect.Value, error) {
 	if val == nil {
 		var err error
 
@@ -214,7 +207,7 @@ func (vk *_genericInvoker) from(val interface{}, t reflect.Type) (reflect.Value,
 // reference implementation
 //	  https://github.com/codegangsta/inject/blob/master/inject.go
 //
-func (vk *_genericInvoker) Call(f interface{}, param []interface{}) ([]interface{}, error) {
+func (vk *GenericInvoker) Call(f interface{}, param []interface{}) ([]interface{}, error) {
 	var err error
 
 	funcT := reflect.TypeOf(f)
@@ -260,7 +253,7 @@ func (vk *_genericInvoker) Call(f interface{}, param []interface{}) ([]interface
 // - returns: the array of returns
 // returns:
 // converted return array and error
-func (vk *_genericInvoker) Return(f interface{}, returns []interface{}) ([]interface{}, error) {
+func (vk *GenericInvoker) Return(f interface{}, returns []interface{}) ([]interface{}, error) {
 	funcT := reflect.TypeOf(f)
 
 	// make sure parameter matched

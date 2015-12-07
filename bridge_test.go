@@ -67,7 +67,6 @@ func (me *BridgeTestSuite) _TestSendTask() {
 		"SendTask",
 		func() {},
 		transport.Encode.Default, transport.Encode.Default,
-		transport.Invoke.Default, transport.Invoke.Default,
 	)
 
 	// add listener
@@ -99,7 +98,6 @@ func (me *BridgeTestSuite) _TestAddListener() {
 		"AddListener",
 		func() {},
 		transport.Encode.Default, transport.Encode.Default,
-		transport.Invoke.Default, transport.Invoke.Default,
 	)
 
 	// prepare listeners
@@ -164,7 +162,6 @@ func (me *BridgeTestSuite) _TestReport() {
 		"Report",
 		func() {},
 		transport.Encode.Default, transport.Encode.Default,
-		transport.Invoke.Default, transport.Invoke.Default,
 	))
 
 	// attach reporter channel
@@ -206,7 +203,6 @@ func (me *BridgeTestSuite) _TestPoll() {
 		"Poll",
 		func() {},
 		transport.Encode.Default, transport.Encode.Default,
-		transport.Invoke.Default, transport.Invoke.Default,
 	))
 	count := 1
 

@@ -11,70 +11,99 @@ func TestHeader(t *testing.T) {
 
 	// basic case
 	{
-		id := "test string dkjgdlfjgldjfg"
+		id := "041ebfa0-9b6e-11e5-ae12-0002a5d5c51b"
 		name := "test"
-		mashID := int16(19)
 
-		b := EncodeHeader(id, name, mashID)
-		m, err := DecodeHeader(b)
+		b, err := NewHeader(id, name).Flush()
 		ass.Nil(err)
-		ass.Equal(name, m.Name())
-		ass.Equal(mashID, m.MashID())
-		ass.Equal(id, m.ID())
+
+		h, err := DecodeHeader(b)
+		ass.Nil(err)
+		ass.Equal(name, h.Name())
+		ass.Equal(id, h.ID())
 	}
 
 	// zero length id
 	{
 		id := ""
 		name := "test"
-		mashID := int16(25)
 
-		b := EncodeHeader(id, name, mashID)
-		m, err := DecodeHeader(b)
-		ass.Nil(err)
-		ass.Equal(name, m.Name())
-		ass.Equal(mashID, m.MashID())
-		ass.Equal(id, m.ID())
+		_, err := NewHeader(id, name).Flush()
+		ass.NotNil(err)
 	}
 
-	// zero length name
+	// zero length name, should be ok
 	{
-		id := "kjfkljkjalksdjfkajdlfkjadklfjakldfjkadjflakjdf"
+		id := "4c257820-9b6e-11e5-b7d5-0002a5d5c51b"
 		name := ""
-		mashID := int16(35)
 
-		b := EncodeHeader(id, name, mashID)
-		m, err := DecodeHeader(b)
+		b, err := NewHeader(id, name).Flush()
 		ass.Nil(err)
-		ass.Equal(name, m.Name())
-		ass.Equal(mashID, m.MashID())
-		ass.Equal(id, m.ID())
-	}
 
-	// zero length name, id
-	{
-		id := ""
-		name := ""
-		mashID := int16(2345)
-
-		b := EncodeHeader(id, name, mashID)
-		m, err := DecodeHeader(b)
+		h, err := DecodeHeader(b)
 		ass.Nil(err)
-		ass.Equal(name, m.Name())
-		ass.Equal(mashID, m.MashID())
-		ass.Equal(id, m.ID())
+		ass.Equal(name, h.Name())
+		ass.Equal(id, h.ID())
 	}
 
 	// wrong version
 	{
-		id := ""
+		id := "7dd224e0-9b6e-11e5-aa62-0002a5d5c51b"
 		name := ""
-		mashID := int16(23145)
 
-		b := EncodeHeader(id, name, mashID)
+		b, err := NewHeader(id, name).Flush()
+		ass.Nil(err)
+
 		b[0] ^= 0xff
-		m, err := DecodeHeader(b)
+		h, err := DecodeHeader(b)
 		ass.NotNil(err)
-		ass.Nil(m)
+		ass.Nil(h)
+	}
+
+	// length is not enough
+	{
+		id := "7dd224e0-9b6e-11e5-aa62-0002a5d5c51b"
+		name := ""
+
+		b, err := NewHeader(id, name).Flush()
+		ass.Nil(err)
+
+		h, err := DecodeHeader(b[:48])
+		ass.NotNil(err)
+		ass.Nil(h)
+	}
+
+	// payloads
+	{
+		id := "7dd224e0-9b6e-11e5-aa62-0002a5d5c51b"
+		name := "test"
+
+		h := NewHeader(id, name)
+
+		// append several dummy payloads
+		for i := 0; i < 1000; i++ {
+			h.AddPayload(10)
+		}
+
+		b, err := h.Flush()
+		ass.Nil(err)
+
+		h, err = DecodeHeader(b)
+		ass.Nil(err)
+		ass.NotNil(h)
+		ass.Len(h.Payloads(), 1000)
+		for _, v := range h.Payloads() {
+			ass.Equal(uint64(10), v)
+		}
+
+		// reset
+		h.ResetPayloads()
+		b, err = h.Flush()
+		ass.Nil(err)
+
+		h, err = DecodeHeader(b)
+		ass.Nil(err)
+		ass.NotNil(h)
+		ass.Len(h.Payloads(), 0)
 	}
 }

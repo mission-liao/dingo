@@ -1,11 +1,14 @@
 package transport
 
-type Report struct {
-	I string
-	N string
+type reportPayload struct {
 	S int16
 	E *Error
 	R []interface{}
+}
+
+type Report struct {
+	H *Header
+	P *reportPayload
 }
 
 var Status = struct {
@@ -33,25 +36,25 @@ var Status = struct {
 //
 // getter
 //
-func (r *Report) ID() string            { return r.I }
-func (r *Report) Name() string          { return r.N }
-func (r *Report) Status() int16         { return r.S }
-func (r *Report) Err() *Error           { return r.E }
-func (r *Report) Return() []interface{} { return r.R }
+func (r *Report) ID() string            { return r.H.I }
+func (r *Report) Name() string          { return r.H.N }
+func (r *Report) Status() int16         { return r.P.S }
+func (r *Report) Err() *Error           { return r.P.E }
+func (r *Report) Return() []interface{} { return r.P.R }
 
 //
 // setter
 //
-func (r *Report) SetReturn(ret []interface{}) { r.R = ret }
+func (r *Report) SetReturn(ret []interface{}) { r.P.R = ret }
 
 //
 // checker
 //
-func (r *Report) Valid() bool { return r.S == Status.None }
-func (r *Report) Done() bool  { return r.S == Status.Done || r.S == Status.Fail }
+func (r *Report) Valid() bool { return r.P.S == Status.None }
+func (r *Report) Done() bool  { return r.P.S == Status.Done || r.P.S == Status.Fail }
 func (r *Report) Equal(other *Report) bool {
 	if other == nil {
 		return false
 	}
-	return r.S == other.S
+	return r.P.S == other.P.S
 }

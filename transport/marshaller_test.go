@@ -33,10 +33,12 @@ func (me *MarshallerTestSuite) TestTask() {
 
 		// decode
 		if err == nil {
-			t, err := me.m.DecodeTask(b)
+			t, err := me.m.DecodeTask(nil, b)
 			me.Nil(err)
 			me.NotNil(t)
-			me.True(t.Equal(task))
+			if t != nil {
+				me.True(t.Equal(task))
+			}
 		}
 	}
 
@@ -69,10 +71,12 @@ func (me *MarshallerTestSuite) TestReport() {
 
 		// decode
 		if err == nil {
-			r, err := me.m.DecodeReport(b)
+			r, err := me.m.DecodeReport(nil, b)
 			me.Nil(err)
 			me.NotNil(r)
-			me.True(r.Equal(report))
+			if r != nil {
+				me.True(r.Equal(report))
+			}
 		}
 	}
 
@@ -94,7 +98,7 @@ type jsonMarshallerTestSuite struct {
 func TestJsonMarshallerSuite(t *testing.T) {
 	suite.Run(t, &jsonMarshallerTestSuite{
 		MarshallerTestSuite{
-			m: &jsonMarshaller{},
+			m: &JsonMarshaller{},
 		},
 	})
 }
@@ -110,7 +114,7 @@ type gobMarshallerTestSuite struct {
 func TestGobMarshallerSuite(t *testing.T) {
 	suite.Run(t, &gobMarshallerTestSuite{
 		MarshallerTestSuite{
-			m: &gobMarshaller{},
+			m: &GobMarshaller{},
 		},
 	})
 }

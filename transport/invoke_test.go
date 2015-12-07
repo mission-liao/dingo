@@ -107,7 +107,7 @@ type InvokeJsonTestSuite struct {
 func TestInvokeJsonSuite(t *testing.T) {
 	suite.Run(t, &InvokeJsonTestSuite{
 		InvokeTestSuite{
-			ivk:     &_genericInvoker{},
+			ivk:     &GenericInvoker{},
 			convert: ioJSON,
 		},
 	})
@@ -149,7 +149,7 @@ func TestInvokeGobSuite(t *testing.T) {
 
 	suite.Run(t, &InvokeGobTestSuite{
 		InvokeTestSuite{
-			ivk:     &_genericInvoker{},
+			ivk:     &GenericInvoker{},
 			convert: ioGOB,
 		},
 	})

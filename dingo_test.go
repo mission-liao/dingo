@@ -69,7 +69,6 @@ func (me *DingoTestSuite) TestBasic() {
 			return n + 1
 		}, 1, 1,
 		transport.Encode.Default, transport.Encode.Default,
-		transport.Invoke.Default, transport.Invoke.Default,
 	)
 	me.Equal(0, remain)
 	me.Nil(err)

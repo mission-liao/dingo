@@ -49,7 +49,6 @@ func (me *WorkerTestSuite) TestParellelRun() {
 	me._trans.Register(
 		"", fn,
 		transport.Encode.Default, transport.Encode.Default,
-		transport.Invoke.Default, transport.Invoke.Default,
 	)
 	reports, remain, err := me._ws.allocate("", tasks, nil, 3, 0)
 	me.Nil(err)

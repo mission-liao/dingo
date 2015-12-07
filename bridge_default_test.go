@@ -60,7 +60,6 @@ func (me *DefaultBridgeTestSuite) TestReturnFix() {
 		"ReturnFix",
 		func() float64 { return 0 },
 		transport.Encode.Default, transport.Encode.Default,
-		transport.Invoke.Default, transport.Invoke.Default,
 	))
 
 	// compose a task
