@@ -142,7 +142,7 @@ func (me *Mgr) EncodeTask(task *Task) (b []byte, err error) {
 		return
 	}
 
-	b, err = m.EncodeTask(task)
+	b, err = m.EncodeTask(opt.fn, task)
 	return
 }
 
@@ -189,7 +189,7 @@ func (me *Mgr) EncodeReport(report *Report) (b []byte, err error) {
 		return
 	}
 
-	b, err = m.EncodeReport(report)
+	b, err = m.EncodeReport(opt.fn, report)
 	return
 }
 

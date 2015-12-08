@@ -242,7 +242,9 @@ func (s *InvokerTestSuite) TestStruct() {
 					f, ok := ret[0].(**TestStruct)
 					s.True(ok)
 					if ok {
-						s.Equal((**TestStruct)(nil), f)
+						// JsonSafeMarshaller would match the second case,
+						// instead of the first one.
+						s.True((**TestStruct)(nil) == f || (*TestStruct)(nil) == *f)
 					}
 				}
 			}

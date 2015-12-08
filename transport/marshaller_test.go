@@ -25,16 +25,18 @@ func (me *MarshallerTestSuite) TestTask() {
 		return
 	}
 
+	fn := func(float64, string, string) {}
+
 	{
 		// encode
-		b, err := me.m.EncodeTask(task)
+		b, err := me.m.EncodeTask(fn, task)
 		me.Nil(err)
 		me.NotNil(b)
 
 		// decode
 		if err == nil {
 			// provide a fake function as a reference of fingerprint
-			t, err := me.m.DecodeTask(nil, func(float64, string, string) {}, b)
+			t, err := me.m.DecodeTask(nil, fn, b)
 			me.Nil(err)
 			me.NotNil(t)
 			if t != nil {
@@ -45,7 +47,7 @@ func (me *MarshallerTestSuite) TestTask() {
 
 	// nil case
 	{
-		_, err := me.m.EncodeTask(nil)
+		_, err := me.m.EncodeTask(fn, nil)
 		me.NotNil(err)
 	}
 }
@@ -56,6 +58,7 @@ func (me *MarshallerTestSuite) TestReport() {
 	if err != nil {
 		return
 	}
+	fn := func() (a int64, b float64, c, d string) { return }
 
 	{
 		report, err := task.ComposeReport(
@@ -66,14 +69,15 @@ func (me *MarshallerTestSuite) TestReport() {
 		me.Nil(err)
 
 		// encode
-		b, err := me.m.EncodeReport(report)
+		b, err := me.m.EncodeReport(fn, report)
 		me.Nil(err)
 		me.NotNil(b)
 
 		// decode
 		if err == nil {
+			_ = "breakpoint"
 			// provide a fake function as a reference of fingerprint
-			r, err := me.m.DecodeReport(nil, func() (a int64, b float64, c, d string) { return }, b)
+			r, err := me.m.DecodeReport(nil, fn, b)
 			me.Nil(err)
 			me.NotNil(r)
 			if r != nil {
@@ -84,7 +88,7 @@ func (me *MarshallerTestSuite) TestReport() {
 
 	// nil case
 	{
-		_, err := me.m.EncodeReport(nil)
+		_, err := me.m.EncodeReport(fn, nil)
 		me.NotNil(err)
 	}
 }
@@ -117,6 +121,22 @@ func TestGobMarshallerSuite(t *testing.T) {
 	suite.Run(t, &gobMarshallerTestSuite{
 		MarshallerTestSuite{
 			m: &GobMarshaller{},
+		},
+	})
+}
+
+//
+// JsonSafe
+//
+
+type jsonSafeMarshallerTestSuite struct {
+	MarshallerTestSuite
+}
+
+func TestJsonSafeMarshallerSuite(t *testing.T) {
+	suite.Run(t, &jsonSafeMarshallerTestSuite{
+		MarshallerTestSuite{
+			m: &JsonSafeMarshaller{},
 		},
 	})
 }

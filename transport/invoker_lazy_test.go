@@ -70,3 +70,36 @@ func (s *InvokerLazyGobTestSuite) TestReturn() {
 	_, ok = v[1].(*_test_embed)
 	s.True(ok)
 }
+
+//
+// json-safe
+//
+
+type InvokerLazyJsonSafeTestSuite struct {
+	InvokerTestSuite
+}
+
+func TestInvokerLazyJsonSafeSuite(t *testing.T) {
+	m := JsonSafeMarshaller{}
+	suite.Run(t, &InvokerLazyJsonSafeTestSuite{
+		InvokerTestSuite{
+			ivk: &LazyInvoker{},
+			convert: func(f interface{}, args ...interface{}) (v []interface{}, err error) {
+				// encode
+				b, offs, err := m.encode(args)
+				if err != nil {
+					return
+				}
+
+				// decode
+				funcT := reflect.TypeOf(f)
+				v, _, err = m.decode(b, offs, func(i int) reflect.Type {
+					// for invoker, we mainly focus on input
+					return funcT.In(i)
+				})
+
+				return
+			},
+		},
+	})
+}

@@ -28,20 +28,7 @@ func (vk *LazyInvoker) Call(f interface{}, param []interface{}) ([]interface{}, 
 		// special handle for pointer
 		t := funcT.In(i)
 		if t.Kind() == reflect.Ptr {
-			v_ := reflect.New(t)
-			r_ := v_ // cache the value corresponding to required type
-			if v.IsValid() {
-				for t.Kind() == reflect.Ptr {
-					t = t.Elem()
-					v_.Elem().Set(reflect.New(t))
-					v_ = v_.Elem()
-				}
-				for v.Kind() == reflect.Ptr {
-					v = v.Elem()
-				}
-				v_.Elem().Set(v)
-			}
-			in[i] = r_.Elem()
+			in[i] = *vk.toPointer(t, v)
 		} else {
 			in[i] = v
 		}
@@ -63,5 +50,60 @@ func (vk *LazyInvoker) Call(f interface{}, param []interface{}) ([]interface{}, 
 }
 
 func (vk *LazyInvoker) Return(f interface{}, returns []interface{}) ([]interface{}, error) {
+	funcT := reflect.TypeOf(f)
+	if len(returns) != funcT.NumOut() {
+		return nil, errors.New(fmt.Sprintf("Parameter Count mismatch: %v %v", len(returns), funcT.NumOut()))
+	}
+
+	for k, v := range returns {
+		t := funcT.Out(k)
+		// special handle for pointer
+		if t.Kind() == reflect.Ptr {
+			r := *vk.toPointer(t, reflect.ValueOf(v))
+			if r.CanInterface() {
+				returns[k] = r.Interface()
+			} else {
+				return nil, errors.New(fmt.Sprintf("can't interface of %v from %d:%v", r, k, v))
+			}
+		}
+	}
+
 	return returns, nil
+}
+
+//
+// private function
+//
+
+func (vk *LazyInvoker) toPointer(t reflect.Type, v reflect.Value) *reflect.Value {
+	if t.Kind() != reflect.Ptr {
+		return &v
+	}
+
+	v_ := reflect.New(t)
+	r_ := v_.Elem()
+	if v.IsValid() {
+		for t.Kind() == reflect.Ptr {
+			t = t.Elem()
+			if t.Kind() == reflect.Ptr {
+				v_.Elem().Set(reflect.New(t))
+				v_ = v_.Elem()
+			} else {
+				if v.Kind() != reflect.Ptr {
+					v_.Elem().Set(reflect.New(t))
+					v_ = v_.Elem()
+				}
+			}
+		}
+		for v.Kind() == reflect.Ptr {
+			if v.Elem().Kind() == reflect.Ptr {
+				v = v.Elem()
+			} else {
+				break
+			}
+		}
+		v_.Elem().Set(v)
+	}
+
+	return &r_
 }
