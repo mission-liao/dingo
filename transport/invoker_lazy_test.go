@@ -2,10 +2,15 @@ package transport
 
 import (
 	"encoding/gob"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 )
+
+//
+// gob
+//
 
 type InvokerLazyGobTestSuite struct {
 	InvokerTestSuite
@@ -47,4 +52,21 @@ func (s *InvokerLazyGobTestSuite) TestSliceOfStruct() {
 		&TestStruct{Name: "Tom", Count: 12},
 		&TestStruct{},
 	})
+}
+
+func (s *InvokerLazyGobTestSuite) TestReturn() {
+	// struct & *struct would be marshalled to the same
+	// stuff by god, we need to take care of that.
+	fn := func() (a *TestStruct, b *_test_embed) { return }
+
+	v, err := s.convert(fn, &TestStruct{}, &_test_embed{})
+	s.Nil(err)
+	v, err = s.ivk.Return(fn, v)
+	s.Nil(err)
+
+	// check each type
+	_, ok := v[0].(*TestStruct)
+	s.True(ok)
+	_, ok = v[1].(*_test_embed)
+	s.True(ok)
 }
