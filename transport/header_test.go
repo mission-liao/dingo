@@ -82,7 +82,7 @@ func TestHeader(t *testing.T) {
 
 		// append several dummy payloads
 		for i := 0; i < 1000; i++ {
-			h.AddPayload(10)
+			h.Append(10)
 		}
 
 		b, err := h.Flush()
@@ -91,28 +91,28 @@ func TestHeader(t *testing.T) {
 		h, err = DecodeHeader(b)
 		ass.Nil(err)
 		ass.NotNil(h)
-		ass.Len(h.Payloads(), 1000)
-		for _, v := range h.Payloads() {
+		ass.Len(h.Registry(), 1000)
+		for _, v := range h.Registry() {
 			ass.Equal(uint64(10), v)
 		}
 
 		// reset
-		h.ResetPayloads()
+		h.Reset()
 		b, err = h.Flush()
 		ass.Nil(err)
 
 		h, err = DecodeHeader(b)
 		ass.Nil(err)
 		ass.NotNil(h)
-		ass.Len(h.Payloads(), 0)
+		ass.Len(h.Registry(), 0)
 
 		// flush with reset
 		for i := 0; i < 1000; i++ {
-			h.AddPayload(10)
+			h.Append(10)
 		}
-		ass.Len(h.Payloads(), 1000)
+		ass.Len(h.Registry(), 1000)
 		_, err = h.Flush()
 		ass.Nil(err)
-		ass.Len(h.Payloads(), 0)
+		ass.Len(h.Registry(), 0)
 	}
 }

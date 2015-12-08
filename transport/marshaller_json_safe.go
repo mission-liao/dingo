@@ -33,7 +33,7 @@ func (me *JsonSafeMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, 
 		return
 	}
 	for _, v := range offs {
-		task.H.AddPayload(v)
+		task.H.Append(v)
 	}
 
 	// encode header
@@ -55,7 +55,7 @@ func (me *JsonSafeMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (t
 		}
 	}
 
-	funcT, ps := reflect.TypeOf(fn), h.Payloads()
+	funcT, ps := reflect.TypeOf(fn), h.Registry()
 	if funcT.NumIn() != len(ps) {
 		err = errors.New(fmt.Sprintf("Unable to decode task, because its count of payload is wrong: %v %v", ps, fn))
 		return
@@ -118,7 +118,7 @@ func (me *JsonSafeMarshaller) EncodeReport(fn interface{}, report *Report) (b []
 	}
 
 	for _, v := range offs {
-		report.H.AddPayload(v)
+		report.H.Append(v)
 	}
 
 	// encode header
@@ -140,7 +140,7 @@ func (me *JsonSafeMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) 
 		}
 	}
 
-	funcT, ps := reflect.TypeOf(fn), h.Payloads()
+	funcT, ps := reflect.TypeOf(fn), h.Registry()
 	if funcT.NumOut()+2 != len(ps) {
 		err = errors.New(fmt.Sprintf("Unable to decode report, because its count of payload is wrong: %v %v", ps, fn))
 		return

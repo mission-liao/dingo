@@ -13,13 +13,13 @@ type Meta interface {
 }
 
 const idLen int = 36
-const maxCountOfPayloads uint64 = uint64(^uint32(0))
+const maxCountOfRegistries uint64 = uint64(^uint32(0))
 
 type Header struct {
 	T int16    // header type
 	I string   // dingo-generated id
 	N string   // task name
-	P []uint64 // offsets in bytes of each payload
+	R []uint64 // a serious of uint, Marshaller would decide their usage
 }
 
 //
@@ -29,15 +29,15 @@ type Header struct {
 func (me *Header) Type() int16    { return me.T }
 func (me *Header) ID() string     { return me.I }
 func (me *Header) Name() string   { return me.N }
-func (me *Header) Length() uint64 { return uint64(50 + 8*len(me.P) + len(me.N)) }
+func (me *Header) Length() uint64 { return uint64(50 + 8*len(me.R) + len(me.N)) }
 func (me *Header) Flush() ([]byte, error) {
-	defer me.ResetPayloads()
+	defer me.Reset()
 
 	if len(me.I) != idLen {
 		return nil, errors.New(fmt.Sprintf("length of id should be equal to %v, not [%v]", idLen, me.I))
 	}
 
-	// type(2) || total-length(8) || id(36) || count of payload(4) || payloads(?) || name(?)
+	// type(2) || total-length(8) || id(36) || count of registries(4) || registries(?) || name(?)
 	length := me.Length()
 	b := make([]byte, length)
 
@@ -50,26 +50,26 @@ func (me *Header) Flush() ([]byte, error) {
 	// id -- 36 bytes
 	copy(b[10:46], me.I)
 
-	// count of payload -- 4 bytes
-	cntOfPayloads := uint64(len(me.P))
-	if cntOfPayloads >= maxCountOfPayloads {
-		return nil, errors.New(fmt.Sprintf("count of payloads exceeds maximum: %v", cntOfPayloads))
+	// count of registries -- 4 bytes
+	cntOfRegistries := uint64(len(me.R))
+	if cntOfRegistries >= maxCountOfRegistries {
+		return nil, errors.New(fmt.Sprintf("count of registries exceeds maximum: %v", cntOfRegistries))
 	}
-	binary.PutUvarint(b[46:50], cntOfPayloads)
+	binary.PutUvarint(b[46:50], cntOfRegistries)
 
-	// payloads
-	for i, v := range me.P {
+	// registries
+	for i, v := range me.R {
 		binary.PutUvarint(b[50+i*8:], v)
 	}
 
 	// name
-	copy(b[50+len(me.P)*8:length], me.N)
+	copy(b[50+len(me.R)*8:length], me.N)
 
 	return b, nil
 }
-func (me *Header) Payloads() []uint64       { return me.P }
-func (me *Header) ResetPayloads()           { me.P = []uint64{} }
-func (me *Header) AddPayload(offset uint64) { me.P = append(me.P, offset) }
+func (me *Header) Registry() []uint64 { return me.R }
+func (me *Header) Reset()             { me.R = []uint64{} }
+func (me *Header) Append(r uint64)    { me.R = append(me.R, r) }
 
 func NewHeader(id, name string) *Header {
 	return &Header{
@@ -109,29 +109,29 @@ func DecodeHeader(b []byte) (h *Header, err error) {
 		return
 	}
 
-	// count of payloads
+	// count of registries
 	C, err := binary.ReadUvarint(bytes.NewBuffer(b[46:50]))
 	if (50 + C*8) > L {
-		err = errors.New(fmt.Sprintf("payload count is %v, when length is %v", C, L))
+		err = errors.New(fmt.Sprintf("registries count is %v, when length is %v", C, L))
 		return
 	}
 
-	// payloads
-	Ps := []uint64{}
-	var P uint64
+	// registries
+	Rs := []uint64{}
+	var R uint64
 	for i := uint64(0); i < C; i++ {
-		P, err = binary.ReadUvarint(bytes.NewBuffer(b[50+i*8 : 50+(i+1)*8]))
+		R, err = binary.ReadUvarint(bytes.NewBuffer(b[50+i*8 : 50+(i+1)*8]))
 		if err != nil {
 			return
 		}
-		Ps = append(Ps, P)
+		Rs = append(Rs, R)
 	}
 
 	h = &Header{
 		T: int16(T),
 		I: string(b[10:46]),
 		N: string(b[50+C*8 : L]),
-		P: Ps,
+		R: Rs,
 	}
 	return
 }
