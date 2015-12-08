@@ -105,5 +105,14 @@ func TestHeader(t *testing.T) {
 		ass.Nil(err)
 		ass.NotNil(h)
 		ass.Len(h.Payloads(), 0)
+
+		// flush with reset
+		for i := 0; i < 1000; i++ {
+			h.AddPayload(10)
+		}
+		ass.Len(h.Payloads(), 1000)
+		_, err = h.Flush()
+		ass.Nil(err)
+		ass.Len(h.Payloads(), 0)
 	}
 }

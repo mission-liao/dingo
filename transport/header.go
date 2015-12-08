@@ -1,7 +1,5 @@
 package transport
 
-// TODO: the first 2 bytes should be the version of header format
-
 import (
 	"bytes"
 	"encoding/binary"
@@ -33,6 +31,8 @@ func (me *Header) ID() string     { return me.I }
 func (me *Header) Name() string   { return me.N }
 func (me *Header) Length() uint64 { return uint64(50 + 8*len(me.P) + len(me.N)) }
 func (me *Header) Flush() ([]byte, error) {
+	defer me.ResetPayloads()
+
 	if len(me.I) != idLen {
 		return nil, errors.New(fmt.Sprintf("length of id should be equal to %v, not [%v]", idLen, me.I))
 	}
