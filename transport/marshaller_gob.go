@@ -3,136 +3,12 @@ package transport
 import (
 	"bytes"
 	"encoding/gob"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
 )
 
-var Encode = struct {
-	Default int16
-	JSON    int16
-	GOB     int16
-}{
-	0, 1, 2,
-}
-
-// requirement:
-// - each function should be thread-safe
-type Marshaller interface {
-	Prepare(name string, fn interface{}) (err error)
-	EncodeTask(task *Task) (b []byte, err error)
-	DecodeTask(h *Header, fn interface{}, b []byte) (task *Task, err error)
-	EncodeReport(report *Report) (b []byte, err error)
-	DecodeReport(h *Header, fn interface{}, b []byte) (report *Report, err error)
-}
-
-//
-// JSON
-//
-
-type JsonMarshaller struct {
-}
-
-func (me *JsonMarshaller) Prepare(string, interface{}) (err error) {
-	return
-}
-
-func (me *JsonMarshaller) EncodeTask(task *Task) (b []byte, err error) {
-	if task == nil {
-		err = errors.New("nil is not acceptable")
-		return
-	}
-
-	// encode header
-	bHead, err := task.H.Flush()
-	if err != nil {
-		return
-	}
-
-	// encode payload
-	bArgs, err := json.Marshal(task.Args())
-	if err != nil {
-		return
-	}
-
-	b = append(bHead, bArgs...)
-	return
-}
-
-func (me *JsonMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *Task, err error) {
-	// decode header
-	if h == nil {
-		h, err = DecodeHeader(b)
-		if err != nil {
-			return
-		}
-	}
-
-	// decode payload
-	var args []interface{}
-	err = json.Unmarshal(b[h.Length():], &args)
-	if err == nil {
-		task = &Task{
-			H: h,
-			A: args,
-		}
-	}
-
-	return
-}
-
-func (me *JsonMarshaller) EncodeReport(report *Report) (b []byte, err error) {
-	if report == nil {
-		err = errors.New("nil is not acceptable")
-		return
-	}
-
-	// encode header
-	bHead, err := report.H.Flush()
-	if err != nil {
-		return
-	}
-
-	// encode payload
-	bPayload, err := json.Marshal(report.P)
-	if err != nil {
-		return
-	}
-
-	b = append(bHead, bPayload...)
-	return
-}
-
-func (me *JsonMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (report *Report, err error) {
-	var payloads reportPayload
-
-	// decode header
-	if h == nil {
-		h, err = DecodeHeader(b)
-		if err != nil {
-			return
-		}
-	}
-
-	// decode payload
-	err = json.Unmarshal(b[h.Length():], &payloads)
-	if err == nil {
-		report = &Report{
-			H: h,
-			P: &payloads,
-		}
-	}
-
-	return
-}
-
-//
-// Gob
-//
-
-type GobMarshaller struct {
-}
+type GobMarshaller struct{}
 
 // Gob needs to register type before encode/decode
 func (me *GobMarshaller) Prepare(name string, fn interface{}) (err error) {
@@ -170,7 +46,7 @@ func (me *GobMarshaller) Prepare(name string, fn interface{}) (err error) {
 	return
 }
 
-func (me *GobMarshaller) EncodeTask(task *Task) (b []byte, err error) {
+func (me *GobMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, err error) {
 	if task == nil {
 		err = errors.New("nil is bad for Gob")
 		return
@@ -212,7 +88,7 @@ func (me *GobMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *
 	return
 }
 
-func (me *GobMarshaller) EncodeReport(report *Report) (b []byte, err error) {
+func (me *GobMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte, err error) {
 	if report == nil {
 		err = errors.New("nil is bad for Gob")
 		return
