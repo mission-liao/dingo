@@ -40,7 +40,8 @@ func (me *MarshallerTestSuite) TestTask() {
 			me.Nil(err)
 			me.NotNil(t)
 			if t != nil {
-				me.True(t.Equal(task))
+				// me.True(t.Equal(task))
+				me.Equal(t.H, task.H)
 				me.True(t.Option().IgnoreReport())
 			}
 		}
@@ -54,17 +55,17 @@ func (me *MarshallerTestSuite) TestTask() {
 }
 
 func (me *MarshallerTestSuite) TestReport() {
-	task, err := ComposeTask("test", &Option{IR: true}, []interface{}{int64(1), float64(1.5), "user", "password"})
+	task, err := ComposeTask("test", &Option{IR: true}, nil)
 	me.Nil(err)
 	if err != nil {
 		return
 	}
-	fn := func() (a int64, b float64, c, d string) { return }
+	fn := func() (a float64, b, c string) { return }
 
 	{
 		report, err := task.ComposeReport(
 			Status.Sent,
-			[]interface{}{int64(2), float64(2.5), "user", "password"},
+			[]interface{}{float64(2.5), "user", "password"},
 			errors.New("test error"),
 		)
 		me.Nil(err)

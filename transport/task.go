@@ -66,5 +66,5 @@ func (t *Task) ComposeReport(s int16, r []interface{}, err interface{}) (*Report
 
 // TODO: is this function useful?
 func (t *Task) Equal(other *Task) bool {
-	return t.H.N == other.H.N && reflect.DeepEqual(t.P.A, other.P.A)
+	return reflect.DeepEqual(t, other)
 }

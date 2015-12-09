@@ -1,5 +1,9 @@
 package transport
 
+import (
+	"reflect"
+)
+
 type reportPayload struct {
 	S int16
 	E *Error
@@ -54,11 +58,9 @@ func (r *Report) SetReturn(ret []interface{}) { r.P.R = ret }
 //
 func (r *Report) Valid() bool { return r.P.S == Status.None }
 func (r *Report) Done() bool  { return r.P.S == Status.Done || r.P.S == Status.Fail }
-
-// TODO: is this function useful?
 func (r *Report) Equal(other *Report) bool {
 	if other == nil {
 		return false
 	}
-	return r.P.S == other.P.S
+	return reflect.DeepEqual(r, other)
 }

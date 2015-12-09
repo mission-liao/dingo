@@ -45,6 +45,13 @@ func (me *JsonMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task 
 		}
 	}
 
+	// clean registry when leaving
+	defer func() {
+		if h != nil {
+			h.Reset()
+		}
+	}()
+
 	// decode payload
 	var payload *taskPayload
 	err = json.Unmarshal(b[h.Length():], &payload)
@@ -92,6 +99,13 @@ func (me *JsonMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (rep
 			return
 		}
 	}
+
+	// clean registry when leaving
+	defer func() {
+		if h != nil {
+			h.Reset()
+		}
+	}()
 
 	// decode payload
 	err = json.Unmarshal(b[h.Length():], &payloads)

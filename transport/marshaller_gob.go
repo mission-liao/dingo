@@ -79,6 +79,13 @@ func (me *GobMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *
 		}
 	}
 
+	// clean registry when leaving
+	defer func() {
+		if h != nil {
+			h.Reset()
+		}
+	}()
+
 	// decode payload
 	var payload *taskPayload
 	err = gob.NewDecoder(bytes.NewBuffer(b[h.Length():])).Decode(&payload)
@@ -123,6 +130,13 @@ func (me *GobMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (repo
 			return
 		}
 	}
+
+	// clean registry when leaving
+	defer func() {
+		if h != nil {
+			h.Reset()
+		}
+	}()
 
 	// decode payload
 	var payload *reportPayload

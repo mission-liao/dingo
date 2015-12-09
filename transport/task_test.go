@@ -26,6 +26,8 @@ func TestTaskEqual(t *testing.T) {
 
 		o, err := ComposeTask("name#1", nil, []interface{}{1, "test123", m2})
 		ass.Nil(err)
+
+		o.H.I = t.H.ID()
 		ass.True(t.Equal(o))
 	}
 
@@ -42,6 +44,8 @@ func TestTaskEqual(t *testing.T) {
 			"t3": "3",
 		}})
 		ass.Nil(err)
+
+		o.H.I = t.H.ID()
 		ass.False(t.Equal(o))
 	}
 
@@ -52,6 +56,8 @@ func TestTaskEqual(t *testing.T) {
 
 		o, err := ComposeTask("name#2", nil, []interface{}{1, "test#123"})
 		ass.Nil(err)
+
+		o.H.I = t.H.ID()
 		ass.False(t.Equal(o))
 	}
 
@@ -62,6 +68,8 @@ func TestTaskEqual(t *testing.T) {
 
 		o, err := ComposeTask("name#1", nil, []interface{}{"test#123", 1})
 		ass.Nil(err)
+
+		o.H.I = t.H.ID()
 		ass.False(t.Equal(o))
 	}
 
@@ -72,6 +80,20 @@ func TestTaskEqual(t *testing.T) {
 
 		o, err := ComposeTask("name#1", nil, []interface{}{2, "test#123"})
 		ass.Nil(err)
+
+		o.H.I = t.H.ID()
+		ass.False(t.Equal(o))
+	}
+
+	// different option
+	{
+		t, err := ComposeTask("name#1", &Option{IR: true}, []interface{}{1, "test#123"})
+		ass.Nil(err)
+
+		o, err := ComposeTask("name#1", &Option{IR: false}, []interface{}{2, "test#123"})
+		ass.Nil(err)
+
+		o.H.I = t.H.ID()
 		ass.False(t.Equal(o))
 	}
 }
