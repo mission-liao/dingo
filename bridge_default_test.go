@@ -63,7 +63,7 @@ func (me *DefaultBridgeTestSuite) TestReturnFix() {
 	))
 
 	// compose a task
-	t, err := transport.ComposeTask("ReturnFix", nil)
+	t, err := transport.ComposeTask("ReturnFix", nil, nil)
 	me.Nil(err)
 
 	// compose a corresponding report

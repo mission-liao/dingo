@@ -241,6 +241,10 @@ func (me *_workers) _worker_routine_(
 ) {
 	defer wait.Done()
 	rep := func(task *transport.Task, status int16, payload []interface{}, err error) {
+		if task.Option().IgnoreReport() {
+			return
+		}
+
 		var (
 			e    *transport.Error
 			r    *transport.Report

@@ -12,6 +12,7 @@ type fnOpt struct {
 	mash struct {
 		task, report int16
 	}
+	opt *Option
 }
 
 type Mgr struct {
@@ -118,12 +119,54 @@ func (me *Mgr) Register(name string, fn interface{}, msTask, msReport int16) (er
 		nfns[k] = fns[k]
 	}
 	nfns[name] = &fnOpt{
-		fn: fn,
+		fn:  fn,
+		opt: NewOption(),
 		mash: struct {
 			task, report int16
 		}{msTask, msReport},
 	}
 	me.fn2opt.Store(nfns)
+	return
+}
+
+func (me *Mgr) SetOption(name string, opt *Option) (err error) {
+	if opt == nil {
+		err = errors.New("nil Option is not acceptable")
+		return
+	}
+
+	me.fn2optLock.Lock()
+	defer me.fn2optLock.Unlock()
+
+	fns := me.fn2opt.Load().(map[string]*fnOpt)
+	if _, ok := fns[name]; !ok {
+		err = errors.New(fmt.Sprintf("name %v doesn't exists", name))
+		return
+	}
+	nfns := make(map[string]*fnOpt)
+	for k := range fns {
+		nfns[k] = fns[k]
+	}
+	nfns[name].opt = opt
+	me.fn2opt.Store(nfns)
+
+	return
+}
+
+func (me *Mgr) GetOption(name string) (opt *Option, err error) {
+	fns := me.fn2opt.Load().(map[string]*fnOpt)
+	if _, ok := fns[name]; !ok {
+		err = errors.New(fmt.Sprintf("name %v doesn't exists", name))
+		return
+	}
+
+	fn, ok := fns[name]
+	if !ok {
+		err = errors.New(fmt.Sprintf("name %v doesn't exist", name))
+		return
+	}
+
+	opt = fn.opt
 	return
 }
 

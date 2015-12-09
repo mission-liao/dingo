@@ -39,6 +39,10 @@ type App interface {
 	// - err: any error produced
 	Register(name string, fn interface{}, count, share int, taskMash, reportMash int16) (remain int, err error)
 
+	// set default option used for a function
+	//
+	SetOption(name string, opt *transport.Option) (err error)
+
 	// attach an instance, instance could be any instance implementing
 	// backend.Reporter, backend.Backend, broker.Producer, broker.Consumer.
 	//
@@ -282,6 +286,10 @@ func (me *_app) Register(name string, fn interface{}, count, share int, taskMash
 	return
 }
 
+func (me *_app) SetOption(name string, opt *transport.Option) error {
+	return me.trans.SetOption(name, opt)
+}
+
 func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 	me.objsLock.Lock()
 	defer me.objsLock.Unlock()
@@ -411,19 +419,24 @@ func (me *_app) Call(name string, opt *transport.Option, args ...interface{}) (r
 	me.objsLock.RLock()
 	defer me.objsLock.RUnlock()
 
-	// TODO: attach Option to transport.Task
-	t, err := transport.ComposeTask(name, args)
+	if opt == nil {
+		opt, err = me.trans.GetOption(name)
+		if err != nil {
+			return
+		}
+	}
+	t, err := transport.ComposeTask(name, opt, args)
 	if err != nil {
 		return
 	}
 
-	// a blocking call
+	// a blocking call to broker component
 	err = me.b.SendTask(t)
 	if err != nil {
 		return
 	}
 
-	if opt != nil && opt.IgnoreReport_ {
+	if opt.IgnoreReport() {
 		return
 	}
 

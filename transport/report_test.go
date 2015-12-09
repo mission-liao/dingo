@@ -15,7 +15,7 @@ func TestReportMarshal(t *testing.T) {
 		P: &reportPayload{
 			S: 101,
 			E: &Error{102, "test error"},
-			O: &Option{IR: true},
+			O: NewOption().SetIgnoreReport(true),
 			R: nil,
 		},
 	})

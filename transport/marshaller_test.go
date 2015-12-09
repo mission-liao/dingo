@@ -18,7 +18,10 @@ type MarshallerTestSuite struct {
 }
 
 func (me *MarshallerTestSuite) TestTask() {
-	task, err := ComposeTask("test", &Option{IR: true}, []interface{}{float64(1.5), "user", "password"})
+	task, err := ComposeTask(
+		"test", NewOption().SetIgnoreReport(true),
+		[]interface{}{float64(1.5), "user", "password"},
+	)
 	me.NotNil(task)
 	me.Nil(err)
 	if err != nil {
@@ -55,7 +58,7 @@ func (me *MarshallerTestSuite) TestTask() {
 }
 
 func (me *MarshallerTestSuite) TestReport() {
-	task, err := ComposeTask("test", &Option{IR: true}, nil)
+	task, err := ComposeTask("test", NewOption().SetIgnoreReport(true), nil)
 	me.Nil(err)
 	if err != nil {
 		return

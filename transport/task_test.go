@@ -87,10 +87,10 @@ func TestTaskEqual(t *testing.T) {
 
 	// different option
 	{
-		t, err := ComposeTask("name#1", &Option{IR: true}, []interface{}{1, "test#123"})
+		t, err := ComposeTask("name#1", NewOption().SetIgnoreReport(true), []interface{}{1, "test#123"})
 		ass.Nil(err)
 
-		o, err := ComposeTask("name#1", &Option{IR: false}, []interface{}{2, "test#123"})
+		o, err := ComposeTask("name#1", NewOption().SetIgnoreReport(false), []interface{}{2, "test#123"})
 		ass.Nil(err)
 
 		o.H.I = t.H.ID()

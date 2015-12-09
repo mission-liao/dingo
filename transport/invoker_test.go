@@ -82,7 +82,6 @@ func (s *InvokerTestSuite) TestFloat64() {
 			return v, nil
 		}
 
-		_ = "breakpoint"
 		_f := float64(1.0)
 		param, err := s.convert(chk, &_f)
 		s.Nil(err)

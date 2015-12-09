@@ -3,6 +3,7 @@ package dingo
 import (
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
@@ -46,17 +47,17 @@ func (me *WorkerTestSuite) TestParellelRun() {
 		// workers would be blocked here
 		<-stepOut
 	}
-	me._trans.Register(
-		"", fn,
+	me.Nil(me._trans.Register(
+		"TestParellelRun", fn,
 		transport.Encode.Default, transport.Encode.Default,
-	)
-	reports, remain, err := me._ws.allocate("", tasks, nil, 3, 0)
+	))
+	reports, remain, err := me._ws.allocate("TestParellelRun", tasks, nil, 3, 0)
 	me.Nil(err)
 	me.Equal(0, remain)
 	me.Len(reports, 1)
 
 	for i := 0; i < 3; i++ {
-		t, err := transport.ComposeTask("", []interface{}{i})
+		t, err := transport.ComposeTask("TestParellelRun", nil, []interface{}{i})
 		me.Nil(err)
 		if err == nil {
 			tasks <- t
@@ -80,4 +81,30 @@ func (me *WorkerTestSuite) TestParellelRun() {
 func (me *WorkerTestSuite) TestPanic() {
 	// TODO: worker routine should recover from
 	// panic
+}
+
+func (me *WorkerTestSuite) TestIgnoreReport() {
+	// allocate workers
+	tasks := make(chan *transport.Task)
+	me.Nil(me._trans.Register("TestIgnoreReport", func() {}, transport.Encode.Default, transport.Encode.Default))
+	reports, remain, err := me._ws.allocate("TestIgnoreReport", tasks, nil, 1, 0)
+	me.Nil(err)
+	me.Equal(0, remain)
+	me.Len(reports, 1)
+
+	// an option with IgnoreReport == true
+	task, err := transport.ComposeTask("TestIgnoreReport", transport.NewOption().SetIgnoreReport(true), nil)
+	me.NotNil(task)
+	me.Nil(err)
+
+	// send task, and shouldn't get any report
+	if task != nil {
+		tasks <- task
+		select {
+		case <-reports[0]:
+			me.Fail("shouldn't receive any reports")
+		case <-time.After(500 * time.Millisecond):
+			// wait for 0.5 second
+		}
+	}
 }

@@ -7,12 +7,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMarshallers(t *testing.T) {
+func TestMgrMarshallers(t *testing.T) {
 	ass := assert.New(t)
 	trans := NewMgr()
 	nothing := func() {}
-	ass.Nil(trans.Register("test", nothing, Encode.JSON, Encode.GOB))
-	task, err := ComposeTask("test", nil, []interface{}{float64(1)})
+	ass.Nil(trans.Register("TestMgrMarshallers", nothing, Encode.JSON, Encode.GOB))
+	task, err := ComposeTask("TestMgrMarshallers", nil, []interface{}{float64(1)})
 	task.H.I = "a2a2da60-9cba-11e5-b690-0002a5d5c51b"
 	ass.Nil(err)
 
@@ -55,7 +55,7 @@ func TestMarshallers(t *testing.T) {
 	}
 }
 
-func TestInvokers(t *testing.T) {
+func TestMgrInvokers(t *testing.T) {
 	called := int(0)
 	fn := func(i int64) int8 {
 		called = int(i)
@@ -64,10 +64,10 @@ func TestInvokers(t *testing.T) {
 
 	ass := assert.New(t)
 	trans := NewMgr()
-	ass.Nil(trans.Register("TestInvokers", fn, Encode.JSON, Encode.JSON))
+	ass.Nil(trans.Register("TestMgrInvokers", fn, Encode.JSON, Encode.JSON))
 
 	// compose a task, with wrong type of input
-	task, err := ComposeTask("TestInvokers", nil, []interface{}{int32(3)})
+	task, err := ComposeTask("TestMgrInvokers", nil, []interface{}{int32(3)})
 	ass.Nil(err)
 
 	// Call it
@@ -85,4 +85,31 @@ func TestInvokers(t *testing.T) {
 	ass.Nil(trans.Return(report))
 	ass.Len(report.Return(), 1)
 	ass.Equal(int8(2), report.Return()[0].(int8))
+}
+
+func TestMgrOption(t *testing.T) {
+	ass := assert.New(t)
+	trans := NewMgr()
+
+	// name doesn't register
+	ass.NotNil(trans.SetOption("TestMgrOption", NewOption()))
+
+	// get won't work
+	opt, err := trans.GetOption("TestMgrOption")
+	ass.NotNil(err)
+	ass.Nil(opt)
+
+	// regist a record
+	ass.Nil(trans.Register("TestMgrOption", func() {}, Encode.Default, Encode.Default))
+
+	// ok
+	ass.Nil(trans.SetOption("TestMgrOption", NewOption()))
+
+	// ok to get
+	opt, err = trans.GetOption("TestMgrOption")
+	ass.Nil(err)
+	ass.NotNil(opt)
+
+	// nil Option
+	ass.NotNil(trans.SetOption("TestMgrOption", nil))
 }

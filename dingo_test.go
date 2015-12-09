@@ -63,7 +63,7 @@ func (me *DingoTestSuite) TearDownSuite() {
 func (me *DingoTestSuite) TestBasic() {
 	// register a set of workers
 	called := 0
-	remain, err := me.app.Register("Basic",
+	remain, err := me.app.Register("TestBasic",
 		func(n int) int {
 			called = n
 			return n + 1
@@ -74,7 +74,7 @@ func (me *DingoTestSuite) TestBasic() {
 	me.Nil(err)
 
 	// call that function
-	reports, err := me.app.Call("Basic", nil, 5)
+	reports, err := me.app.Call("TestBasic", nil, 5)
 	me.Nil(err)
 	me.NotNil(reports)
 

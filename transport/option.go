@@ -20,3 +20,7 @@ func (me *Option) SetIgnoreReport(ignore bool) *Option {
 	me.IR = ignore
 	return me
 }
+
+func NewOption() *Option {
+	return &Option{}
+}

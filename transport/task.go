@@ -18,7 +18,7 @@ type Task struct {
 
 func ComposeTask(name string, opt *Option, args []interface{}) (*Task, error) {
 	if opt == nil {
-		opt = &Option{} // make sure it's the default option
+		opt = NewOption() // make sure it's the default option
 	}
 	return &Task{
 		H: NewHeader(uuid.NewV4().String(), name),

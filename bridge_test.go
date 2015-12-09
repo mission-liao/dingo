@@ -75,7 +75,7 @@ func (me *BridgeTestSuite) _TestSendTask() {
 	me.Nil(err)
 
 	// compose a task
-	t, err := transport.ComposeTask("SendTask", nil)
+	t, err := transport.ComposeTask("SendTask", nil, nil)
 	me.Nil(err)
 
 	// send that task
@@ -113,7 +113,7 @@ func (me *BridgeTestSuite) _TestAddListener() {
 	me.Nil(err)
 
 	// compose a task, and send it
-	t, err := transport.ComposeTask("AddListener", nil)
+	t, err := transport.ComposeTask("AddListener", nil, nil)
 	me.Nil(err)
 	me.Nil(me.bg.SendTask(t))
 
@@ -169,7 +169,7 @@ func (me *BridgeTestSuite) _TestReport() {
 	me.Nil(me.bg.Report(reports))
 
 	// a sample task
-	t, err := transport.ComposeTask("Report", nil)
+	t, err := transport.ComposeTask("Report", nil, nil)
 	me.Nil(err)
 	outputs, err := me.bg.Poll(t)
 	me.Nil(err)
@@ -219,10 +219,10 @@ func (me *BridgeTestSuite) _TestPoll() {
 	// - t5 -> r3
 	ts := []*transport.Task{}
 	for i := 0; i < count; i++ {
-		t, err := transport.ComposeTask("Poll", []interface{}{fmt.Sprintf("t%d", 2*i)})
+		t, err := transport.ComposeTask("Poll", nil, []interface{}{fmt.Sprintf("t%d", 2*i)})
 		me.Nil(err)
 		ts = append(ts, t)
-		t, err = transport.ComposeTask("Poll", []interface{}{fmt.Sprintf("t%d", 2*i+1)})
+		t, err = transport.ComposeTask("Poll", nil, []interface{}{fmt.Sprintf("t%d", 2*i+1)})
 		me.Nil(err)
 		ts = append(ts, t)
 	}
