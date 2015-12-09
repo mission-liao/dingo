@@ -21,55 +21,6 @@ type _eventListener struct {
 	events         chan *common.Event
 }
 
-type App interface {
-	//
-	Close() error
-
-	// register a function
-	//
-	// parameters ->
-	// - name: name of tasks
-	// - fn: the function that actually perform the task.
-	// - count: count of workers to be initialized.
-	// - share: the count of workers sharing one report channel
-	// - taskMash, reportMash: id of transport.Marshaller for 'transport.Task' and 'transport.Report'
-	//
-	// returns ->
-	// - remain: remaining count of workers that not initialized.
-	// - err: any error produced
-	Register(name string, fn interface{}, count, share int, taskMash, reportMash int16) (remain int, err error)
-
-	// set default option used for a function
-	//
-	SetOption(name string, opt *transport.Option) (err error)
-
-	// attach an instance, instance could be any instance implementing
-	// backend.Reporter, backend.Backend, broker.Producer, broker.Consumer.
-	//
-	// parameters:
-	// - obj: object to be attached
-	// - types: interfaces contained in 'obj', refer to dingo.InstT
-	// returns:
-	// - id: identifier assigned to this object, 0 is invalid value
-	// - err: errors
-	Use(obj interface{}, types int) (id int, used int, err error)
-
-	//
-	Init(cfg Config) (err error)
-
-	// send a task
-	//
-	Call(name string, opt *transport.Option, args ...interface{}) (<-chan *transport.Report, error)
-
-	// get the channel to receive events from 'dingo', based on the id of requested object
-	//
-	Listen(target, level, expected_id int) (int, <-chan *common.Event, error)
-
-	// release the error channel
-	//
-	StopListen(id int) error
-}
-
 //
 // app
 //
@@ -79,7 +30,7 @@ type _object struct {
 	obj  interface{}
 }
 
-type _app struct {
+type App struct {
 	cfg          Config
 	objsLock     sync.RWMutex
 	objs         map[int]*_object
@@ -97,8 +48,8 @@ type _app struct {
 //
 // factory function
 //
-func NewApp(nameOfBridge string) (app App, err error) {
-	v := &_app{
+func NewApp(nameOfBridge string) (app *App, err error) {
+	v := &App{
 		objs:     make(map[int]*_object),
 		eventMux: common.NewMux(),
 		trans:    transport.NewMgr(),
@@ -159,7 +110,7 @@ func NewApp(nameOfBridge string) (app App, err error) {
 // private
 //
 
-func (me *_app) attachEvents(obj common.Object) (err error) {
+func (me *App) attachEvents(obj common.Object) (err error) {
 	if obj == nil {
 		return
 	}
@@ -198,7 +149,7 @@ func (me *_app) attachEvents(obj common.Object) (err error) {
 // App interface
 //
 
-func (me *_app) Close() (err error) {
+func (me *App) Close() (err error) {
 	me.objsLock.Lock()
 	defer me.objsLock.Unlock()
 
@@ -243,7 +194,19 @@ func (me *_app) Close() (err error) {
 	return
 }
 
-func (me *_app) Register(name string, fn interface{}, count, share int, taskMash, reportMash int16) (remain int, err error) {
+// register a function
+//
+// parameters ->
+// - name: name of tasks
+// - fn: the function that actually perform the task.
+// - count: count of workers to be initialized.
+// - share: the count of workers sharing one report channel
+// - taskMash, reportMash: id of transport.Marshaller for 'transport.Task' and 'transport.Report'
+//
+// returns ->
+// - remain: remaining count of workers that not initialized.
+// - err: any error produced
+func (me *App) Register(name string, fn interface{}, count, share int, taskMash, reportMash int16) (remain int, err error) {
 	me.objsLock.RLock()
 	defer me.objsLock.RUnlock()
 
@@ -286,11 +249,22 @@ func (me *_app) Register(name string, fn interface{}, count, share int, taskMash
 	return
 }
 
-func (me *_app) SetOption(name string, opt *transport.Option) error {
+// set default option used for a function
+//
+func (me *App) SetOption(name string, opt *transport.Option) error {
 	return me.trans.SetOption(name, opt)
 }
 
-func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
+// attach an instance, instance could be any instance implementing
+// backend.Reporter, backend.Backend, broker.Producer, broker.Consumer.
+//
+// parameters:
+// - obj: object to be attached
+// - types: interfaces contained in 'obj', refer to dingo.InstT
+// returns:
+// - id: identifier assigned to this object, 0 is invalid value
+// - err: errors
+func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 	me.objsLock.Lock()
 	defer me.objsLock.Unlock()
 
@@ -394,7 +368,7 @@ func (me *_app) Use(obj interface{}, types int) (id int, used int, err error) {
 	return
 }
 
-func (me *_app) Init(cfg Config) (err error) {
+func (me *App) Init(cfg Config) (err error) {
 	var (
 		remain int
 		tasks  <-chan *transport.Task
@@ -415,7 +389,9 @@ func (me *_app) Init(cfg Config) (err error) {
 	return
 }
 
-func (me *_app) Call(name string, opt *transport.Option, args ...interface{}) (reports <-chan *transport.Report, err error) {
+// send a task
+//
+func (me *App) Call(name string, opt *transport.Option, args ...interface{}) (reports <-chan *transport.Report, err error) {
 	me.objsLock.RLock()
 	defer me.objsLock.RUnlock()
 
@@ -448,7 +424,9 @@ func (me *_app) Call(name string, opt *transport.Option, args ...interface{}) (r
 	return
 }
 
-func (me *_app) Listen(targets, level, expected_id int) (id int, events <-chan *common.Event, err error) {
+// get the channel to receive events from 'dingo', based on the id of requested object
+//
+func (me *App) Listen(targets, level, expected_id int) (id int, events <-chan *common.Event, err error) {
 	// the implementation below
 	// refers to 'ReadMostly' example in sync/atomic
 
@@ -483,7 +461,9 @@ func (me *_app) Listen(targets, level, expected_id int) (id int, events <-chan *
 	return
 }
 
-func (me *_app) StopListen(id int) (err error) {
+// release the error channel
+//
+func (me *App) StopListen(id int) (err error) {
 	// the implementation below
 	// refers to 'ReadMostly' example in sync/atomic
 

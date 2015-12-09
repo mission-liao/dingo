@@ -14,16 +14,16 @@ type DingoTestSuite struct {
 	suite.Suite
 
 	cfg    *Config
-	app    *_app
+	app    *App
 	eid    int
 	events <-chan *common.Event
 }
 
 func (me *DingoTestSuite) SetupSuite() {
+	var err error
 	me.cfg = Default()
-	app, err := NewApp("")
+	me.app, err = NewApp("")
 	me.Nil(err)
-	me.app = app.(*_app)
 	me.eid, me.events, err = me.app.Listen(common.InstT.ALL, common.ErrLvl.DEBUG, 0)
 	me.Nil(err)
 }
