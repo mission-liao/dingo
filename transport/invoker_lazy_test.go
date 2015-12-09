@@ -12,7 +12,7 @@ import (
 // gob
 //
 
-type InvokerLazyGobTestSuite struct {
+type invokerLazyGobTestSuite struct {
 	InvokerTestSuite
 }
 
@@ -24,7 +24,7 @@ func TestInvokerLazyGobSuite(t *testing.T) {
 	gob.Register(map[string]*TestStruct{})
 	gob.Register([]*TestStruct{})
 
-	suite.Run(t, &InvokerLazyGobTestSuite{
+	suite.Run(t, &invokerLazyGobTestSuite{
 		InvokerTestSuite{
 			ivk:     &LazyInvoker{},
 			convert: ioGOB,
@@ -36,7 +36,7 @@ func TestInvokerLazyGobSuite(t *testing.T) {
 // test cases
 //
 
-func (s *InvokerLazyGobTestSuite) TestMap2Struct() {
+func (s *invokerLazyGobTestSuite) TestMap2Struct() {
 	s.InvokerTestSuite._testMap2Struct(map[string]*TestStruct{
 		"a": &TestStruct{Name: "Mary", Count: 11},
 		"b": &TestStruct{Name: "Bob", Count: 10},
@@ -45,7 +45,7 @@ func (s *InvokerLazyGobTestSuite) TestMap2Struct() {
 	})
 }
 
-func (s *InvokerLazyGobTestSuite) TestSliceOfStruct() {
+func (s *invokerLazyGobTestSuite) TestSliceOfStruct() {
 	s.InvokerTestSuite._testSliceOfStruct([]*TestStruct{
 		&TestStruct{Name: "Mary", Count: 11},
 		&TestStruct{Name: "Bob", Count: 10},
@@ -54,7 +54,7 @@ func (s *InvokerLazyGobTestSuite) TestSliceOfStruct() {
 	})
 }
 
-func (s *InvokerLazyGobTestSuite) TestReturn() {
+func (s *invokerLazyGobTestSuite) TestReturn() {
 	// struct & *struct would be marshalled to the same
 	// stuff by god, we need to take care of that.
 	fn := func() (a *TestStruct, b *_test_embed) { return }
@@ -75,13 +75,13 @@ func (s *InvokerLazyGobTestSuite) TestReturn() {
 // json-safe
 //
 
-type InvokerLazyJsonSafeTestSuite struct {
+type invokerLazyJsonSafeTestSuite struct {
 	InvokerTestSuite
 }
 
 func TestInvokerLazyJsonSafeSuite(t *testing.T) {
 	m := JsonSafeMarshaller{}
-	suite.Run(t, &InvokerLazyJsonSafeTestSuite{
+	suite.Run(t, &invokerLazyJsonSafeTestSuite{
 		InvokerTestSuite{
 			ivk: &LazyInvoker{},
 			convert: func(f interface{}, args ...interface{}) (v []interface{}, err error) {
@@ -108,7 +108,7 @@ func TestInvokerLazyJsonSafeSuite(t *testing.T) {
 // test cases
 //
 
-func (s *InvokerLazyJsonSafeTestSuite) TestMap2Struct() {
+func (s *invokerLazyJsonSafeTestSuite) TestMap2Struct() {
 	s.InvokerTestSuite._testMap2Struct(map[string]*TestStruct{
 		"a": &TestStruct{Name: "Mary", Count: 11},
 		"b": &TestStruct{Name: "Bob", Count: 10},
@@ -117,7 +117,7 @@ func (s *InvokerLazyJsonSafeTestSuite) TestMap2Struct() {
 	})
 }
 
-func (s *InvokerLazyJsonSafeTestSuite) TestSliceOfStruct() {
+func (s *invokerLazyJsonSafeTestSuite) TestSliceOfStruct() {
 	s.InvokerTestSuite._testSliceOfStruct([]*TestStruct{
 		&TestStruct{Name: "Mary", Count: 11},
 		&TestStruct{Name: "Bob", Count: 10},

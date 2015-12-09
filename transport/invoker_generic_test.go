@@ -75,12 +75,12 @@ func (s *InvokerGenericTestSuite) TestReturn() {
 // json
 //
 
-type InvokerGenericJsonTestSuite struct {
+type invokerGenericJsonTestSuite struct {
 	InvokerGenericTestSuite
 }
 
 func TestInvokerGenericJsonSuite(t *testing.T) {
-	suite.Run(t, &InvokerGenericJsonTestSuite{
+	suite.Run(t, &invokerGenericJsonTestSuite{
 		InvokerGenericTestSuite{
 			InvokerTestSuite{
 				ivk:     &GenericInvoker{},
@@ -90,7 +90,7 @@ func TestInvokerGenericJsonSuite(t *testing.T) {
 	})
 }
 
-func (s *InvokerGenericJsonTestSuite) TestMap2Struct() {
+func (s *invokerGenericJsonTestSuite) TestMap2Struct() {
 	s.InvokerTestSuite._testMap2Struct(map[string]*TestStruct{
 		"a": &TestStruct{Name: "Mary", Count: 11},
 		"b": &TestStruct{Name: "Bob", Count: 10},
@@ -99,7 +99,7 @@ func (s *InvokerGenericJsonTestSuite) TestMap2Struct() {
 	})
 }
 
-func (s *InvokerGenericJsonTestSuite) TestSliceOfStruct() {
+func (s *invokerGenericJsonTestSuite) TestSliceOfStruct() {
 	s.InvokerTestSuite._testSliceOfStruct([]*TestStruct{
 		&TestStruct{Name: "Mary", Count: 11},
 		&TestStruct{Name: "Bob", Count: 10},
@@ -112,7 +112,7 @@ func (s *InvokerGenericJsonTestSuite) TestSliceOfStruct() {
 // gob
 //
 
-type InvokerGenericGobTestSuite struct {
+type invokerGenericGobTestSuite struct {
 	InvokerGenericTestSuite
 }
 
@@ -124,7 +124,7 @@ func TestInvokerGenericGobSuite(t *testing.T) {
 	gob.Register(map[string]*TestStruct{})
 	gob.Register([]*TestStruct{})
 
-	suite.Run(t, &InvokerGenericGobTestSuite{
+	suite.Run(t, &invokerGenericGobTestSuite{
 		InvokerGenericTestSuite{
 			InvokerTestSuite{
 				ivk:     &GenericInvoker{},
@@ -134,7 +134,7 @@ func TestInvokerGenericGobSuite(t *testing.T) {
 	})
 }
 
-func (s *InvokerGenericGobTestSuite) TestMap2Struct() {
+func (s *invokerGenericGobTestSuite) TestMap2Struct() {
 	s.InvokerTestSuite._testMap2Struct(map[string]*TestStruct{
 		"a": &TestStruct{Name: "Mary", Count: 11},
 		"b": &TestStruct{Name: "Bob", Count: 10},
@@ -143,7 +143,7 @@ func (s *InvokerGenericGobTestSuite) TestMap2Struct() {
 	})
 }
 
-func (s *InvokerGenericGobTestSuite) TestSliceOfStruct() {
+func (s *invokerGenericGobTestSuite) TestSliceOfStruct() {
 	s.InvokerTestSuite._testSliceOfStruct([]*TestStruct{
 		&TestStruct{Name: "Mary", Count: 11},
 		&TestStruct{Name: "Bob", Count: 10},
