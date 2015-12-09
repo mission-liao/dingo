@@ -103,3 +103,25 @@ func TestInvokerLazyJsonSafeSuite(t *testing.T) {
 		},
 	})
 }
+
+//
+// test cases
+//
+
+func (s *InvokerLazyJsonSafeTestSuite) TestMap2Struct() {
+	s.InvokerTestSuite._testMap2Struct(map[string]*TestStruct{
+		"a": &TestStruct{Name: "Mary", Count: 11},
+		"b": &TestStruct{Name: "Bob", Count: 10},
+		"c": &TestStruct{Name: "Tom", Count: 12},
+		"d": nil,
+	})
+}
+
+func (s *InvokerLazyJsonSafeTestSuite) TestSliceOfStruct() {
+	s.InvokerTestSuite._testSliceOfStruct([]*TestStruct{
+		&TestStruct{Name: "Mary", Count: 11},
+		&TestStruct{Name: "Bob", Count: 10},
+		&TestStruct{Name: "Tom", Count: 12},
+		nil,
+	})
+}
