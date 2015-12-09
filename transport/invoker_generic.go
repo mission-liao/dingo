@@ -156,7 +156,15 @@ func (vk *GenericInvoker) convert(v reflect.Value, t reflect.Type) (reflect.Valu
 		// TODO: special case for []byte
 		err = vk.convert2slice(v, elm, t)
 	default:
-		err = errors.New(fmt.Sprintf("Unsupported Element Type: %v", elm.Kind().String()))
+		if v.Type().ConvertibleTo(t) {
+			// gob/json encoding can't handle pointer to value.
+			// pointer, or pointer to value would both be converted to value.
+			//
+			// the underlying type of those parameter with 'Ptr' type would be deduced here.
+			elm.Set(v.Convert(t))
+		} else {
+			err = errors.New(fmt.Sprintf("Unsupported Element Type: %v", elm.Kind().String()))
+		}
 	}
 
 	if deref == 0 {

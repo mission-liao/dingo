@@ -74,8 +74,37 @@ func (s *InvokerTestSuite) TestFloat64() {
 		}
 	}
 
-	// TODO: *float64
+	// *float64
 	{
+		called := (*float64)(nil)
+		chk := func(v *float64) (*float64, error) {
+			called = v
+			return v, nil
+		}
+
+		_ = "breakpoint"
+		_f := float64(1.0)
+		param, err := s.convert(chk, &_f)
+		s.Nil(err)
+		s.NotNil(param)
+		if param != nil {
+			ret, err := s.ivk.Call(chk, param)
+			s.Nil(err)
+			s.Len(ret, 2)
+
+			if ret != nil && len(ret) > 0 {
+				f, ok := ret[0].(*float64)
+				s.True(ok)
+				if ok {
+					s.Equal(float64(1.0), *f)
+				}
+			}
+
+			s.NotNil(called)
+			if called != nil {
+				s.Equal(float64(1.0), *called)
+			}
+		}
 	}
 }
 
