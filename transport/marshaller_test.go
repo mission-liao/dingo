@@ -18,7 +18,7 @@ type MarshallerTestSuite struct {
 }
 
 func (me *MarshallerTestSuite) TestTask() {
-	task, err := ComposeTask("test", []interface{}{float64(1.5), "user", "password"})
+	task, err := ComposeTask("test", &Option{IR: true}, []interface{}{float64(1.5), "user", "password"})
 	me.NotNil(task)
 	me.Nil(err)
 	if err != nil {
@@ -41,6 +41,7 @@ func (me *MarshallerTestSuite) TestTask() {
 			me.NotNil(t)
 			if t != nil {
 				me.True(t.Equal(task))
+				me.True(t.Option().IgnoreReport())
 			}
 		}
 	}
@@ -53,7 +54,7 @@ func (me *MarshallerTestSuite) TestTask() {
 }
 
 func (me *MarshallerTestSuite) TestReport() {
-	task, err := ComposeTask("test", []interface{}{int64(1), float64(1.5), "user", "password"})
+	task, err := ComposeTask("test", &Option{IR: true}, []interface{}{int64(1), float64(1.5), "user", "password"})
 	me.Nil(err)
 	if err != nil {
 		return
@@ -75,13 +76,13 @@ func (me *MarshallerTestSuite) TestReport() {
 
 		// decode
 		if err == nil {
-			_ = "breakpoint"
 			// provide a fake function as a reference of fingerprint
 			r, err := me.m.DecodeReport(nil, fn, b)
 			me.Nil(err)
 			me.NotNil(r)
 			if r != nil {
 				me.True(r.Equal(report))
+				me.True(r.Option().IgnoreReport())
 			}
 		}
 	}

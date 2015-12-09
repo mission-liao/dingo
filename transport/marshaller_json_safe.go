@@ -20,18 +20,30 @@ func (me *JsonSafeMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, 
 		return
 	}
 
-	// encode payload
+	// reset registry
+	task.H.Reset()
+
+	// encode args
 	args, funcT := task.Args(), reflect.TypeOf(fn)
 	if len(task.Args()) != funcT.NumIn() {
 		err = errors.New(fmt.Sprintf("Unable to encode %v, because its count of args is wrong", task))
 		return
 	}
 
-	// encode payloads one argument by one
+	// args
 	bArgs, offs, err := me.encode(args)
 	if err != nil {
 		return
 	}
+	// option
+	bOpt, err := json.Marshal(task.P.O)
+	if err != nil {
+		return
+	}
+	// here we assume 'option' is smaller than 'args'
+	offs = append(offs, uint64(len(bOpt)))
+
+	// update registries in header
 	for _, v := range offs {
 		task.H.Append(v)
 	}
@@ -43,6 +55,7 @@ func (me *JsonSafeMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, 
 	}
 
 	b = append(bHead, bArgs...)
+	b = append(b, bOpt...)
 	return
 }
 
@@ -56,21 +69,37 @@ func (me *JsonSafeMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (t
 	}
 
 	funcT, ps := reflect.TypeOf(fn), h.Registry()
-	if funcT.NumIn() != len(ps) {
+	if funcT.NumIn()+1 != len(ps) {
 		err = errors.New(fmt.Sprintf("Unable to decode task, because its count of payload is wrong: %v %v", ps, fn))
 		return
 	}
 
-	args, _, err := me.decode(b[h.Length():], ps, func(i int) reflect.Type {
+	// decode args
+	args, offset, err := me.decode(b[h.Length():], ps[:len(ps)-1], func(i int) reflect.Type {
 		return funcT.In(i)
 	})
 	if err != nil {
 		return
 	}
 
+	// decode option
+	var o *Option
+	c := offset + h.Length()
+	{
+		p := ps[len(ps)-1]
+		err = json.Unmarshal(b[c:c+p], &o)
+		if err != nil {
+			return
+		}
+		c += p
+	}
+
 	task = &Task{
 		H: h,
-		A: args,
+		P: &taskPayload{
+			O: o,
+			A: args,
+		},
 	}
 	return
 }
@@ -80,6 +109,9 @@ func (me *JsonSafeMarshaller) EncodeReport(fn interface{}, report *Report) (b []
 		err = errors.New("nil is not acceptable")
 		return
 	}
+
+	// reset registry
+	report.H.Reset()
 
 	// encode payload
 	returns, funcT := report.Return(), reflect.TypeOf(fn)
@@ -103,17 +135,31 @@ func (me *JsonSafeMarshaller) EncodeReport(fn interface{}, report *Report) (b []
 		}
 
 		offs = append(offs, uint64(len(b_)))
+		// TODO: not efficient, should do this at that last
 		bReturns = append(bReturns, b_...)
 	}
 
 	// err
 	{
-		b_, err = json.Marshal(&report.P.E)
+		b_, err = json.Marshal(report.P.E)
 		if err != nil {
 			return
 		}
 
 		offs = append(offs, uint64(len(b_)))
+		// TODO: not efficient, should do this at that last
+		bReturns = append(bReturns, b_...)
+	}
+
+	// option
+	{
+		b_, err = json.Marshal(report.P.O)
+		if err != nil {
+			return
+		}
+
+		offs = append(offs, uint64(len(b_)))
+		// TODO: not efficient, should do this at that last
 		bReturns = append(bReturns, b_...)
 	}
 
@@ -141,13 +187,13 @@ func (me *JsonSafeMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) 
 	}
 
 	funcT, ps := reflect.TypeOf(fn), h.Registry()
-	if funcT.NumOut()+2 != len(ps) {
+	if funcT.NumOut()+3 != len(ps) {
 		err = errors.New(fmt.Sprintf("Unable to decode report, because its count of payload is wrong: %v %v", ps, fn))
 		return
 	}
 
 	// decode returns
-	returns, offset, err := me.decode(b[h.Length():], ps[:len(ps)-2], func(i int) reflect.Type {
+	returns, offset, err := me.decode(b[h.Length():], ps[:len(ps)-3], func(i int) reflect.Type {
 		return funcT.Out(i)
 	})
 	if err != nil {
@@ -156,13 +202,14 @@ func (me *JsonSafeMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) 
 
 	var (
 		s int16
-		e Error
+		e *Error
+		o *Option
 	)
 
 	// decode status
 	c := offset + h.Length()
 	{
-		p := ps[len(ps)-2]
+		p := ps[len(ps)-3]
 		err = json.Unmarshal(b[c:c+p], &s)
 		if err != nil {
 			return
@@ -172,8 +219,18 @@ func (me *JsonSafeMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) 
 
 	// decode err
 	{
-		p := ps[len(ps)-1]
+		p := ps[len(ps)-2]
 		err = json.Unmarshal(b[c:c+p], &e)
+		if err != nil {
+			return
+		}
+		c += p
+	}
+
+	// decode option
+	{
+		p := ps[len(ps)-1]
+		err = json.Unmarshal(b[c:c+p], &o)
 		if err != nil {
 			return
 		}
@@ -184,7 +241,8 @@ func (me *JsonSafeMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) 
 		H: h,
 		P: &reportPayload{
 			S: s,
-			E: &e,
+			E: e,
+			O: o,
 			R: returns,
 		},
 	}

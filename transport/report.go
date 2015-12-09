@@ -3,6 +3,7 @@ package transport
 type reportPayload struct {
 	S int16
 	E *Error
+	O *Option
 	R []interface{}
 }
 
@@ -40,6 +41,7 @@ func (r *Report) ID() string            { return r.H.I }
 func (r *Report) Name() string          { return r.H.N }
 func (r *Report) Status() int16         { return r.P.S }
 func (r *Report) Err() *Error           { return r.P.E }
+func (r *Report) Option() *Option       { return r.P.O }
 func (r *Report) Return() []interface{} { return r.P.R }
 
 //
@@ -52,6 +54,8 @@ func (r *Report) SetReturn(ret []interface{}) { r.P.R = ret }
 //
 func (r *Report) Valid() bool { return r.P.S == Status.None }
 func (r *Report) Done() bool  { return r.P.S == Status.Done || r.P.S == Status.Fail }
+
+// TODO: is this function useful?
 func (r *Report) Equal(other *Report) bool {
 	if other == nil {
 		return false

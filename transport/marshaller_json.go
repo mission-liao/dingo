@@ -17,19 +17,22 @@ func (me *JsonMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, err 
 		return
 	}
 
+	// reset registry
+	task.H.Reset()
+
+	// encode payload
+	bPayload, err := json.Marshal(task.P)
+	if err != nil {
+		return
+	}
+
 	// encode header
 	bHead, err := task.H.Flush()
 	if err != nil {
 		return
 	}
 
-	// encode payload
-	bArgs, err := json.Marshal(task.Args())
-	if err != nil {
-		return
-	}
-
-	b = append(bHead, bArgs...)
+	b = append(bHead, bPayload...)
 	return
 }
 
@@ -43,15 +46,14 @@ func (me *JsonMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task 
 	}
 
 	// decode payload
-	var args []interface{}
-	err = json.Unmarshal(b[h.Length():], &args)
+	var payload *taskPayload
+	err = json.Unmarshal(b[h.Length():], &payload)
 	if err == nil {
 		task = &Task{
 			H: h,
-			A: args,
+			P: payload,
 		}
 	}
-
 	return
 }
 
@@ -60,6 +62,9 @@ func (me *JsonMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte
 		err = errors.New("nil is not acceptable")
 		return
 	}
+
+	// reset registry
+	report.H.Reset()
 
 	// encode header
 	bHead, err := report.H.Flush()
@@ -78,7 +83,7 @@ func (me *JsonMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte
 }
 
 func (me *JsonMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (report *Report, err error) {
-	var payloads reportPayload
+	var payloads *reportPayload
 
 	// decode header
 	if h == nil {
@@ -93,7 +98,7 @@ func (me *JsonMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (rep
 	if err == nil {
 		report = &Report{
 			H: h,
-			P: &payloads,
+			P: payloads,
 		}
 	}
 

@@ -6,18 +6,26 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-//
-// building block of a task
-//
-type Task struct {
-	H *Header
+type taskPayload struct {
+	O *Option
 	A []interface{}
 }
 
-func ComposeTask(name string, args []interface{}) (*Task, error) {
+type Task struct {
+	H *Header
+	P *taskPayload
+}
+
+func ComposeTask(name string, opt *Option, args []interface{}) (*Task, error) {
+	if opt == nil {
+		opt = &Option{} // make sure it's the default option
+	}
 	return &Task{
 		H: NewHeader(uuid.NewV4().String(), name),
-		A: args,
+		P: &taskPayload{
+			O: opt,
+			A: args,
+		},
 	}, nil
 }
 
@@ -26,7 +34,8 @@ func ComposeTask(name string, args []interface{}) (*Task, error) {
 //
 func (t *Task) ID() string          { return t.H.I }
 func (t *Task) Name() string        { return t.H.N }
-func (t *Task) Args() []interface{} { return t.A }
+func (t *Task) Option() *Option     { return t.P.O }
+func (t *Task) Args() []interface{} { return t.P.A }
 
 //
 // APIs
@@ -48,11 +57,14 @@ func (t *Task) ComposeReport(s int16, r []interface{}, err interface{}) (*Report
 		H: t.H,
 		P: &reportPayload{
 			S: s,
+			O: t.P.O,
 			E: err_,
 			R: r,
 		},
 	}, nil
 }
+
+// TODO: is this function useful?
 func (t *Task) Equal(other *Task) bool {
-	return t.H.N == other.H.N && reflect.DeepEqual(t.A, other.A)
+	return t.H.N == other.H.N && reflect.DeepEqual(t.P.A, other.P.A)
 }

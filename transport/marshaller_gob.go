@@ -52,6 +52,9 @@ func (me *GobMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, err e
 		return
 	}
 
+	// reset registry
+	task.H.Reset()
+
 	// encode header
 	bHead, err := task.H.Flush()
 	if err != nil {
@@ -60,7 +63,7 @@ func (me *GobMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, err e
 
 	// encode payload
 	var buff *bytes.Buffer = new(bytes.Buffer)
-	err = gob.NewEncoder(buff).Encode(task.Args())
+	err = gob.NewEncoder(buff).Encode(task.P)
 	if err == nil {
 		b = append(bHead, buff.Bytes()...)
 	}
@@ -77,12 +80,12 @@ func (me *GobMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *
 	}
 
 	// decode payload
-	var args []interface{}
-	err = gob.NewDecoder(bytes.NewBuffer(b[h.Length():])).Decode(&args)
+	var payload *taskPayload
+	err = gob.NewDecoder(bytes.NewBuffer(b[h.Length():])).Decode(&payload)
 	if err == nil {
 		task = &Task{
 			H: h,
-			A: args,
+			P: payload,
 		}
 	}
 	return
@@ -93,6 +96,9 @@ func (me *GobMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte,
 		err = errors.New("nil is bad for Gob")
 		return
 	}
+
+	// reset registry
+	report.H.Reset()
 
 	// encode header
 	bHead, err := report.H.Flush()
@@ -119,12 +125,12 @@ func (me *GobMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (repo
 	}
 
 	// decode payload
-	var payload reportPayload
+	var payload *reportPayload
 	err = gob.NewDecoder(bytes.NewBuffer(b[h.Length():])).Decode(&payload)
 	if err == nil {
 		report = &Report{
 			H: h,
-			P: &payload,
+			P: payload,
 		}
 	}
 	return

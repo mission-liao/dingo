@@ -1,10 +1,22 @@
 package transport
 
 type Option struct {
-	IgnoreReport_ bool `json:"IgnoreReport"`
+	IR bool
 }
 
-func (me *Option) IgnoreReport(yes bool) *Option {
-	me.IgnoreReport_ = yes
+//
+// getter
+//
+
+func (me *Option) IgnoreReport() bool {
+	return me.IR
+}
+
+//
+// setter
+//
+
+func (me *Option) SetIgnoreReport(ignore bool) *Option {
+	me.IR = ignore
 	return me
 }
