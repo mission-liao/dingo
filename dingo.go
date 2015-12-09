@@ -37,7 +37,7 @@ type App struct {
 	eventMux     *common.Mux
 	eventOut     atomic.Value
 	eventOutLock sync.Mutex
-	b            Bridge
+	b            bridge
 	trans        *transport.Mgr
 
 	// internal routines

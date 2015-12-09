@@ -7,7 +7,7 @@ import (
 	"github.com/mission-liao/dingo/transport"
 )
 
-type Bridge interface {
+type bridge interface {
 	Close() (err error)
 	Events() ([]<-chan *common.Event, error)
 
@@ -47,7 +47,7 @@ type Bridge interface {
 	Exists(it int) bool
 }
 
-func NewBridge(which string, trans *transport.Mgr, args ...interface{}) Bridge {
+func NewBridge(which string, trans *transport.Mgr, args ...interface{}) bridge {
 	switch which {
 	case "local":
 		return newLocalBridge(args...)

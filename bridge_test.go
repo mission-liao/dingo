@@ -13,7 +13,7 @@ type BridgeTestSuite struct {
 	suite.Suite
 
 	name     string
-	bg       Bridge
+	bg       bridge
 	trans    *transport.Mgr
 	events   []*common.Event
 	eventMux *common.Mux
