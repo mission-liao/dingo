@@ -42,6 +42,12 @@ func NewMgr() (c *Mgr) {
 		LazyInvoker
 	}{}
 	ms[Encode.Default] = ms[Encode.JSON]
+
+	// JsonSafeMarshaller is ok with LazyInvoker
+	ms[Encode.JSONSAFE] = &struct {
+		JsonSafeMarshaller
+		LazyInvoker
+	}{}
 	c.ms.Store(ms)
 
 	// init map from name of function to options

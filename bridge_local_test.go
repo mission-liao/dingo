@@ -6,11 +6,11 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type LocalBridgeTestSuite struct {
+type localBridgeTestSuite struct {
 	BridgeTestSuite
 }
 
-func (me *LocalBridgeTestSuite) SetupTest() {
+func (me *localBridgeTestSuite) SetupTest() {
 	me.BridgeTestSuite.SetupTest()
 	me.Nil(me.bg.AttachProducer(nil))
 	me.Nil(me.bg.AttachConsumer(nil, nil))
@@ -19,7 +19,7 @@ func (me *LocalBridgeTestSuite) SetupTest() {
 }
 
 func TestBridgeLocalSuite(t *testing.T) {
-	suite.Run(t, &LocalBridgeTestSuite{
+	suite.Run(t, &localBridgeTestSuite{
 		BridgeTestSuite{
 			name: "local",
 		},

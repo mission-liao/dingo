@@ -29,7 +29,7 @@ func (me *BridgeTestSuite) TearDownSuite() {
 
 func (me *BridgeTestSuite) SetupTest() {
 	// prepare Bridge
-	me.bg = NewBridge(me.name, me.trans)
+	me.bg = newBridge(me.name, me.trans)
 
 	// bind event channel
 	es, err := me.bg.Events()

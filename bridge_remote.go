@@ -14,7 +14,7 @@ import (
 // default implementation
 //
 
-type defaultBridge struct {
+type remoteBridge struct {
 	producerLock  sync.RWMutex
 	producer      broker.Producer
 	consumerLock  sync.RWMutex
@@ -34,8 +34,8 @@ type defaultBridge struct {
 	trans     *transport.Mgr
 }
 
-func newDefaultBridge(trans *transport.Mgr) (b *defaultBridge) {
-	b = &defaultBridge{
+func newRemoteBridge(trans *transport.Mgr) (b *remoteBridge) {
+	b = &remoteBridge{
 		listeners: common.NewRoutines(),
 		reporters: common.NewRoutines(),
 		storers:   common.NewRoutines(),
@@ -52,7 +52,7 @@ func newDefaultBridge(trans *transport.Mgr) (b *defaultBridge) {
 	return
 }
 
-func (me *defaultBridge) Close() (err error) {
+func (me *remoteBridge) Close() (err error) {
 	me.listeners.Close()
 	me.reporters.Close()
 	me.storers.Close()
@@ -64,13 +64,13 @@ func (me *defaultBridge) Close() (err error) {
 	return
 }
 
-func (me *defaultBridge) Events() ([]<-chan *common.Event, error) {
+func (me *remoteBridge) Events() ([]<-chan *common.Event, error) {
 	return []<-chan *common.Event{
 		me.events,
 	}, nil
 }
 
-func (me *defaultBridge) SendTask(t *transport.Task) (err error) {
+func (me *remoteBridge) SendTask(t *transport.Task) (err error) {
 	me.producerLock.RLock()
 	defer me.producerLock.RUnlock()
 
@@ -88,7 +88,7 @@ func (me *defaultBridge) SendTask(t *transport.Task) (err error) {
 	return
 }
 
-func (me *defaultBridge) AddNamedListener(name string, receipts <-chan *broker.Receipt) (tasks <-chan *transport.Task, err error) {
+func (me *remoteBridge) AddNamedListener(name string, receipts <-chan *broker.Receipt) (tasks <-chan *transport.Task, err error) {
 	me.consumerLock.RLock()
 	defer me.consumerLock.RUnlock()
 
@@ -108,7 +108,7 @@ func (me *defaultBridge) AddNamedListener(name string, receipts <-chan *broker.R
 	return
 }
 
-func (me *defaultBridge) AddListener(rcpt <-chan *broker.Receipt) (tasks <-chan *transport.Task, err error) {
+func (me *remoteBridge) AddListener(rcpt <-chan *broker.Receipt) (tasks <-chan *transport.Task, err error) {
 	me.consumerLock.RLock()
 	defer me.consumerLock.RUnlock()
 
@@ -128,7 +128,7 @@ func (me *defaultBridge) AddListener(rcpt <-chan *broker.Receipt) (tasks <-chan 
 	return
 }
 
-func (me *defaultBridge) StopAllListeners() (err error) {
+func (me *remoteBridge) StopAllListeners() (err error) {
 	me.consumerLock.RLock()
 	defer me.consumerLock.RUnlock()
 
@@ -145,7 +145,7 @@ func (me *defaultBridge) StopAllListeners() (err error) {
 	return
 }
 
-func (me *defaultBridge) Report(reports <-chan *transport.Report) (err error) {
+func (me *remoteBridge) Report(reports <-chan *transport.Report) (err error) {
 	me.reporterLock.RLock()
 	defer me.reporterLock.RUnlock()
 
@@ -201,7 +201,7 @@ func (me *defaultBridge) Report(reports <-chan *transport.Report) (err error) {
 	return
 }
 
-func (me *defaultBridge) Poll(t *transport.Task) (reports <-chan *transport.Report, err error) {
+func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Report, err error) {
 	me.storeLock.RLock()
 	defer me.storeLock.RUnlock()
 
@@ -280,7 +280,7 @@ func (me *defaultBridge) Poll(t *transport.Task) (reports <-chan *transport.Repo
 	return
 }
 
-func (me *defaultBridge) AttachReporter(r backend.Reporter) (err error) {
+func (me *remoteBridge) AttachReporter(r backend.Reporter) (err error) {
 	me.reporterLock.Lock()
 	defer me.reporterLock.Unlock()
 
@@ -298,7 +298,7 @@ func (me *defaultBridge) AttachReporter(r backend.Reporter) (err error) {
 	return
 }
 
-func (me *defaultBridge) AttachStore(s backend.Store) (err error) {
+func (me *remoteBridge) AttachStore(s backend.Store) (err error) {
 	me.storeLock.Lock()
 	defer me.storeLock.Unlock()
 
@@ -316,7 +316,7 @@ func (me *defaultBridge) AttachStore(s backend.Store) (err error) {
 	return
 }
 
-func (me *defaultBridge) AttachProducer(p broker.Producer) (err error) {
+func (me *remoteBridge) AttachProducer(p broker.Producer) (err error) {
 	me.producerLock.Lock()
 	defer me.producerLock.Unlock()
 
@@ -333,7 +333,7 @@ func (me *defaultBridge) AttachProducer(p broker.Producer) (err error) {
 	return
 }
 
-func (me *defaultBridge) AttachConsumer(c broker.Consumer, nc broker.NamedConsumer) (err error) {
+func (me *remoteBridge) AttachConsumer(c broker.Consumer, nc broker.NamedConsumer) (err error) {
 	me.consumerLock.Lock()
 	defer me.consumerLock.Unlock()
 
@@ -354,7 +354,7 @@ func (me *defaultBridge) AttachConsumer(c broker.Consumer, nc broker.NamedConsum
 	return
 }
 
-func (me *defaultBridge) Exists(it int) (ext bool) {
+func (me *remoteBridge) Exists(it int) (ext bool) {
 	switch it {
 	case common.InstT.PRODUCER:
 		func() {
@@ -400,7 +400,7 @@ func (me *defaultBridge) Exists(it int) (ext bool) {
 // routines
 //
 
-func (me *defaultBridge) _listener_routines_(
+func (me *remoteBridge) _listener_routines_(
 	quit <-chan int,
 	wait *sync.WaitGroup,
 	events chan<- *common.Event,

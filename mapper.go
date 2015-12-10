@@ -140,7 +140,6 @@ func (m *_mappers) _mapper_routine_(
 		select {
 		case t, ok := <-tasks:
 			if !ok {
-				// TODO: channel is closed
 				goto cleanup
 			}
 

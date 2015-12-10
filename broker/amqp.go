@@ -195,7 +195,6 @@ func (me *_amqp) AddListener(name string, receipts <-chan *Receipt) (tasks <-cha
 	}
 
 	// bind queue to exchange
-	// TODO: configurable name?
 	err = ci.Channel.QueueBind(
 		qn,
 		name,

@@ -59,18 +59,22 @@ func (me *BrokerTestSuite) TestBasic() {
 	}
 
 	// compose a task
-	t, err := transport.ComposeTask("", []interface{}{})
+	t, err := transport.ComposeTask("", nil, []interface{}{})
 	me.Nil(err)
 	me.NotNil(t)
 	if t == nil {
 		return
 	}
 
+	// generate a header byte stream
+	hb, err := transport.NewHeader(t.ID(), t.Name()).Flush()
+	me.Nil(err)
+	if err != nil {
+		return
+	}
+
 	// send it
-	input := append(
-		transport.EncodeHeader(t.ID(), t.Name(), transport.Encode.Default),
-		[]byte("test byte array")...,
-	)
+	input := append(hb, []byte("test byte array")...)
 	me.Nil(me._producer.Send(t, input))
 
 	// receive it

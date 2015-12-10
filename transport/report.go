@@ -47,28 +47,15 @@ var Status = struct {
 
 	// this field should always the last one
 	Count int16
-
-	// TODO: make these private or remove them
-	// these fields are for test
-	Test1 int16
-	Test2 int16
-	Test3 int16
-	Test4 int16
-	Test5 int16
-	Test6 int16
 }{
 	0, 1, 2, 3, 4, 5,
-
-	// for test
-	101, 102, 103, 104, 105, 106,
 }
 
 func (r *Report) ID() string    { return r.H.I }
 func (r *Report) Name() string  { return r.H.N }
 func (r *Report) Status() int16 { return r.P.S }
 
-// TODO: renamed to Error()
-func (r *Report) Err() *Error                 { return r.P.E }
+func (r *Report) Error() *Error               { return r.P.E }
 func (r *Report) Option() *Option             { return r.P.O }
 func (r *Report) Return() []interface{}       { return r.P.R }
 func (r *Report) SetReturn(ret []interface{}) { r.P.R = ret }
@@ -77,14 +64,7 @@ func (r *Report) SetReturn(ret []interface{}) { r.P.R = ret }
 // checker
 //
 
-// TODO: seems not used, remove it.
-func (r *Report) Valid() bool { return r.P.S == Status.None }
-func (r *Report) Done() bool  { return r.P.S == Status.Done || r.P.S == Status.Fail }
-func (r *Report) Ok() bool    { return r.P.S == Status.Done }
-func (r *Report) Fail() bool  { return r.P.S == Status.Fail }
-func (r *Report) Equal(other *Report) bool {
-	if other == nil {
-		return false
-	}
-	return reflect.DeepEqual(r, other)
-}
+func (r *Report) Done() bool               { return r.P.S == Status.Done || r.P.S == Status.Fail }
+func (r *Report) Ok() bool                 { return r.P.S == Status.Done }
+func (r *Report) Fail() bool               { return r.P.S == Status.Fail }
+func (r *Report) Equal(other *Report) bool { return reflect.DeepEqual(r, other) }

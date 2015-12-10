@@ -1,13 +1,11 @@
 package common
 
 var InstT = struct {
-	DEFAULT  int
-	REPORTER int
-	STORE    int
-	PRODUCER int
-	CONSUMER int
-	// TODO: monitor is deprecated
-	MONITOR        int
+	DEFAULT        int
+	REPORTER       int
+	STORE          int
+	PRODUCER       int
+	CONSUMER       int
 	MAPPER         int
 	WORKER         int
 	BRIDGE         int
@@ -23,7 +21,6 @@ var InstT = struct {
 	(1 << 5),
 	(1 << 6),
 	(1 << 7),
-	(1 << 8),
 	int(^uint(0) >> 1), // Max int
 }
 

@@ -10,14 +10,14 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type DefaultBridgeTestSuite struct {
+type remoteBridgeTestSuite struct {
 	BridgeTestSuite
 
 	brk broker.Broker
 	bkd backend.Backend
 }
 
-func (me *DefaultBridgeTestSuite) SetupTest() {
+func (me *remoteBridgeTestSuite) SetupTest() {
 	var err error
 
 	me.BridgeTestSuite.SetupTest()
@@ -35,15 +35,15 @@ func (me *DefaultBridgeTestSuite) SetupTest() {
 	me.Nil(me.bg.AttachStore(me.bkd.(backend.Store)))
 }
 
-func (me *DefaultBridgeTestSuite) TearDownTest() {
+func (me *remoteBridgeTestSuite) TearDownTest() {
 	me.Nil(me.brk.(common.Object).Close())
 	me.Nil(me.bkd.(common.Object).Close())
 
 	me.BridgeTestSuite.TearDownTest()
 }
 
-func TestBridgeDefaultSuite(t *testing.T) {
-	suite.Run(t, &DefaultBridgeTestSuite{
+func TestBridgeRemoteSuite(t *testing.T) {
+	suite.Run(t, &remoteBridgeTestSuite{
 		BridgeTestSuite: BridgeTestSuite{
 			name: "",
 		},
@@ -54,7 +54,7 @@ func TestBridgeDefaultSuite(t *testing.T) {
 // test cases
 //
 
-func (me *DefaultBridgeTestSuite) TestReturnFix() {
+func (me *remoteBridgeTestSuite) TestReturnFix() {
 	// register a function, returning float64
 	me.Nil(me.trans.Register(
 		"ReturnFix",

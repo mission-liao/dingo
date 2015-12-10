@@ -32,10 +32,11 @@ func ComposeTask(name string, opt *Option, args []interface{}) (*Task, error) {
 //
 // getter
 //
-func (t *Task) ID() string          { return t.H.I }
-func (t *Task) Name() string        { return t.H.N }
-func (t *Task) Option() *Option     { return t.P.O }
-func (t *Task) Args() []interface{} { return t.P.A }
+func (t *Task) ID() string             { return t.H.I }
+func (t *Task) Name() string           { return t.H.N }
+func (t *Task) Option() *Option        { return t.P.O }
+func (t *Task) Args() []interface{}    { return t.P.A }
+func (t *Task) Equal(other *Task) bool { return reflect.DeepEqual(t, other) }
 
 //
 // APIs
@@ -44,10 +45,12 @@ func (t *Task) ComposeReport(s int16, r []interface{}, err interface{}) (*Report
 	var err_ *Error
 	if err != nil {
 		switch v := err.(type) {
+		case *Error:
+			// make sure this type preceding 'error',
+			// because *Error implement the 'error' interface.
+			err_ = v
 		case error:
 			err_ = NewErr(0, v)
-		case *Error:
-			err_ = v
 		default:
 			// TODO: what? log?
 			err_ = nil
@@ -62,9 +65,4 @@ func (t *Task) ComposeReport(s int16, r []interface{}, err interface{}) (*Report
 			R: r,
 		},
 	}, nil
-}
-
-// TODO: is this function useful?
-func (t *Task) Equal(other *Task) bool {
-	return reflect.DeepEqual(t, other)
 }

@@ -1,7 +1,5 @@
 package backend
 
-// TODO: bypass mode in local backend
-
 import (
 	"sync"
 

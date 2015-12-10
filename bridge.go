@@ -47,14 +47,14 @@ type bridge interface {
 	Exists(it int) bool
 }
 
-// TODO: make this function private
-func NewBridge(which string, trans *transport.Mgr, args ...interface{}) bridge {
+func newBridge(which string, trans *transport.Mgr, args ...interface{}) bridge {
 	switch which {
 	case "local":
 		return newLocalBridge(args...)
-	// TODO: add "remote"
+	case "remote":
+		return newRemoteBridge(trans)
 	default:
-		return newDefaultBridge(trans)
+		return newRemoteBridge(trans)
 	}
 
 	return nil

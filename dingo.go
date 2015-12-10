@@ -52,7 +52,7 @@ func NewApp(nameOfBridge string) (app *App, err error) {
 		eventMux: common.NewMux(),
 		trans:    transport.NewMgr(),
 	}
-	v.b = NewBridge(nameOfBridge, v.trans)
+	v.b = newBridge(nameOfBridge, v.trans)
 
 	// refer to 'ReadMostly' example in sync/atomic
 	v.eventOut.Store(make(map[int]*_eventListener))
@@ -506,9 +506,7 @@ func (me *App) Call(name string, opt *transport.Option, args ...interface{}) (re
      }
    }
 */
-func (me *App) Listen(targets, level, expected_id int) (id int, events <-chan *common.Event, err error) {
-	// TODO: rename expected_id to expectedId
-
+func (me *App) Listen(targets, level, expectedId int) (id int, events <-chan *common.Event, err error) {
 	// the implementation below
 	// refers to 'ReadMostly' example in sync/atomic
 
@@ -523,7 +521,7 @@ func (me *App) Listen(targets, level, expected_id int) (id int, events <-chan *c
 
 	m := me.eventOut.Load().(map[int]*_eventListener)
 	// get an identifier
-	id = expected_id
+	id = expectedId
 	for {
 		_, ok := m[id]
 		if !ok {

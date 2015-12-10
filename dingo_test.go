@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-// TODO: add test case for return-fix
-
 type DingoTestSuite struct {
 	suite.Suite
 
