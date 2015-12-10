@@ -5,6 +5,9 @@ import (
 	"errors"
 )
 
+/*
+ Note: this Marshaller can only work with GenericInvoker.
+*/
 type JsonMarshaller struct{}
 
 func (me *JsonMarshaller) Prepare(string, interface{}) (err error) {

@@ -5,6 +5,9 @@ import (
 	"reflect"
 )
 
+/*
+A generic error that could be marshalled/unmarshalled by JSON.
+*/
 type Error struct {
 	C int64
 	M string

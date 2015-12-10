@@ -1,5 +1,7 @@
 package dingo
 
+// TODO: add AddMarshaller
+
 import (
 	// standard
 	"errors"
@@ -21,10 +23,6 @@ type _eventListener struct {
 	events         chan *common.Event
 }
 
-//
-// app
-//
-
 type _object struct {
 	used int
 	obj  interface{}
@@ -39,15 +37,15 @@ type App struct {
 	eventOutLock sync.Mutex
 	b            bridge
 	trans        *transport.Mgr
-
-	// internal routines
-	mappers *_mappers
-	workers *_workers
+	mappers      *_mappers
+	workers      *_workers
 }
 
-//
-// factory function
-//
+/*
+ "nameOfBridge" refers to different modes of dingo:
+  - "local": an App works in local mode, which is similar to other background worker framework.
+  - "remote": an App works in remote mode, brokers(ex. AMQP...) and backends(ex. redis..., if required) would be needed to work.
+*/
 func NewApp(nameOfBridge string) (app *App, err error) {
 	v := &App{
 		objs:     make(map[int]*_object),
@@ -106,10 +104,6 @@ func NewApp(nameOfBridge string) (app *App, err error) {
 	return
 }
 
-//
-// private
-//
-
 func (me *App) attachEvents(obj common.Object) (err error) {
 	if obj == nil {
 		return
@@ -145,10 +139,9 @@ func (me *App) attachEvents(obj common.Object) (err error) {
 	return
 }
 
-//
-// App interface
-//
-
+/*
+ Release this instance. All reporting channels are closed after returning. However, those sent tasks/reports wouldn't be reclaimed.
+*/
 func (me *App) Close() (err error) {
 	me.objsLock.Lock()
 	defer me.objsLock.Unlock()
@@ -194,18 +187,20 @@ func (me *App) Close() (err error) {
 	return
 }
 
-// register a function
-//
-// parameters ->
-// - name: name of tasks
-// - fn: the function that actually perform the task.
-// - count: count of workers to be initialized.
-// - share: the count of workers sharing one report channel
-// - taskMash, reportMash: id of transport.Marshaller for 'transport.Task' and 'transport.Report'
-//
-// returns ->
-// - remain: remaining count of workers that not initialized.
-// - err: any error produced
+/*
+ register a worker function
+
+ parameters:
+  - name: name of tasks
+  - fn: the function that actually perform the task.
+  - count: count of workers to be initialized.
+  - share: the count of workers sharing one report channel.
+  - taskMash, reportMash: id of transport.Marshaller for 'transport.Task' and 'transport.Report'
+
+ returns:
+  - remain: remaining count of workers that failed to initialize.
+  - err: any error produced
+*/
 func (me *App) Register(name string, fn interface{}, count, share int, taskMash, reportMash int16) (remain int, err error) {
 	me.objsLock.RLock()
 	defer me.objsLock.RUnlock()
@@ -249,21 +244,32 @@ func (me *App) Register(name string, fn interface{}, count, share int, taskMash,
 	return
 }
 
-// set default option used for a function
-//
+/*
+ Set default option used for a worker function.
+*/
 func (me *App) SetOption(name string, opt *transport.Option) error {
 	return me.trans.SetOption(name, opt)
 }
 
-// attach an instance, instance could be any instance implementing
-// backend.Reporter, backend.Backend, broker.Producer, broker.Consumer.
-//
-// parameters:
-// - obj: object to be attached
-// - types: interfaces contained in 'obj', refer to dingo.InstT
-// returns:
-// - id: identifier assigned to this object, 0 is invalid value
-// - err: errors
+/*
+ Attach an instance, instance could be any instance implementing
+ backend.Reporter, backend.Backend, broker.Producer, broker.Consumer.
+
+ parameters:
+  - obj: object to be attached
+  - types: interfaces contained in 'obj', refer to dingo.InstT
+ returns:
+  - id: identifier assigned to this object, 0 is invalid value
+  - err: errors
+
+ For a producer, the right combination of "types" is
+ common.InstT.PRODUCER|common.InstT.STORE, if reporting is not required,
+ then only common.InstT.PRODUCER is used.
+
+ For a consumer, the right combination of "types" is
+ common.InstT.CONSUMER|common.InstT.REPORTER, if reporting is not reuqired(make sure there is no producer await),
+ then only common.InstT.CONSUMER is used.
+*/
 func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 	me.objsLock.Lock()
 	defer me.objsLock.Unlock()
@@ -368,6 +374,7 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 	return
 }
 
+// TODO: moving config to NewApp
 func (me *App) Init(cfg Config) (err error) {
 	var (
 		remain int
@@ -389,8 +396,43 @@ func (me *App) Init(cfg Config) (err error) {
 	return
 }
 
-// send a task
-//
+/*
+ Initiate a task by providing "name" and execution-"option" of tasks.
+
+ A reporting channel would be returned for callers to monitor the status of tasks,
+ and access its result. A suggested procedure to monitor reporting channels is
+  finished:
+    for {
+      select {
+        case r, ok := <-report:
+        if !ok {
+          // dingo.App is closed somewhere else
+          break finished
+        }
+
+        if r.OK() {
+          // the result is ready
+          returns := r.Returns()
+        }
+        if r.Fail() {
+          // get error
+          err := r.Error()
+        }
+
+        if r.Done() {
+          break finished
+        }
+      }
+    }
+
+ Multiple reports would be sent for each task:
+  - Sent: the task is already sent to brokers.
+  - Progress: the consumer received this task, and about to execute it
+  - Done: this task is finished without error.
+  - Fail: this task failed for some reason.
+ Noted: the 'Fail' here doesn't mean your worker function is failed,
+ it means "dingo" doesn't execute your worker function properly.
+*/
 func (me *App) Call(name string, opt *transport.Option, args ...interface{}) (reports <-chan *transport.Report, err error) {
 	me.objsLock.RLock()
 	defer me.objsLock.RUnlock()
@@ -424,9 +466,49 @@ func (me *App) Call(name string, opt *transport.Option, args ...interface{}) (re
 	return
 }
 
-// get the channel to receive events from 'dingo', based on the id of requested object
-//
+/*
+ Get the channel to receive events from 'dingo'.
+
+ "targets" are instances you want to monitor, they include:
+  - common.InstT.REPORTER: the backend.Reporter instance attached to this App.
+  - common.InstT.STORE: the backend.Store instance attached to this App.
+  - common.InstT.PRODUCER: the broker.Producer instance attached to this App.
+  - common.InstT.CONSUMER: the broker.Consumer/broker.NamedConsumer instance attached to this App.
+  - common.InstT.MAPPER: the internal component, turn if on when debug.
+  - common.InstT.WORKER: the internal component, turn it on when debug.
+  - common.InstT.BRIDGE: the internal component, turn it on when debug.
+  - common.InstT.ALL: every instance.
+ They are bit flags and can be combined as "targets", like:
+  common.InstT.BRIDGE | common.InstT.WORKER | ...
+
+ "level" are minimal severity level expected, include:
+  - common.ErrLvl.DEBUG
+  - common.ErrLvl.INFO
+  - common.ErrLvl.WARNING
+  - common.ErrLvl.Error
+
+ "id" is the identity of this event channel, which could be used to stop
+ monitoring by calling App.StopListen.
+
+ In general, a dedicated go routine would be initiated for this channel,
+ with an infinite for loop, like this:
+   for {
+     select {
+       case e, ok := <-events:
+         if !ok {
+           // after App.Close(), all reporting channels would be closed,
+           // except those channels abandoned by App.StopListen.
+           return
+         }
+         fmt.Printf("%v\n", e)
+       case <-quit:
+         return
+     }
+   }
+*/
 func (me *App) Listen(targets, level, expected_id int) (id int, events <-chan *common.Event, err error) {
+	// TODO: rename expected_id to expectedId
+
 	// the implementation below
 	// refers to 'ReadMostly' example in sync/atomic
 
@@ -461,8 +543,11 @@ func (me *App) Listen(targets, level, expected_id int) (id int, events <-chan *c
 	return
 }
 
-// release the error channel
-//
+/*
+ Stop listening events.
+
+ Note: quit signals won't be sent for those channels stopped by App.StopListen.
+*/
 func (me *App) StopListen(id int) (err error) {
 	// the implementation below
 	// refers to 'ReadMostly' example in sync/atomic

@@ -6,11 +6,11 @@ import (
 	"reflect"
 )
 
+/*
+ A less generic Invoker that can handle pointer with different level.
+ This Invoker can only work with GobMarshaller and JsonSafeMarshaller.
+*/
 type LazyInvoker struct{}
-
-//
-// Invoker interface
-//
 
 func (vk *LazyInvoker) Call(f interface{}, param []interface{}) ([]interface{}, error) {
 	funcT := reflect.TypeOf(f)
@@ -70,10 +70,6 @@ func (vk *LazyInvoker) Return(f interface{}, returns []interface{}) ([]interface
 
 	return returns, nil
 }
-
-//
-// private function
-//
 
 func (vk *LazyInvoker) toPointer(t reflect.Type, v reflect.Value) *reflect.Value {
 	if t.Kind() != reflect.Ptr {

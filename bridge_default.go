@@ -273,6 +273,7 @@ func (me *defaultBridge) Poll(t *transport.Task) (reports <-chan *transport.Repo
 				break
 			}
 		}
+		// TODO: make sure 'Done' of backend is called
 		close(outputs)
 	}(me.storers.New(), me.storers.Wait(), me.storers.Events(), r, reports2)
 

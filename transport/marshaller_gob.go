@@ -8,10 +8,13 @@ import (
 	"reflect"
 )
 
+/*
+ Note: this Marshaller can work with both GenericInvoker and LazyInvoker.
+*/
 type GobMarshaller struct{}
 
-// Gob needs to register type before encode/decode
 func (me *GobMarshaller) Prepare(name string, fn interface{}) (err error) {
+	// Gob needs to register type before encode/decode
 	fT := reflect.TypeOf(fn)
 	if fT.Kind() != reflect.Func {
 		err = errors.New(fmt.Sprintf("fn is not a function but %v", fn))

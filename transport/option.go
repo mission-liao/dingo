@@ -1,20 +1,13 @@
 package transport
 
 type Option struct {
+	// IgnoreReport: stop reporting when executing tasks.
 	IR bool
 }
-
-//
-// getter
-//
 
 func (me *Option) IgnoreReport() bool {
 	return me.IR
 }
-
-//
-// setter
-//
 
 func (me *Option) SetIgnoreReport(ignore bool) *Option {
 	me.IR = ignore

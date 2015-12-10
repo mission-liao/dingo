@@ -16,28 +16,38 @@ type Envelope struct {
 
 // TODO: add test case for consecutive calling to Reporter.Report
 
-// write reports to backend
+/*
+ Reporter(s) is responsible for sending reports to backend(s). The interaction between
+ Reporter(s) and dingo are asynchronous by channels.
+*/
 type Reporter interface {
 	// send report to backend
 	//
 	// parameters:
-	// - reports: a input channel to receive report to upload
+	// - reports: a input channel to receive reports from dingo.
 	// returns:
 	// - err: errors
 	Report(reports <-chan *Envelope) (id int, err error)
 }
 
-// read reports from backend
+/*
+ Store(s) is responsible for receiving reports from backend(s)
+*/
 type Store interface {
-	// polling results for tasks, callers maintain a list of 'to-check'.
+	// polling reports for tasks
+	//
+	// parameters:
+	// - id: the meta info of that task to be polled.
+	// returns:
+	// - reports: the output channel for dingo to receive reports.
 	Poll(id transport.Meta) (reports <-chan []byte, err error)
 
 	// TODO: test case, make sure queue is deleted after 'Done'
 
 	// Stop monitoring that task
 	//
-	// - ID of task / report are the same, therefore we use report here to
-	//   get ID of corresponding task.
+	// parameters:
+	// - id the meta info of that task/report to stop polling.
 	Done(id transport.Meta) error
 }
 

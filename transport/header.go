@@ -15,22 +15,68 @@ type Meta interface {
 const idLen int = 36
 const maxCountOfRegistries uint64 = uint64(^uint32(0))
 
-type Header struct {
-	T int16    // header type
-	I string   // dingo-generated id
-	N string   // task name
-	R []uint64 // a serious of uint, Marshaller would decide their usage
-}
+/*
+ The Common header section of the byte stream marshalled from Marshaller(s),
+ external components(broker.Producer, broker.Consumer, backend.Reporter, backend.Store) could rely
+ on Header to get some identity info from the byte stream they have, like this:
 
-//
-// Header
-//
+   h, err := DecodeHeader(b)
+   // the id of task
+   h.ID()
+   // the name of task
+   h.Name()
+
+ Registries could be added to Header. For example, if your Marshaller encodes each argument
+ in different byte streams, you could record their lengths(in byte) in registries section
+ in Header:
+
+   // marshalling
+   bs := [][]byte{}
+   h := task.H
+   for _, v := range args {
+     b_, _ := json.Marshal(v)
+	 h.Append(uint64(len(b_)))
+	 bs = append(bs, b_)
+   }
+
+   // compose those byte streams
+   b, _ := h.Flush() // header section
+   for _, v := range bs {
+	   b = append(b, v)
+   }
+
+   // unmarshalling
+   h, _ := DecodeHeader(b)
+   for _, v := range h.Registry() {
+     // you could rely on registry to decompose
+     // the byte stream here.
+   }
+*/
+type Header struct {
+	// header type, "dingo" would raise an error when encountering headers with
+	// unknown types.
+	T int16
+
+	// dingo-generated id for this task
+	I string
+
+	// task name
+	N string
+
+	// registries(a serious of uint64), their usage depends on Marshaller(s).
+	R []uint64
+}
 
 func (me *Header) Type() int16    { return me.T }
 func (me *Header) ID() string     { return me.I }
 func (me *Header) Name() string   { return me.N }
 func (me *Header) Length() uint64 { return uint64(50 + 8*len(me.R) + len(me.N)) }
+
+/*
+Flush the header to a byte stream. Note: after flushing, all registries would be reset.
+*/
 func (me *Header) Flush() ([]byte, error) {
+	// TODO: pre allocate size for []byte
 	defer me.Reset()
 
 	if len(me.I) != idLen {

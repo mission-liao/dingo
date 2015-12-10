@@ -7,8 +7,14 @@ import (
 	"reflect"
 )
 
-type JsonSafeMarshaller struct {
-}
+/*
+ Different from JsonMarshaller, which marshal []interface{} to a single byte stream.
+ JsonSafeMarshaller would marshal each element in []interface{} to separated byte steam,
+ and unmarshall them to variable with "more accurated" type.
+
+ Note: this Marshaller can be used with GenericInvoker and LazyInvoker
+*/
+type JsonSafeMarshaller struct{}
 
 func (me *JsonSafeMarshaller) Prepare(string, interface{}) (err error) {
 	return
@@ -262,10 +268,6 @@ func (me *JsonSafeMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) 
 	}
 	return
 }
-
-//
-// private function
-//
 
 func (me *JsonSafeMarshaller) encode(vs []interface{}) ([]byte, []uint64, error) {
 	bs, offs, length := make([][]byte, 0, len(vs)), make([]uint64, 0, len(vs)), uint64(0)

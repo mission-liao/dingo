@@ -7,11 +7,15 @@ import (
 	"strings"
 )
 
+/*
+ This Invoker is a generic one which can convert values from different types.
+ For example:
+  - a struct can be converted from a map or another struct.
+  - pointers or pointers of pointers or ... is also handled.
+ However, the flexibility comes with price, it's also the slowest option.
+ All builtin Marshaller(s) could be used with this Invoker.
+*/
 type GenericInvoker struct{}
-
-//
-// private function
-//
 
 func (vk *GenericInvoker) convert2slice(v, r reflect.Value, rt reflect.Type) (err error) {
 	if v.Kind() != reflect.Slice {
@@ -179,9 +183,6 @@ func (vk *GenericInvoker) convert(v reflect.Value, t reflect.Type) (reflect.Valu
 	return ret, err
 }
 
-//
-// helper function for converting a value based on a type
-//
 func (vk *GenericInvoker) from(val interface{}, t reflect.Type) (reflect.Value, error) {
 	if val == nil {
 		var err error
@@ -196,15 +197,12 @@ func (vk *GenericInvoker) from(val interface{}, t reflect.Type) (reflect.Value, 
 	return vk.convert(reflect.ValueOf(val), t)
 }
 
-//
-// Invoker interface
-//
-
-//
-// reference implementation
-//	  https://github.com/codegangsta/inject/blob/master/inject.go
-//
 func (vk *GenericInvoker) Call(f interface{}, param []interface{}) ([]interface{}, error) {
+	//
+	// reference implementation
+	//	  https://github.com/codegangsta/inject/blob/master/inject.go
+	//
+
 	var err error
 
 	funcT := reflect.TypeOf(f)

@@ -29,10 +29,14 @@ func NewMgr() (c *Mgr) {
 	ms := make(map[int16]Marshaller)
 	c.msLock.Lock()
 	defer c.msLock.Unlock()
+
+	// only GenericInvoker can handle things from JsonMarshaller
 	ms[Encode.JSON] = &struct {
 		JsonMarshaller
 		GenericInvoker
 	}{}
+
+	// LazyInvoker 'should' be faster than GenericInvoker
 	ms[Encode.GOB] = &struct {
 		GobMarshaller
 		LazyInvoker

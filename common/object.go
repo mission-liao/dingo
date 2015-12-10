@@ -1,11 +1,12 @@
 package common
 
 var InstT = struct {
-	DEFAULT        int
-	REPORTER       int
-	STORE          int
-	PRODUCER       int
-	CONSUMER       int
+	DEFAULT  int
+	REPORTER int
+	STORE    int
+	PRODUCER int
+	CONSUMER int
+	// TODO: monitor is deprecated
 	MONITOR        int
 	MAPPER         int
 	WORKER         int
