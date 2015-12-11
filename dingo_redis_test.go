@@ -13,12 +13,11 @@ import (
 // Redis(Broker) + Redis(Backend)
 //
 
-// TODO: make this private
-type RedisTestSuite struct {
+type redisTestSuite struct {
 	DingoTestSuite
 }
 
-func (me *RedisTestSuite) SetupSuite() {
+func (me *redisTestSuite) SetupSuite() {
 	me.DingoTestSuite.SetupSuite()
 
 	// broker
@@ -43,5 +42,5 @@ func (me *RedisTestSuite) SetupSuite() {
 }
 
 func TestDingoRedisSuite(t *testing.T) {
-	suite.Run(t, &RedisTestSuite{})
+	suite.Run(t, &redisTestSuite{})
 }

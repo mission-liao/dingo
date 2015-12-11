@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type MapperTestSuite struct {
+type mapperTestSuite struct {
 	suite.Suite
 
 	_mps            *_mappers
@@ -21,7 +21,7 @@ type MapperTestSuite struct {
 }
 
 func TestMapperSuite(t *testing.T) {
-	suite.Run(t, &MapperTestSuite{
+	suite.Run(t, &mapperTestSuite{
 		_trans:          transport.NewMgr(),
 		_tasks:          make(chan *transport.Task, 5),
 		_countOfMappers: 3,
@@ -30,7 +30,7 @@ func TestMapperSuite(t *testing.T) {
 	})
 }
 
-func (me *MapperTestSuite) SetupSuite() {
+func (me *mapperTestSuite) SetupSuite() {
 	var err error
 	me._mps, err = newMappers(me._trans)
 	me.Nil(err)
@@ -51,7 +51,7 @@ func (me *MapperTestSuite) SetupSuite() {
 	})
 }
 
-func (me *MapperTestSuite) TearDownSuite() {
+func (me *mapperTestSuite) TearDownSuite() {
 	me.Nil(me._mps.Close())
 	close(me._tasks)
 	me._receiptsMux.Close()
@@ -62,7 +62,7 @@ func (me *MapperTestSuite) TearDownSuite() {
 // test cases
 //
 
-func (me *MapperTestSuite) TestParellelMapping() {
+func (me *mapperTestSuite) TestParellelMapping() {
 	// make sure those mapper routines would be used
 	// when one is blocked.
 

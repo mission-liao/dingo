@@ -13,12 +13,11 @@ import (
 // Amqp(Broker) + Amqp(Backend)
 //
 
-// TODO: make this private
-type AmqpTestSuite struct {
+type amqpTestSuite struct {
 	DingoTestSuite
 }
 
-func (me *AmqpTestSuite) SetupSuite() {
+func (me *amqpTestSuite) SetupSuite() {
 	me.DingoTestSuite.SetupSuite()
 
 	// broker
@@ -43,5 +42,5 @@ func (me *AmqpTestSuite) SetupSuite() {
 }
 
 func TestDingoAmqpSuite(t *testing.T) {
-	suite.Run(t, &AmqpTestSuite{})
+	suite.Run(t, &amqpTestSuite{})
 }

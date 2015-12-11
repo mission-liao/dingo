@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type WorkerTestSuite struct {
+type workerTestSuite struct {
 	suite.Suite
 
 	_ws    *_workers
@@ -17,17 +17,17 @@ type WorkerTestSuite struct {
 }
 
 func TestWorkerSuite(t *testing.T) {
-	suite.Run(t, &WorkerTestSuite{})
+	suite.Run(t, &workerTestSuite{})
 }
 
-func (me *WorkerTestSuite) SetupSuite() {
+func (me *workerTestSuite) SetupSuite() {
 	var err error
 	me._trans = transport.NewMgr()
 	me._ws, err = newWorkers(me._trans)
 	me.Nil(err)
 }
 
-func (me *WorkerTestSuite) TearDownSuite() {
+func (me *workerTestSuite) TearDownSuite() {
 	me.Nil(me._ws.Close())
 }
 
@@ -35,7 +35,7 @@ func (me *WorkerTestSuite) TearDownSuite() {
 // test cases
 //
 
-func (me *WorkerTestSuite) TestParellelRun() {
+func (me *workerTestSuite) TestParellelRun() {
 	// make sure other workers would be called
 	// when one is blocked.
 
@@ -78,12 +78,12 @@ func (me *WorkerTestSuite) TestParellelRun() {
 	close(stepOut)
 }
 
-func (me *WorkerTestSuite) TestPanic() {
+func (me *workerTestSuite) TestPanic() {
 	// TODO: worker routine should recover from
 	// panic
 }
 
-func (me *WorkerTestSuite) TestIgnoreReport() {
+func (me *workerTestSuite) TestIgnoreReport() {
 	// allocate workers
 	tasks := make(chan *transport.Task)
 	me.Nil(me._trans.Register("TestIgnoreReport", func() {}, transport.Encode.Default, transport.Encode.Default))

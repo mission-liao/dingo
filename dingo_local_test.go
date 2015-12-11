@@ -15,12 +15,11 @@ import (
 // local(Broker) + local(Backend)
 //
 
-// TODO: make this private
-type LocalTestSuite struct {
+type localTestSuite struct {
 	DingoTestSuite
 }
 
-func (me *LocalTestSuite) SetupSuite() {
+func (me *localTestSuite) SetupSuite() {
 	me.DingoTestSuite.SetupSuite()
 
 	// broker
@@ -45,7 +44,7 @@ func (me *LocalTestSuite) SetupSuite() {
 }
 
 func TestDingoLocalSuite(t *testing.T) {
-	suite.Run(t, &LocalTestSuite{})
+	suite.Run(t, &localTestSuite{})
 }
 
 //
@@ -55,7 +54,7 @@ func TestDingoLocalSuite(t *testing.T) {
 // thus we only test it here.
 //
 
-func (me *LocalTestSuite) TestIgnoreReport() {
+func (me *localTestSuite) TestIgnoreReport() {
 	remain, err := me.app.Register(
 		"TestIgnoreReport", func() {}, 1, 1,
 		transport.Encode.Default, transport.Encode.Default,
@@ -177,7 +176,7 @@ func (me *customInvoker) Return(f interface{}, returns []interface{}) ([]interfa
 	return returns, nil
 }
 
-func (me *LocalTestSuite) TestCustomMarshaller() {
+func (me *localTestSuite) TestCustomMarshaller() {
 	fn := func(n int, name string) (msg string, count int) {
 		msg = name + "_'s message"
 		count = n + 1

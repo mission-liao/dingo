@@ -13,12 +13,11 @@ import (
 // Amqp(Broker) + Redis(Backend)
 //
 
-// TODO: make this private
-type AmqpRedisTestSuite struct {
+type amqpRedisTestSuite struct {
 	DingoTestSuite
 }
 
-func (me *AmqpRedisTestSuite) SetupSuite() {
+func (me *amqpRedisTestSuite) SetupSuite() {
 	me.DingoTestSuite.SetupSuite()
 
 	// broker
@@ -43,5 +42,5 @@ func (me *AmqpRedisTestSuite) SetupSuite() {
 }
 
 func TestDingoAmqpRedisSuite(t *testing.T) {
-	suite.Run(t, &AmqpRedisTestSuite{})
+	suite.Run(t, &amqpRedisTestSuite{})
 }
