@@ -1,7 +1,5 @@
 package dingo
 
-// TODO: add AddMarshaller
-
 import (
 	// standard
 	"errors"
@@ -185,6 +183,22 @@ func (me *App) Close() (err error) {
 	}()
 
 	return
+}
+
+/*
+ Register a customized Marshaller, input should be an object implements both
+ transport.Marshaller and transport.Invoker.
+
+ You can pick any builtin Invoker(s)/Marshaller(s) combined with your customized one:
+
+   app.AddMarshaller(3, &struct{transport.JsonSafeMarshaller, __your_customized_invoker__})
+
+ "expectedId" is the expected identifier of this Marshaller, which could be useful when you
+ need to sync the Marshaller-ID between producers and consumers. 0~3 are occupied by builtin
+ Marshaller(s). Suggested "expectedId" should begin from 100.
+*/
+func (me *App) AddMarshaller(expectedId int16, m transport.Marshaller) error {
+	return me.trans.AddMarshaller(expectedId, m)
 }
 
 /*
