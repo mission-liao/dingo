@@ -13,6 +13,7 @@ import (
 // Redis(Broker) + Redis(Backend)
 //
 
+// TODO: make this private
 type RedisTestSuite struct {
 	DingoTestSuite
 }

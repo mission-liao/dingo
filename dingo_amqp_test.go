@@ -13,6 +13,7 @@ import (
 // Amqp(Broker) + Amqp(Backend)
 //
 
+// TODO: make this private
 type AmqpTestSuite struct {
 	DingoTestSuite
 }

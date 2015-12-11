@@ -79,14 +79,14 @@ func ioJsonSafe() func(f interface{}, args ...interface{}) (v []interface{}, err
 	m := JsonSafeMarshaller{}
 	return func(f interface{}, args ...interface{}) (v []interface{}, err error) {
 		// encode
-		b, offs, err := m.encode(args)
+		bs, err := m.encode(args)
 		if err != nil {
 			return
 		}
 
 		// decode
 		funcT := reflect.TypeOf(f)
-		v, _, err = m.decode(b, offs, func(i int) reflect.Type {
+		v, err = m.decode(bs, func(i int) reflect.Type {
 			// for invoker, we mainly focus on input
 			return funcT.In(i)
 		})

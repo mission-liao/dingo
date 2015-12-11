@@ -56,7 +56,7 @@ func (me *JsonMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task 
 	}()
 
 	// decode payload
-	var payload *taskPayload
+	var payload *TaskPayload
 	err = json.Unmarshal(b[h.Length():], &payload)
 	if err == nil {
 		task = &Task{
@@ -93,7 +93,7 @@ func (me *JsonMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte
 }
 
 func (me *JsonMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (report *Report, err error) {
-	var payloads *reportPayload
+	var payloads *ReportPayload
 
 	// decode header
 	if h == nil {

@@ -262,7 +262,14 @@ func (me *_workers) _worker_routine_(
 			}
 		}
 
-		reports <- r
+		if r.Done() {
+			reports <- r
+		} else {
+			// TODO: test it
+			if !r.Option().OnlyResult() {
+				reports <- r
+			}
+		}
 	}
 	call := func(t *transport.Task) {
 		var (

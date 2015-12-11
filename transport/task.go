@@ -6,14 +6,14 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-type taskPayload struct {
+type TaskPayload struct {
 	O *Option
 	A []interface{}
 }
 
 type Task struct {
 	H *Header
-	P *taskPayload
+	P *TaskPayload
 }
 
 func ComposeTask(name string, opt *Option, args []interface{}) (*Task, error) {
@@ -22,7 +22,7 @@ func ComposeTask(name string, opt *Option, args []interface{}) (*Task, error) {
 	}
 	return &Task{
 		H: NewHeader(uuid.NewV4().String(), name),
-		P: &taskPayload{
+		P: &TaskPayload{
 			O: opt,
 			A: args,
 		},
@@ -58,7 +58,7 @@ func (t *Task) ComposeReport(s int16, r []interface{}, err interface{}) (*Report
 	}
 	return &Report{
 		H: t.H,
-		P: &reportPayload{
+		P: &ReportPayload{
 			S: s,
 			O: t.P.O,
 			E: err_,

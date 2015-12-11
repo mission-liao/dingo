@@ -90,7 +90,7 @@ func (me *GobMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *
 	}()
 
 	// decode payload
-	var payload *taskPayload
+	var payload *TaskPayload
 	err = gob.NewDecoder(bytes.NewBuffer(b[h.Length():])).Decode(&payload)
 	if err == nil {
 		task = &Task{
@@ -142,7 +142,7 @@ func (me *GobMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (repo
 	}()
 
 	// decode payload
-	var payload *reportPayload
+	var payload *ReportPayload
 	err = gob.NewDecoder(bytes.NewBuffer(b[h.Length():])).Decode(&payload)
 	if err == nil {
 		report = &Report{

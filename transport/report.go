@@ -4,7 +4,7 @@ import (
 	"reflect"
 )
 
-type reportPayload struct {
+type ReportPayload struct {
 	S int16
 	E *Error
 	O *Option
@@ -27,7 +27,7 @@ type reportPayload struct {
 */
 type Report struct {
 	H *Header
-	P *reportPayload
+	P *ReportPayload
 }
 
 var Status = struct {
@@ -65,6 +65,6 @@ func (r *Report) SetReturn(ret []interface{}) { r.P.R = ret }
 //
 
 func (r *Report) Done() bool               { return r.P.S == Status.Done || r.P.S == Status.Fail }
-func (r *Report) Ok() bool                 { return r.P.S == Status.Done }
+func (r *Report) OK() bool                 { return r.P.S == Status.Done }
 func (r *Report) Fail() bool               { return r.P.S == Status.Fail }
 func (r *Report) Equal(other *Report) bool { return reflect.DeepEqual(r, other) }

@@ -13,6 +13,7 @@ import (
 // Amqp(Broker) + Redis(Backend)
 //
 
+// TODO: make this private
 type AmqpRedisTestSuite struct {
 	DingoTestSuite
 }

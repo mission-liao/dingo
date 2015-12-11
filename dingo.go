@@ -216,6 +216,7 @@ func (me *App) AddMarshaller(expectedId int16, m transport.Marshaller) error {
   - err: any error produced
 */
 func (me *App) Register(name string, fn interface{}, count, share int, taskMash, reportMash int16) (remain int, err error) {
+	// TODO: move share, count to another function
 	me.objsLock.RLock()
 	defer me.objsLock.RUnlock()
 

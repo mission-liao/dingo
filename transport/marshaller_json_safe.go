@@ -1,11 +1,63 @@
 package transport
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
 )
+
+/*
+ slice of byte arrays could be composed into one byte stream, along with header section.
+*/
+func ComposeBytes(h *Header, bs [][]byte) (b []byte, err error) {
+	h.Reset()
+
+	length := 0
+	for _, v := range bs {
+		l := len(v)
+		length += l
+		h.Append(uint64(l))
+	}
+
+	bHead, err := h.Flush()
+	if err != nil {
+		return
+	}
+
+	w := bytes.NewBuffer(make([]byte, 0, length+len(bHead)))
+	w.Write(bHead)
+	for _, v := range bs {
+		w.Write(v)
+	}
+
+	b = w.Bytes()
+	return
+}
+
+/*
+ Byte streams composed by "ComposeByte" could be decomposed into [][]byte by
+ this function.
+*/
+func DecomposeBytes(h *Header, b []byte) (bs [][]byte, err error) {
+	ps := h.Registry()
+	bs = make([][]byte, 0, len(ps))
+	b = b[h.Length():]
+
+	c := uint64(0)
+	for k, p := range ps {
+		if c+p > uint64(len(b)) {
+			err = errors.New(fmt.Sprintf("buffer overrun: %d, %d, %d, %d", k, c, p, len(b)))
+			return
+		}
+
+		bs = append(bs, b[c:c+p])
+		c += p
+	}
+
+	return
+}
 
 /*
  Different from JsonMarshaller, which marshal []interface{} to a single byte stream.
@@ -37,31 +89,18 @@ func (me *JsonSafeMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, 
 	}
 
 	// args
-	bArgs, offs, err := me.encode(args)
+	bs, err := me.encode(args)
 	if err != nil {
 		return
 	}
+
 	// option
 	bOpt, err := json.Marshal(task.P.O)
 	if err != nil {
 		return
 	}
-	// here we assume 'option' is smaller than 'args'
-	offs = append(offs, uint64(len(bOpt)))
 
-	// update registries in header
-	for _, v := range offs {
-		task.H.Append(v)
-	}
-
-	// encode header
-	bHead, err := task.H.Flush()
-	if err != nil {
-		return
-	}
-
-	b = append(bHead, bArgs...)
-	b = append(b, bOpt...)
+	b, err = ComposeBytes(task.H, append(bs, bOpt))
 	return
 }
 
@@ -87,8 +126,13 @@ func (me *JsonSafeMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (t
 		return
 	}
 
+	bs, err := DecomposeBytes(h, b)
+	if err != nil {
+		return
+	}
+
 	// decode args
-	args, offset, err := me.decode(b[h.Length():], ps[:len(ps)-1], func(i int) reflect.Type {
+	args, err := me.decode(bs[:len(bs)-1], func(i int) reflect.Type {
 		return funcT.In(i)
 	})
 	if err != nil {
@@ -97,19 +141,16 @@ func (me *JsonSafeMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (t
 
 	// decode option
 	var o *Option
-	c := offset + h.Length()
 	{
-		p := ps[len(ps)-1]
-		err = json.Unmarshal(b[c:c+p], &o)
+		err = json.Unmarshal(bs[len(bs)-1], &o)
 		if err != nil {
 			return
 		}
-		c += p
 	}
 
 	task = &Task{
 		H: h,
-		P: &taskPayload{
+		P: &TaskPayload{
 			O: o,
 			A: args,
 		},
@@ -134,59 +175,27 @@ func (me *JsonSafeMarshaller) EncodeReport(fn interface{}, report *Report) (b []
 	}
 
 	// returns
-	bReturns, offs, err := me.encode(returns)
+	bs, err := me.encode(returns)
 	if err != nil {
 		return
 	}
 
-	var b_ []byte
-	// status
-	{
-		b_, err = json.Marshal(report.P.S)
-		if err != nil {
-			return
-		}
-
-		offs = append(offs, uint64(len(b_)))
-		// TODO: not efficient, should do this at that last
-		bReturns = append(bReturns, b_...)
-	}
-
-	// err
-	{
-		b_, err = json.Marshal(report.P.E)
-		if err != nil {
-			return
-		}
-
-		offs = append(offs, uint64(len(b_)))
-		// TODO: not efficient, should do this at that last
-		bReturns = append(bReturns, b_...)
-	}
-
-	// option
-	{
-		b_, err = json.Marshal(report.P.O)
-		if err != nil {
-			return
-		}
-
-		offs = append(offs, uint64(len(b_)))
-		// TODO: not efficient, should do this at that last
-		bReturns = append(bReturns, b_...)
-	}
-
-	for _, v := range offs {
-		report.H.Append(v)
-	}
-
-	// encode header
-	bHead, err := report.H.Flush()
+	bStatus, err := json.Marshal(report.P.S)
 	if err != nil {
 		return
 	}
 
-	b = append(bHead, bReturns...)
+	bErr, err := json.Marshal(report.P.E)
+	if err != nil {
+		return
+	}
+
+	bOpt, err := json.Marshal(report.P.O)
+	if err != nil {
+		return
+	}
+
+	b, err = ComposeBytes(report.H, append(bs, bStatus, bErr, bOpt))
 	return
 }
 
@@ -212,8 +221,13 @@ func (me *JsonSafeMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) 
 		return
 	}
 
+	bs, err := DecomposeBytes(h, b)
+	if err != nil {
+		return
+	}
+
 	// decode returns
-	returns, offset, err := me.decode(b[h.Length():], ps[:len(ps)-3], func(i int) reflect.Type {
+	returns, err := me.decode(bs[:len(bs)-3], func(i int) reflect.Type {
 		return funcT.Out(i)
 	})
 	if err != nil {
@@ -227,39 +241,26 @@ func (me *JsonSafeMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) 
 	)
 
 	// decode status
-	c := offset + h.Length()
-	{
-		p := ps[len(ps)-3]
-		err = json.Unmarshal(b[c:c+p], &s)
-		if err != nil {
-			return
-		}
-		c += p
+	err = json.Unmarshal(bs[len(bs)-3], &s)
+	if err != nil {
+		return
 	}
 
 	// decode err
-	{
-		p := ps[len(ps)-2]
-		err = json.Unmarshal(b[c:c+p], &e)
-		if err != nil {
-			return
-		}
-		c += p
+	err = json.Unmarshal(bs[len(bs)-2], &e)
+	if err != nil {
+		return
 	}
 
 	// decode option
-	{
-		p := ps[len(ps)-1]
-		err = json.Unmarshal(b[c:c+p], &o)
-		if err != nil {
-			return
-		}
-		c += p
+	err = json.Unmarshal(bs[len(bs)-1], &o)
+	if err != nil {
+		return
 	}
 
 	report = &Report{
 		H: h,
-		P: &reportPayload{
+		P: &ReportPayload{
 			S: s,
 			E: e,
 			O: o,
@@ -269,40 +270,28 @@ func (me *JsonSafeMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) 
 	return
 }
 
-func (me *JsonSafeMarshaller) encode(vs []interface{}) ([]byte, []uint64, error) {
-	bs, offs, length := make([][]byte, 0, len(vs)), make([]uint64, 0, len(vs)), uint64(0)
+func (me *JsonSafeMarshaller) encode(vs []interface{}) (bs [][]byte, err error) {
+	bs = make([][]byte, 0, len(vs))
 	for _, v := range vs {
-		b_, err := json.Marshal(v)
-		kk := string(b_)
-		fmt.Sprintf("%v", kk)
+		var b_ []byte
+		b_, err = json.Marshal(v)
 		if err != nil {
-			return nil, []uint64{}, err
+			return
 		}
 		bs = append(bs, b_)
-		offs = append(offs, uint64(len(b_)))
-		length += uint64(len(b_))
 	}
 
-	b := make([]byte, 0, length)
-	for _, v := range bs {
-		b = append(b, v...)
-	}
-
-	return b, offs, nil
+	return
 }
 
-func (me *JsonSafeMarshaller) decode(b []byte, offs []uint64, tfn func(i int) reflect.Type) ([]interface{}, uint64, error) {
-	vs := make([]interface{}, 0, len(offs))
-	c := uint64(0)
-	for k, o := range offs {
-		if c+o > uint64(len(b)) {
-			return nil, 0, errors.New(fmt.Sprintf("buffer overrun: %d, %d, %d, %d", k, c, o, len(b)))
-		}
+func (me *JsonSafeMarshaller) decode(bs [][]byte, tfn func(i int) reflect.Type) ([]interface{}, error) {
+	vs := make([]interface{}, 0, len(bs))
+	for k, b := range bs {
 		t := tfn(k)
 		v := reflect.New(t)
 		r := v.Elem() // cache the value for the right type
 		if r.CanInterface() == false {
-			return nil, 0, errors.New(fmt.Sprintf("can't interface of r %d:%v", k, t))
+			return nil, errors.New(fmt.Sprintf("can't interface of r %d:%v", k, t))
 		}
 
 		if t.Kind() != reflect.Ptr {
@@ -319,14 +308,13 @@ func (me *JsonSafeMarshaller) decode(b []byte, offs []uint64, tfn func(i int) re
 		}
 
 		// generate a zero value
-		err := json.Unmarshal(b[c:c+o], v.Interface())
+		err := json.Unmarshal(b, v.Interface())
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 
 		vs = append(vs, r.Interface())
-		c += o
 	}
 
-	return vs, c, nil
+	return vs, nil
 }

@@ -12,7 +12,7 @@ func TestReportMarshal(t *testing.T) {
 
 	body, err := json.Marshal(&Report{
 		H: NewHeader("test_id", "test_name"),
-		P: &reportPayload{
+		P: &ReportPayload{
 			S: 101,
 			E: &Error{102, "test error"},
 			O: NewOption().SetIgnoreReport(true),
