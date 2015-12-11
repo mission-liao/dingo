@@ -141,11 +141,9 @@ func (me *JsonSafeMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (t
 
 	// decode option
 	var o *Option
-	{
-		err = json.Unmarshal(bs[len(bs)-1], &o)
-		if err != nil {
-			return
-		}
+	err = json.Unmarshal(bs[len(bs)-1], &o)
+	if err != nil {
+		return
 	}
 
 	task = &Task{

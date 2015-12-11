@@ -76,10 +76,10 @@ func (me *localTestSuite) TestIgnoreReport() {
 // error-checking are skipped for simplicity.
 //
 
-type customMarshaller struct{}
+type testMyMarshaller struct{}
 
-func (me *customMarshaller) Prepare(string, interface{}) (err error) { return }
-func (me *customMarshaller) EncodeTask(fn interface{}, task *transport.Task) ([]byte, error) {
+func (me *testMyMarshaller) Prepare(string, interface{}) (err error) { return }
+func (me *testMyMarshaller) EncodeTask(fn interface{}, task *transport.Task) ([]byte, error) {
 	// encode args
 	bN, _ := json.Marshal(task.Args()[0])
 	bName, _ := json.Marshal(task.Args()[1])
@@ -88,7 +88,7 @@ func (me *customMarshaller) EncodeTask(fn interface{}, task *transport.Task) ([]
 	return transport.ComposeBytes(task.H, [][]byte{bN, bName, bOpt})
 }
 
-func (me *customMarshaller) DecodeTask(h *transport.Header, fn interface{}, b []byte) (task *transport.Task, err error) {
+func (me *testMyMarshaller) DecodeTask(h *transport.Header, fn interface{}, b []byte) (task *transport.Task, err error) {
 	var (
 		n    int
 		name string
@@ -110,7 +110,7 @@ func (me *customMarshaller) DecodeTask(h *transport.Header, fn interface{}, b []
 	return
 }
 
-func (me *customMarshaller) EncodeReport(fn interface{}, report *transport.Report) (b []byte, err error) {
+func (me *testMyMarshaller) EncodeReport(fn interface{}, report *transport.Report) (b []byte, err error) {
 	bs := [][]byte{}
 
 	// encode returns
@@ -131,7 +131,7 @@ func (me *customMarshaller) EncodeReport(fn interface{}, report *transport.Repor
 	return transport.ComposeBytes(report.H, bs)
 }
 
-func (me *customMarshaller) DecodeReport(h *transport.Header, fn interface{}, b []byte) (report *transport.Report, err error) {
+func (me *testMyMarshaller) DecodeReport(h *transport.Header, fn interface{}, b []byte) (report *transport.Report, err error) {
 	var (
 		msg   string
 		count int
@@ -162,9 +162,9 @@ func (me *customMarshaller) DecodeReport(h *transport.Header, fn interface{}, b 
 	return
 }
 
-type customInvoker struct{}
+type testMyInvoker struct{}
 
-func (me *customInvoker) Call(f interface{}, param []interface{}) ([]interface{}, error) {
+func (me *testMyInvoker) Call(f interface{}, param []interface{}) ([]interface{}, error) {
 	msg, count := f.(func(int, string) (string, int))(
 		param[0].(int),
 		param[1].(string),
@@ -172,8 +172,38 @@ func (me *customInvoker) Call(f interface{}, param []interface{}) ([]interface{}
 	return []interface{}{msg, count}, nil
 }
 
-func (me *customInvoker) Return(f interface{}, returns []interface{}) ([]interface{}, error) {
+func (me *testMyInvoker) Return(f interface{}, returns []interface{}) ([]interface{}, error) {
 	return returns, nil
+}
+
+func (me *localTestSuite) TestMyMarshaller() {
+	fn := func(n int, name string) (msg string, count int) {
+		msg = name + "_'s message"
+		count = n + 1
+		return
+	}
+
+	// register marshaller
+	mid := int16(101)
+	err := me.app.AddMarshaller(mid, &struct {
+		testMyInvoker
+		testMyMarshaller
+	}{})
+	me.Nil(err)
+
+	// allocate workers
+	remain, err := me.app.Register("TestMyMarshaller", fn, 1, 1, mid, mid)
+	me.Equal(0, remain)
+	me.Nil(err)
+
+	// initiate a task with an option(IgnoreReport == true)
+	reports, err := me.app.Call(
+		"TestMyMarshaller", transport.NewOption().SetOnlyResult(true), 12345, "mission",
+	)
+	me.Nil(err)
+	r := <-reports
+	me.Equal("mission_'s message", r.Return()[0].(string))
+	me.Equal(int(12346), r.Return()[1].(int))
 }
 
 func (me *localTestSuite) TestCustomMarshaller() {
@@ -184,11 +214,50 @@ func (me *localTestSuite) TestCustomMarshaller() {
 	}
 
 	// register marshaller
-	mid := int16(101)
+	mid := int16(102)
 	err := me.app.AddMarshaller(mid, &struct {
-		customInvoker
-		customMarshaller
-	}{})
+		testMyInvoker
+		transport.CustomMarshaller
+	}{
+		testMyInvoker{},
+		transport.CustomMarshaller{
+			Encode: func(output bool, val []interface{}) (bs [][]byte, err error) {
+				bs = [][]byte{}
+				if output {
+					bMsg, _ := json.Marshal(val[0])
+					bCount, _ := json.Marshal(val[1])
+					bs = append(bs, bMsg, bCount)
+				} else {
+					bN, _ := json.Marshal(val[0])
+					bName, _ := json.Marshal(val[1])
+					bs = append(bs, bN, bName)
+				}
+				return
+			},
+			Decode: func(output bool, bs [][]byte) (val []interface{}, err error) {
+				val = []interface{}{}
+				if output {
+					var (
+						msg string
+						n   int
+					)
+					json.Unmarshal(bs[0], &msg)
+					json.Unmarshal(bs[1], &n)
+					val = append(val, msg, n)
+				} else {
+					var (
+						n    int
+						name string
+					)
+					json.Unmarshal(bs[0], &n)
+					json.Unmarshal(bs[1], &name)
+					val = append(val, n, name)
+				}
+
+				return
+			},
+		},
+	})
 	me.Nil(err)
 
 	// allocate workers
@@ -198,10 +267,88 @@ func (me *localTestSuite) TestCustomMarshaller() {
 
 	// initiate a task with an option(IgnoreReport == true)
 	reports, err := me.app.Call(
-		"TestCustomMarshaller", transport.NewOption().SetOnlyResult(true), 12345, "mission",
+		"TestCustomMarshaller", transport.NewOption(), 12345, "mission",
 	)
 	me.Nil(err)
-	r := <-reports
-	me.Equal("mission_'s message", r.Return()[0].(string))
-	me.Equal(int(12346), r.Return()[1].(int))
+
+finished:
+	for {
+		select {
+		case r := <-reports:
+			if r.OK() {
+				me.Equal("mission_'s message", r.Return()[0].(string))
+				me.Equal(int(12346), r.Return()[1].(int))
+			}
+			if r.Fail() {
+				me.Fail("this task is failed, unexpected")
+			}
+			if r.Done() {
+				break finished
+			}
+		}
+	}
+}
+
+type testMyInvoker2 struct{}
+
+func (me *testMyInvoker2) Call(f interface{}, param []interface{}) ([]interface{}, error) {
+	f.(func())()
+	return nil, nil
+}
+
+func (me *testMyInvoker2) Return(f interface{}, returns []interface{}) ([]interface{}, error) {
+	return returns, nil
+}
+
+func (me *localTestSuite) TestCustomMarshallerWithMinimalFunc() {
+	called := false
+	fn := func() {
+		called = true
+	}
+
+	// register marshaller
+	mid := int16(103)
+	err := me.app.AddMarshaller(mid, &struct {
+		testMyInvoker2
+		transport.CustomMarshaller
+	}{
+		testMyInvoker2{},
+		transport.CustomMarshaller{
+			Encode: func(output bool, val []interface{}) (bs [][]byte, err error) {
+				return
+			},
+			Decode: func(output bool, bs [][]byte) (val []interface{}, err error) {
+				return
+			},
+		},
+	})
+	me.Nil(err)
+
+	// allocate workers
+	remain, err := me.app.Register("TestCustomMarshallerWithMinimalFunc", fn, 1, 1, mid, mid)
+	me.Equal(0, remain)
+	me.Nil(err)
+
+	// initiate a task with an option(IgnoreReport == true)
+	reports, err := me.app.Call(
+		"TestCustomMarshallerWithMinimalFunc", transport.NewOption(),
+	)
+	me.Nil(err)
+
+finished:
+	for {
+		select {
+		case r := <-reports:
+			if r.OK() {
+				me.Len(r.Return(), 0)
+			}
+			if r.Fail() {
+				me.Fail("this task is failed, unexpected")
+			}
+			if r.Done() {
+				break finished
+			}
+		}
+	}
+	me.True(called)
 }
