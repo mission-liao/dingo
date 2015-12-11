@@ -30,7 +30,7 @@ func (me *JsonMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, err 
 	}
 
 	// encode header
-	bHead, err := task.H.Flush()
+	bHead, err := task.H.Flush(uint64(len(bPayload)))
 	if err != nil {
 		return
 	}
@@ -76,14 +76,14 @@ func (me *JsonMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte
 	// reset registry
 	report.H.Reset()
 
-	// encode header
-	bHead, err := report.H.Flush()
+	// encode payload
+	bPayload, err := json.Marshal(report.P)
 	if err != nil {
 		return
 	}
 
-	// encode payload
-	bPayload, err := json.Marshal(report.P)
+	// encode header
+	bHead, err := report.H.Flush(uint64(len(bPayload)))
 	if err != nil {
 		return
 	}

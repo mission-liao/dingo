@@ -59,16 +59,16 @@ func (me *GobMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, err e
 	task.H.Reset()
 
 	// encode header
-	bHead, err := task.H.Flush()
+	bHead, err := task.H.Flush(0)
 	if err != nil {
 		return
 	}
 
 	// encode payload
-	var buff *bytes.Buffer = new(bytes.Buffer)
+	var buff *bytes.Buffer = bytes.NewBuffer(bHead)
 	err = gob.NewEncoder(buff).Encode(task.P)
 	if err == nil {
-		b = append(bHead, buff.Bytes()...)
+		b = buff.Bytes()
 	}
 	return
 }
@@ -111,16 +111,16 @@ func (me *GobMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte,
 	report.H.Reset()
 
 	// encode header
-	bHead, err := report.H.Flush()
+	bHead, err := report.H.Flush(0)
 	if err != nil {
 		return
 	}
 
 	// encode payload
-	var buff *bytes.Buffer = new(bytes.Buffer)
+	var buff *bytes.Buffer = bytes.NewBuffer(bHead)
 	err = gob.NewEncoder(buff).Encode(report.P)
 	if err == nil {
-		b = append(bHead, buff.Bytes()...)
+		b = buff.Bytes()
 	}
 	return
 }

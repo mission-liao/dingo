@@ -21,13 +21,12 @@ func ComposeBytes(h *Header, bs [][]byte) (b []byte, err error) {
 		h.Append(uint64(l))
 	}
 
-	bHead, err := h.Flush()
+	bHead, err := h.Flush(uint64(length))
 	if err != nil {
 		return
 	}
 
-	w := bytes.NewBuffer(make([]byte, 0, length+len(bHead)))
-	w.Write(bHead)
+	w := bytes.NewBuffer(bHead)
 	for _, v := range bs {
 		w.Write(v)
 	}

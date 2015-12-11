@@ -40,7 +40,7 @@ const maxCountOfRegistries uint64 = uint64(^uint32(0))
    }
 
    // compose those byte streams
-   b, _ := h.Flush() // header section
+   b, _ := h.Flush(0) // header section
    for _, v := range bs {
 	   b = append(b, v)
    }
@@ -75,8 +75,7 @@ func (me *Header) Length() uint64 { return uint64(50 + 8*len(me.R) + len(me.N)) 
 /*
 Flush the header to a byte stream. Note: after flushing, all registries would be reset.
 */
-func (me *Header) Flush() ([]byte, error) {
-	// TODO: pre allocate size for []byte
+func (me *Header) Flush(prealloc uint64) ([]byte, error) {
 	defer me.Reset()
 
 	if len(me.I) != idLen {
@@ -85,7 +84,7 @@ func (me *Header) Flush() ([]byte, error) {
 
 	// type(2) || total-length(8) || id(36) || count of registries(4) || registries(?) || name(?)
 	length := me.Length()
-	b := make([]byte, length)
+	b := make([]byte, length, length+prealloc)
 
 	// type -- 4 bytes
 	binary.PutVarint(b[:2], int64(me.T))

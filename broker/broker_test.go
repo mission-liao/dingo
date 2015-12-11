@@ -67,7 +67,7 @@ func (me *BrokerTestSuite) TestBasic() {
 	}
 
 	// generate a header byte stream
-	hb, err := transport.NewHeader(t.ID(), t.Name()).Flush()
+	hb, err := transport.NewHeader(t.ID(), t.Name()).Flush(0)
 	me.Nil(err)
 	if err != nil {
 		return

@@ -14,7 +14,7 @@ func TestHeader(t *testing.T) {
 		id := "041ebfa0-9b6e-11e5-ae12-0002a5d5c51b"
 		name := "test"
 
-		b, err := NewHeader(id, name).Flush()
+		b, err := NewHeader(id, name).Flush(0)
 		ass.Nil(err)
 
 		h, err := DecodeHeader(b)
@@ -28,7 +28,7 @@ func TestHeader(t *testing.T) {
 		id := ""
 		name := "test"
 
-		_, err := NewHeader(id, name).Flush()
+		_, err := NewHeader(id, name).Flush(0)
 		ass.NotNil(err)
 	}
 
@@ -37,7 +37,7 @@ func TestHeader(t *testing.T) {
 		id := "4c257820-9b6e-11e5-b7d5-0002a5d5c51b"
 		name := ""
 
-		b, err := NewHeader(id, name).Flush()
+		b, err := NewHeader(id, name).Flush(0)
 		ass.Nil(err)
 
 		h, err := DecodeHeader(b)
@@ -51,7 +51,7 @@ func TestHeader(t *testing.T) {
 		id := "7dd224e0-9b6e-11e5-aa62-0002a5d5c51b"
 		name := ""
 
-		b, err := NewHeader(id, name).Flush()
+		b, err := NewHeader(id, name).Flush(0)
 		ass.Nil(err)
 
 		b[0] ^= 0xff
@@ -65,7 +65,7 @@ func TestHeader(t *testing.T) {
 		id := "7dd224e0-9b6e-11e5-aa62-0002a5d5c51b"
 		name := ""
 
-		b, err := NewHeader(id, name).Flush()
+		b, err := NewHeader(id, name).Flush(0)
 		ass.Nil(err)
 
 		h, err := DecodeHeader(b[:48])
@@ -85,7 +85,7 @@ func TestHeader(t *testing.T) {
 			h.Append(10)
 		}
 
-		b, err := h.Flush()
+		b, err := h.Flush(0)
 		ass.Nil(err)
 
 		h, err = DecodeHeader(b)
@@ -98,7 +98,7 @@ func TestHeader(t *testing.T) {
 
 		// reset
 		h.Reset()
-		b, err = h.Flush()
+		b, err = h.Flush(0)
 		ass.Nil(err)
 
 		h, err = DecodeHeader(b)
@@ -111,7 +111,7 @@ func TestHeader(t *testing.T) {
 			h.Append(10)
 		}
 		ass.Len(h.Registry(), 1000)
-		_, err = h.Flush()
+		_, err = h.Flush(0)
 		ass.Nil(err)
 		ass.Len(h.Registry(), 0)
 	}
