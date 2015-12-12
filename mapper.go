@@ -136,46 +136,63 @@ func (m *_mappers) _mapper_routine_(
 	receipts chan<- *broker.Receipt,
 ) {
 	defer wait.Done()
+	defer close(receipts)
+
+	receive := func(t *transport.Task) {
+		// find registered worker
+		err := m.dispatch(t)
+
+		// compose a receipt
+		var rpt broker.Receipt
+		if err != nil {
+			// send an error event
+			events <- common.NewEventFromError(common.InstT.MAPPER, err)
+
+			if err == errWorkerNotFound {
+				rpt = broker.Receipt{
+					Status: broker.Status.WORKER_NOT_FOUND,
+				}
+			} else {
+				rpt = broker.Receipt{
+					Status:  broker.Status.NOK,
+					Payload: err,
+				}
+			}
+		} else {
+			rpt = broker.Receipt{
+				Status: broker.Status.OK,
+			}
+		}
+		receipts <- &rpt
+	}
+
+finished:
 	for {
 		select {
 		case t, ok := <-tasks:
 			if !ok {
-				goto cleanup
+				break finished
 			}
-
-			// find registered worker
-			err := m.dispatch(t)
-
-			// compose a receipt
-			var rpt broker.Receipt
-			if err != nil {
-				// send an error event
-				events <- common.NewEventFromError(common.InstT.MAPPER, err)
-
-				if err == errWorkerNotFound {
-					rpt = broker.Receipt{
-						Status: broker.Status.WORKER_NOT_FOUND,
-					}
-				} else {
-					rpt = broker.Receipt{
-						Status:  broker.Status.NOK,
-						Payload: err,
-					}
-				}
-			} else {
-				rpt = broker.Receipt{
-					Status: broker.Status.OK,
-				}
-			}
-			receipts <- &rpt
+			receive(t)
 
 		case <-quit:
 			// clean up code below
-			goto cleanup
+			break finished
 		}
 	}
-cleanup:
-	// TODO: cleanup
-	close(receipts)
+
+done:
+	// consuming remaining tasks in channel.
+	for {
+		select {
+		case t, ok := <-tasks:
+			if !ok {
+				break done
+			}
+			receive(t)
+		default:
+			break done
+		}
+	}
 	return
 }
