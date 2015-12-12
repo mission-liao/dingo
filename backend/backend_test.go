@@ -14,6 +14,7 @@ type BackendTestSuite struct {
 	_reporter Reporter
 	_store    Store
 	_reports  chan *Envelope
+	_task     *transport.Task
 }
 
 func (me *BackendTestSuite) SetupSuite() {
@@ -42,11 +43,11 @@ func (me *BackendTestSuite) TestBasic() {
 	err := me._trans.Register("basic", func() {}, transport.Encode.Default, transport.Encode.Default)
 
 	// compose a dummy task
-	task, err := transport.ComposeTask("basic", nil, []interface{}{})
+	me._task, err = transport.ComposeTask("basic", nil, []interface{}{})
 	me.Nil(err)
 
 	// send a report
-	report, err := task.ComposeReport(transport.Status.Sent, make([]interface{}, 0), nil)
+	report, err := me._task.ComposeReport(transport.Status.Sent, make([]interface{}, 0), nil)
 	me.Nil(err)
 	{
 		b, err := me._trans.EncodeReport(report)
@@ -58,7 +59,7 @@ func (me *BackendTestSuite) TestBasic() {
 	}
 
 	// poll corresponding task
-	reports, err := me._store.Poll(task)
+	reports, err := me._store.Poll(me._task)
 	me.Nil(err)
 	me.NotNil(reports)
 	select {
@@ -73,5 +74,5 @@ func (me *BackendTestSuite) TestBasic() {
 	}
 
 	// done polling
-	me.Nil(me._store.Done(task))
+	me.Nil(me._store.Done(me._task))
 }

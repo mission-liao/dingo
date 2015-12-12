@@ -42,8 +42,6 @@ type Store interface {
 	// - reports: the output channel for dingo to receive reports.
 	Poll(id transport.Meta) (reports <-chan []byte, err error)
 
-	// TODO: test case, make sure queue is deleted after 'Done'
-
 	// Stop monitoring that task
 	//
 	// parameters:
