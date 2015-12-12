@@ -82,7 +82,7 @@ func (me *DingoTestSuite) TestBasic() {
 	status := []int16{
 		transport.Status.Sent,
 		transport.Status.Progress,
-		transport.Status.Done,
+		transport.Status.Success,
 	}
 	for {
 		done := false

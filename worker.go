@@ -272,6 +272,12 @@ func (me *_workers) _worker_routine_(
 		}
 	}
 	call := func(t *transport.Task) {
+		defer func() {
+			if r := recover(); r != nil {
+				rep(t, transport.Status.Panic, nil, transport.NewErr(0, errors.New(fmt.Sprintf("%v", r))))
+			}
+		}()
+
 		var (
 			ret       []interface{}
 			err, err_ error
@@ -292,7 +298,7 @@ func (me *_workers) _worker_routine_(
 			status = transport.Status.Fail
 			events <- common.NewEventFromError(common.InstT.WORKER, err_)
 		} else {
-			status = transport.Status.Done
+			status = transport.Status.Success
 		}
 		rep(t, status, ret, err)
 	}

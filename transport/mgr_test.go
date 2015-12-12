@@ -35,7 +35,7 @@ func TestMgrMarshallers(t *testing.T) {
 	}
 
 	{
-		report, err := task.ComposeReport(Status.Done, []interface{}{"test", int64(2)}, errors.New("test error"))
+		report, err := task.ComposeReport(Status.Success, []interface{}{"test", int64(2)}, errors.New("test error"))
 		ass.Nil(err)
 
 		// report encoded by gob
@@ -78,7 +78,7 @@ func TestMgrInvokers(t *testing.T) {
 	ass.Equal(int8(3), ret[0].(int8))
 
 	// Compose a Report, with wrong type of output
-	report, err := task.ComposeReport(Status.Done, []interface{}{int32(2)}, nil)
+	report, err := task.ComposeReport(Status.Success, []interface{}{int32(2)}, nil)
 	ass.Nil(err)
 
 	// fix Return, the type of return value would become 'int8'

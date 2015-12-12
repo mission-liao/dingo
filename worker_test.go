@@ -79,8 +79,26 @@ func (me *workerTestSuite) TestParellelRun() {
 }
 
 func (me *workerTestSuite) TestPanic() {
-	// TODO: worker routine should recover from
-	// panic
+	// allocate workers
+	tasks := make(chan *transport.Task)
+	me.Nil(me._trans.Register("TestPanic", func() { panic("QQ") }, transport.Encode.Default, transport.Encode.Default))
+	reports, remain, err := me._ws.allocate("TestPanic", tasks, nil, 1, 0)
+	me.Nil(err)
+	me.Equal(0, remain)
+	me.Len(reports, 1)
+
+	// an option with OnlyResult == true
+	task, err := transport.ComposeTask("TestPanic", transport.NewOption().SetOnlyResult(true), nil)
+	me.NotNil(task)
+	me.Nil(err)
+	if task != nil {
+		// sending a task
+		tasks <- task
+		// await for reports
+		r := <-reports[0]
+		// should be a failed one
+		me.True(r.Panic())
+	}
 }
 
 func (me *workerTestSuite) TestIgnoreReport() {
@@ -107,4 +125,8 @@ func (me *workerTestSuite) TestIgnoreReport() {
 			// wait for 0.5 second
 		}
 	}
+}
+
+func (me *workerTestSuite) TestOnlyResult() {
+	// TODO: test only result option
 }

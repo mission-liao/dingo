@@ -187,7 +187,7 @@ func (me *BridgeTestSuite) _TestReport() {
 	// a report with 'Done' == true
 	// the output channel should be closed
 	{
-		input, err := t.ComposeReport(transport.Status.Done, nil, nil)
+		input, err := t.ComposeReport(transport.Status.Success, nil, nil)
 		me.Nil(err)
 		reports <- input
 		r, ok := <-outputs
@@ -239,7 +239,7 @@ func (me *BridgeTestSuite) _TestPoll() {
 		me.Nil(err)
 		rs[k/2] <- r
 
-		r, err = t.ComposeReport(transport.Status.Done, nil, nil)
+		r, err = t.ComposeReport(transport.Status.Success, nil, nil)
 		me.Nil(err)
 		rs[k/2] <- r
 	}
@@ -261,7 +261,7 @@ func (me *BridgeTestSuite) _TestPoll() {
 		me.Equal(transport.Status.Progress, r.Status())
 		r, ok = <-out
 		me.True(ok)
-		me.Equal(transport.Status.Done, r.Status())
+		me.Equal(transport.Status.Success, r.Status())
 		r, ok = <-out
 		me.False(ok)
 	}
