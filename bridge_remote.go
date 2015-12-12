@@ -225,6 +225,13 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 		outputs chan<- *transport.Report,
 	) {
 		defer wait.Done()
+		defer func() {
+			err = me.store.Done(t)
+			if err != nil {
+				events <- common.NewEventFromError(common.InstT.STORE, err)
+			}
+		}()
+
 		out := func(b []byte) (done bool) {
 			r, err := me.trans.DecodeReport(b)
 			if err != nil {
@@ -243,37 +250,34 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 			done = r.Done()
 			return
 		}
+
+	finished:
 		for {
 			select {
 			case _, _ = <-quit:
-				goto clean
+				break finished
 			case v, ok := <-inputs:
 				if !ok {
-					goto clean
+					break finished
 				}
 				if out(v) {
-					goto clean
+					break finished
 				}
 			}
 		}
-	clean:
-		finished := false
+
+	done:
 		for {
 			select {
 			case v, ok := <-inputs:
 				if !ok {
-					finished = true
-					break
+					break done
 				}
 				out(v)
 			default:
-				finished = true
-			}
-			if finished {
-				break
+				break done
 			}
 		}
-		// TODO: make sure 'Done' of backend is called
 		close(outputs)
 	}(me.storers.New(), me.storers.Wait(), me.storers.Events(), r, reports2)
 
