@@ -207,16 +207,34 @@ func (me *App) AddMarshaller(expectedId int16, m transport.Marshaller) error {
  parameters:
   - name: name of tasks
   - fn: the function that actually perform the task.
+  - taskMash, reportMash: id of transport.Marshaller for 'transport.Task' and 'transport.Report'
+
+ returns:
+  - err: any error produced
+*/
+func (me *App) Register(name string, fn interface{}, taskMash, reportMash int16) error {
+	return me.trans.Register(name, fn, taskMash, reportMash)
+}
+
+/*
+ allocate more workers.
+
+ parameters:
+  - name:
   - count: count of workers to be initialized.
   - share: the count of workers sharing one report channel.
-  - taskMash, reportMash: id of transport.Marshaller for 'transport.Task' and 'transport.Report'
 
  returns:
   - remain: remaining count of workers that failed to initialize.
   - err: any error produced
 */
-func (me *App) Register(name string, fn interface{}, count, share int, taskMash, reportMash int16) (remain int, err error) {
-	// TODO: move share, count to another function
+func (me *App) Allocate(name string, count, share int) (remain int, err error) {
+	// check if this name register
+	_, err = me.trans.GetOption(name)
+	if err != nil {
+		return
+	}
+
 	me.objsLock.RLock()
 	defer me.objsLock.RUnlock()
 
@@ -224,12 +242,6 @@ func (me *App) Register(name string, fn interface{}, count, share int, taskMash,
 		tasks   <-chan *transport.Task
 		reports []<-chan *transport.Report
 	)
-
-	// set encoder/decoder
-	err = me.trans.Register(name, fn, taskMash, reportMash)
-	if err != nil {
-		return
-	}
 
 	if me.b.Exists(common.InstT.NAMED_CONSUMER) {
 		receipts := make(chan *broker.Receipt, 10)
@@ -246,6 +258,9 @@ func (me *App) Register(name string, fn interface{}, count, share int, taskMash,
 		if err != nil {
 			return
 		}
+	} else {
+		err = errors.New("there is no consumer attached")
+		return
 	}
 
 	for _, v := range reports {

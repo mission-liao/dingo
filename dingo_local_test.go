@@ -55,10 +55,12 @@ func TestDingoLocalSuite(t *testing.T) {
 //
 
 func (me *localTestSuite) TestIgnoreReport() {
-	remain, err := me.app.Register(
-		"TestIgnoreReport", func() {}, 1, 1,
+	// initiate workers
+	me.Nil(me.app.Register(
+		"TestIgnoreReport", func() {},
 		transport.Encode.Default, transport.Encode.Default,
-	)
+	))
+	remain, err := me.app.Allocate("TestIgnoreReport", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
@@ -192,7 +194,8 @@ func (me *localTestSuite) TestMyMarshaller() {
 	me.Nil(err)
 
 	// allocate workers
-	remain, err := me.app.Register("TestMyMarshaller", fn, 1, 1, mid, mid)
+	me.Nil(me.app.Register("TestMyMarshaller", fn, mid, mid))
+	remain, err := me.app.Allocate("TestMyMarshaller", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
@@ -222,20 +225,18 @@ func (me *localTestSuite) TestCustomMarshaller() {
 		testMyInvoker{},
 		transport.CustomMarshaller{
 			Encode: func(output bool, val []interface{}) (bs [][]byte, err error) {
-				bs = [][]byte{}
 				if output {
 					bMsg, _ := json.Marshal(val[0])
 					bCount, _ := json.Marshal(val[1])
-					bs = append(bs, bMsg, bCount)
+					bs = [][]byte{bMsg, bCount}
 				} else {
 					bN, _ := json.Marshal(val[0])
 					bName, _ := json.Marshal(val[1])
-					bs = append(bs, bN, bName)
+					bs = [][]byte{bN, bName}
 				}
 				return
 			},
 			Decode: func(output bool, bs [][]byte) (val []interface{}, err error) {
-				val = []interface{}{}
 				if output {
 					var (
 						msg string
@@ -243,7 +244,7 @@ func (me *localTestSuite) TestCustomMarshaller() {
 					)
 					json.Unmarshal(bs[0], &msg)
 					json.Unmarshal(bs[1], &n)
-					val = append(val, msg, n)
+					val = []interface{}{msg, n}
 				} else {
 					var (
 						n    int
@@ -251,9 +252,8 @@ func (me *localTestSuite) TestCustomMarshaller() {
 					)
 					json.Unmarshal(bs[0], &n)
 					json.Unmarshal(bs[1], &name)
-					val = append(val, n, name)
+					val = []interface{}{n, name}
 				}
-
 				return
 			},
 		},
@@ -261,7 +261,8 @@ func (me *localTestSuite) TestCustomMarshaller() {
 	me.Nil(err)
 
 	// allocate workers
-	remain, err := me.app.Register("TestCustomMarshaller", fn, 1, 1, mid, mid)
+	me.Nil(me.app.Register("TestCustomMarshaller", fn, mid, mid))
+	remain, err := me.app.Allocate("TestCustomMarshaller", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
@@ -325,7 +326,8 @@ func (me *localTestSuite) TestCustomMarshallerWithMinimalFunc() {
 	me.Nil(err)
 
 	// allocate workers
-	remain, err := me.app.Register("TestCustomMarshallerWithMinimalFunc", fn, 1, 1, mid, mid)
+	me.Nil(me.app.Register("TestCustomMarshallerWithMinimalFunc", fn, mid, mid))
+	remain, err := me.app.Allocate("TestCustomMarshallerWithMinimalFunc", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 

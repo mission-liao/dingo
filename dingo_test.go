@@ -60,16 +60,18 @@ func (me *DingoTestSuite) TearDownSuite() {
 
 func (me *DingoTestSuite) TestBasic() {
 	// register a set of workers
+	_ = "breakpoint"
 	called := 0
-	remain, err := me.app.Register("TestBasic",
+	err := me.app.Register("TestBasic",
 		func(n int) int {
 			called = n
 			return n + 1
-		}, 1, 1,
-		transport.Encode.Default, transport.Encode.Default,
+		}, transport.Encode.Default, transport.Encode.Default,
 	)
-	me.Equal(0, remain)
 	me.Nil(err)
+	remain, err := me.app.Allocate("TestBasic", 1, 1)
+	me.Nil(err)
+	me.Equal(0, remain)
 
 	// call that function
 	reports, err := me.app.Call("TestBasic", nil, 5)

@@ -165,18 +165,12 @@ func (me *Mgr) SetOption(name string, opt *Option) (err error) {
 
 func (me *Mgr) GetOption(name string) (opt *Option, err error) {
 	fns := me.fn2opt.Load().(map[string]*fnOpt)
-	if _, ok := fns[name]; !ok {
+	if fn, ok := fns[name]; ok {
+		opt = fn.opt
+	} else {
 		err = errors.New(fmt.Sprintf("name %v doesn't exists", name))
-		return
 	}
 
-	fn, ok := fns[name]
-	if !ok {
-		err = errors.New(fmt.Sprintf("name %v doesn't exist", name))
-		return
-	}
-
-	opt = fn.opt
 	return
 }
 
