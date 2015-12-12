@@ -107,8 +107,7 @@ func (me *_redis) Done(id transport.Meta) (err error) {
 		return
 	}
 
-	// TODO: delete key
-
+	delete(me.rids, id.ID())
 	return me.stores.Stop(v)
 }
 
@@ -146,12 +145,21 @@ clean:
 }
 
 func (me *_redis) _store_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports chan<- []byte, id transport.Meta) {
+	conn := me.pool.Get()
 	defer func() {
 		done <- 1
-	}()
 
-	conn := me.pool.Get()
-	defer conn.Close()
+		// delete key in redis
+		_, err := conn.Do("DEL", getKey(id))
+		if err != nil {
+			events <- common.NewEventFromError(common.InstT.STORE, err)
+		}
+
+		err = conn.Close()
+		if err != nil {
+			events <- common.NewEventFromError(common.InstT.STORE, err)
+		}
+	}()
 
 	for {
 		select {
