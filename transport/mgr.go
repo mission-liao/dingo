@@ -90,8 +90,6 @@ func (me *Mgr) Register(name string, fn interface{}, msTask, msReport int16) (er
 		return
 	}
 
-	// TODO: test case
-
 	// check existence of marshaller IDs
 	ms := me.ms.Load().(map[int16]Marshaller)
 	chk := func(id int16) (err error) {

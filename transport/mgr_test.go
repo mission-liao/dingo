@@ -2,6 +2,7 @@ package transport
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,10 +11,9 @@ import (
 func TestMgrMarshallers(t *testing.T) {
 	ass := assert.New(t)
 	trans := NewMgr()
-	nothing := func() {}
-	ass.Nil(trans.Register("TestMgrMarshallers", nothing, Encode.JSON, Encode.GOB))
+	ass.Nil(trans.Register("TestMgrMarshallers", func() {}, Encode.JSON, Encode.GOB))
 	task, err := ComposeTask("TestMgrMarshallers", nil, []interface{}{float64(1)})
-	task.H.I = "a2a2da60-9cba-11e5-b690-0002a5d5c51b"
+	task.H.I = "a2a2da60-9cba-11e5-b690-0002a5d5c51b" // fix ID for testing
 	ass.Nil(err)
 
 	{
@@ -46,8 +46,8 @@ func TestMgrMarshallers(t *testing.T) {
 		h, err := DecodeHeader(b)
 		ass.Nil(err)
 
-		// make sure it's gob
-		ass.Equal("6\xff\x91\x03\x01\x01\rReportPayload\x01\xff\x92\x00\x01\x04\x01\x01S\x01\x04\x00\x01\x01E\x01\xff\x94\x00\x01\x01O\x01\xff\x96\x00\x01\x01R\x01\xff\x82\x00\x00\x00\x1f\xff\x93\x03\x01\x01\x05Error\x01\xff\x94\x00\x01\x02\x01\x01C\x01\x04\x00\x01\x01M\x01\f\x00\x00\x00\"\xff\x95\x03\x01\x01\x06Option\x01\xff\x96\x00\x01\x02\x01\x02IR\x01\x02\x00\x01\x02OR\x01\x02\x00\x00\x00\f\xff\x81\x02\x01\x02\xff\x82\x00\x01\x10\x00\x000\xff\x92\x01\x06\x01\x02\ntest error\x00\x01\x00\x01\x02\x06string\f\x06\x00\x04test\x05int64\x04\x02\x00\x04\x00", string(b[h.Length():]))
+		// make sure it's gob -- need a better to make sure if its gob encoded stream
+		ass.True(strings.Contains(string(b[h.Length():]), "\x00"))
 		// decode by gob
 		r, err := trans.DecodeReport(b)
 		ass.Nil(err)
@@ -112,4 +112,18 @@ func TestMgrOption(t *testing.T) {
 
 	// nil Option
 	ass.NotNil(trans.SetOption("TestMgrOption", nil))
+}
+
+func TestMgrRegister(t *testing.T) {
+	ass := assert.New(t)
+	trans := NewMgr()
+
+	// register a function, with not-existed marshaller id.
+	ass.NotNil(trans.Register("TestMgrResgister", func() {}, 100, 100))
+
+	// register a function with default marshaller id
+	ass.Nil(trans.Register("TestMgrMarshallers1", func() {}, Encode.Default, Encode.Default))
+
+	// register something already registered
+	ass.NotNil(trans.Register("TestMgrMarshallers1", func() {}, Encode.Default, Encode.Default))
 }
