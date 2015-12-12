@@ -197,7 +197,6 @@ func (me *_amqp) Done(id transport.Meta) (err error) {
 //
 
 func (me *_amqp) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan *Envelope) {
-	// TODO: keep one AmqpConnection, instead of get/realease for each report.
 	defer func() {
 		done <- 1
 	}()
@@ -310,21 +309,37 @@ func (me *_amqp) _store_routine_(
 		close(reports)
 	}()
 
+finished:
 	for {
 		select {
 		case _, _ = <-quit:
-			goto clean
+			break finished
 		case d, ok := <-dv:
 			if !ok {
-				goto clean
+				break finished
 			}
 
+			d.Ack(false)
 			reports <- d.Body
 		}
 	}
 
-clean:
-	// TODO: consuming remaining stuffs in queue
+	// consuming remaining stuffs in queue
+done:
+	for {
+		select {
+		case d, ok := <-dv:
+			if !ok {
+				break done
+			}
+
+			d.Ack(false)
+			reports <- d.Body
+		default:
+			break done
+		}
+	}
+
 	// cancel consuming
 	err = ci.Channel.Cancel(getConsumerTag(id), false)
 	if err != nil {
