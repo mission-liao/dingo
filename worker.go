@@ -265,7 +265,6 @@ func (me *_workers) _worker_routine_(
 		if r.Done() {
 			reports <- r
 		} else {
-			// TODO: test it
 			if !r.Option().OnlyResult() {
 				reports <- r
 			}

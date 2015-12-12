@@ -101,7 +101,7 @@ func (me *workerTestSuite) TestPanic() {
 	}
 }
 
-func (me *workerTestSuite) TestIgnoreReport() {
+func (me *workerTestSuite) _TestIgnoreReport() {
 	// allocate workers
 	tasks := make(chan *transport.Task)
 	me.Nil(me._trans.Register("TestIgnoreReport", func() {}, transport.Encode.Default, transport.Encode.Default))
@@ -128,5 +128,23 @@ func (me *workerTestSuite) TestIgnoreReport() {
 }
 
 func (me *workerTestSuite) TestOnlyResult() {
-	// TODO: test only result option
+	// allocate workers
+	tasks := make(chan *transport.Task)
+	me.Nil(me._trans.Register("TestOnlyResult", func() {}, transport.Encode.Default, transport.Encode.Default))
+	reports, remain, err := me._ws.allocate("TestOnlyResult", tasks, nil, 1, 0)
+	me.Nil(err)
+	me.Equal(0, remain)
+	me.Len(reports, 1)
+
+	// an option with IgnoreReport == true
+	task, err := transport.ComposeTask("TestOnlyResult", transport.NewOption().SetOnlyResult(true), nil)
+	me.NotNil(task)
+	me.Nil(err)
+
+	// send task, only the last report should be sent
+	if task != nil {
+		tasks <- task
+		r := <-reports[0]
+		me.True(r.Done())
+	}
 }
