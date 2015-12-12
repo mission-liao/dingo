@@ -201,85 +201,102 @@ func (me *_amqp) _reporter_routine_(quit <-chan int, done chan<- int, events cha
 		done <- 1
 	}()
 
+	out := func(e *Envelope) (err error) {
+		// report an error event when leaving
+		defer func() {
+			if err != nil {
+				events <- common.NewEventFromError(common.InstT.REPORTER, err)
+			}
+		}()
+
+		// acquire a channel
+		ci, err := me.AmqpConnection.Channel()
+		if err != nil {
+			return
+		}
+		defer me.AmqpConnection.ReleaseChannel(ci)
+
+		qName, rKey := getQueueName(e.ID), getRoutingKey(e.ID)
+
+		// TODO: rework here, a new interface API should be added for preparation.
+		// declare a queue for this task
+		_, err = ci.Channel.QueueDeclare(
+			qName, // name of queue
+			true,  // durable
+			false, // auto-delete
+			false, // exclusive
+			false, // nowait
+			nil,   // args
+		)
+		if err != nil {
+			return
+		}
+
+		// bind queue to result-exchange
+		err = ci.Channel.QueueBind(
+			qName,            // name of queue
+			rKey,             // routing key
+			"dingo.x.result", // name of exchange
+			false,            // nowait
+			nil,              // args
+		)
+		if err != nil {
+			return
+		}
+
+		err = ci.Channel.Publish(
+			"dingo.x.result", // name of exchange
+			rKey,             // routing key
+			false,            // madatory
+			false,            // immediate
+			amqp.Publishing{
+				DeliveryMode: amqp.Persistent,
+				ContentType:  "text/json",
+				Body:         e.Body,
+			},
+		)
+		if err != nil {
+			return
+		}
+
+		// block until amqp.Channel.NotifyPublish
+		// TODO: time out, retry
+		cf := <-ci.Confirm
+		if !cf.Ack {
+			err = errors.New("Unable to publish to server")
+			return
+		}
+
+		return
+	}
+
+finished:
 	for {
 		select {
 		case _, _ = <-quit:
-			goto clean
+			break finished
 		case e, ok := <-reports:
 			if !ok {
 				// reports channel is closed
-				goto clean
+				break finished
 			}
-
-			// acquire a channel
-			err := func() (err error) {
-				ci, err := me.AmqpConnection.Channel()
-				if err != nil {
-					return
-				}
-				defer me.AmqpConnection.ReleaseChannel(ci)
-
-				qName, rKey := getQueueName(e.ID), getRoutingKey(e.ID)
-
-				// declare a queue for this task
-				_, err = ci.Channel.QueueDeclare(
-					qName, // name of queue
-					true,  // durable
-					false, // auto-delete
-					false, // exclusive
-					false, // nowait
-					nil,   // args
-				)
-				if err != nil {
-					return
-				}
-
-				// bind queue to result-exchange
-				err = ci.Channel.QueueBind(
-					qName,            // name of queue
-					rKey,             // routing key
-					"dingo.x.result", // name of exchange
-					false,            // nowait
-					nil,              // args
-				)
-				if err != nil {
-					return
-				}
-
-				err = ci.Channel.Publish(
-					"dingo.x.result", // name of exchange
-					rKey,             // routing key
-					false,            // madatory
-					false,            // immediate
-					amqp.Publishing{
-						DeliveryMode: amqp.Persistent,
-						ContentType:  "text/json",
-						Body:         e.Body,
-					},
-				)
-				if err != nil {
-					return
-				}
-
-				// block until amqp.Channel.NotifyPublish
-				// TODO: time out, retry
-				cf := <-ci.Confirm
-				if !cf.Ack {
-					err = errors.New("Unable to publish to server")
-					return
-				}
-
-				return
-			}()
-			if err != nil {
-				events <- common.NewEventFromError(common.InstT.REPORTER, err)
-				break
-			}
+			out(e)
 		}
 	}
 
-clean:
-	// TODO: cosume all remaining reports?
+done:
+	// cosume all remaining reports
+	for {
+		select {
+		case e, ok := <-reports:
+			if !ok {
+				break done
+			}
+			out(e)
+		default:
+			break done
+		}
+	}
 }
 
 func (me *_amqp) _store_routine_(
