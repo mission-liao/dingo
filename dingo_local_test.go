@@ -54,7 +54,7 @@ func (me *localTestSuite) TestIgnoreReport() {
 	// initiate a task with an option(IgnoreReport == true)
 	reports, err := me.App_.Call(
 		"TestIgnoreReport",
-		transport.NewOption().SetIgnoreReport(true),
+		transport.NewOption().SetIgnoreReport(true).SetMonitorProgress(true),
 	)
 	me.Nil(err)
 	me.Nil(reports)
@@ -186,9 +186,10 @@ func (me *localTestSuite) TestMyMarshaller() {
 	me.Equal(0, remain)
 	me.Nil(err)
 
-	// initiate a task with an option(IgnoreReport == true)
 	reports, err := me.App_.Call(
-		"TestMyMarshaller", transport.NewOption().SetOnlyResult(true), 12345, "mission",
+		"TestMyMarshaller",
+		transport.NewOption(),
+		12345, "mission",
 	)
 	me.Nil(err)
 	r := <-reports
@@ -255,7 +256,7 @@ func (me *localTestSuite) TestCustomMarshaller() {
 
 	// initiate a task with an option(IgnoreReport == true)
 	reports, err := me.App_.Call(
-		"TestCustomMarshaller", transport.NewOption(), 12345, "mission",
+		"TestCustomMarshaller", transport.NewOption().SetMonitorProgress(true), 12345, "mission",
 	)
 	me.Nil(err)
 
@@ -320,7 +321,7 @@ func (me *localTestSuite) TestCustomMarshallerWithMinimalFunc() {
 
 	// initiate a task with an option(IgnoreReport == true)
 	reports, err := me.App_.Call(
-		"TestCustomMarshallerWithMinimalFunc", transport.NewOption(),
+		"TestCustomMarshallerWithMinimalFunc", transport.NewOption().SetMonitorProgress(true),
 	)
 	me.Nil(err)
 

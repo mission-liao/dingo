@@ -87,8 +87,8 @@ func (me *workerTestSuite) TestPanic() {
 	me.Equal(0, remain)
 	me.Len(reports, 1)
 
-	// an option with OnlyResult == true
-	task, err := transport.ComposeTask("TestPanic", transport.NewOption().SetOnlyResult(true), nil)
+	// an option with MonitorProgress == false
+	task, err := transport.ComposeTask("TestPanic", transport.NewOption(), nil)
 	me.NotNil(task)
 	me.Nil(err)
 	if task != nil {
@@ -101,7 +101,7 @@ func (me *workerTestSuite) TestPanic() {
 	}
 }
 
-func (me *workerTestSuite) _TestIgnoreReport() {
+func (me *workerTestSuite) TestIgnoreReport() {
 	// allocate workers
 	tasks := make(chan *transport.Task)
 	me.Nil(me._trans.Register("TestIgnoreReport", func() {}, transport.Encode.Default, transport.Encode.Default))
@@ -127,7 +127,7 @@ func (me *workerTestSuite) _TestIgnoreReport() {
 	}
 }
 
-func (me *workerTestSuite) TestOnlyResult() {
+func (me *workerTestSuite) TestMonitorProgress() {
 	// allocate workers
 	tasks := make(chan *transport.Task)
 	me.Nil(me._trans.Register("TestOnlyResult", func() {}, transport.Encode.Default, transport.Encode.Default))
@@ -136,8 +136,8 @@ func (me *workerTestSuite) TestOnlyResult() {
 	me.Equal(0, remain)
 	me.Len(reports, 1)
 
-	// an option with IgnoreReport == true
-	task, err := transport.ComposeTask("TestOnlyResult", transport.NewOption().SetOnlyResult(true), nil)
+	// an option with MonitorProgress == false
+	task, err := transport.ComposeTask("TestOnlyResult", transport.NewOption(), nil)
 	me.NotNil(task)
 	me.Nil(err)
 

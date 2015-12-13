@@ -3,19 +3,19 @@ package transport
 type Option struct {
 	// IgnoreReport: stop reporting when executing tasks.
 	IR bool
-	// OnlyResult: only the last report would be sent: Done or Fail
-	OR bool
+	// MonitorProgress: monitoring the progress of task execution
+	MP bool
 }
 
-func (me *Option) IgnoreReport() bool { return me.IR }
-func (me *Option) OnlyResult() bool   { return me.OR }
+func (me *Option) IgnoreReport() bool    { return me.IR }
+func (me *Option) MonitorProgress() bool { return me.MP }
 
 func (me *Option) SetIgnoreReport(ignore bool) *Option {
 	me.IR = ignore
 	return me
 }
-func (me *Option) SetOnlyResult(only bool) *Option {
-	me.OR = only
+func (me *Option) SetMonitorProgress(only bool) *Option {
+	me.MP = only
 	return me
 }
 

@@ -26,7 +26,7 @@ func TestMgrMarshallers(t *testing.T) {
 		ass.Nil(err)
 
 		// make sure it's json
-		ass.Equal("{\"O\":{\"IR\":false,\"OR\":false},\"A\":[1]}", string(b[h.Length():]))
+		ass.Equal("{\"O\":{\"IR\":false,\"MP\":false},\"A\":[1]}", string(b[h.Length():]))
 
 		// decode by json
 		t, err := trans.DecodeTask(b)

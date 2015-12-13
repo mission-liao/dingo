@@ -15,7 +15,7 @@ func TestReportMarshal(t *testing.T) {
 		P: &ReportPayload{
 			S: 101,
 			E: &Error{102, "test error"},
-			O: NewOption().SetIgnoreReport(true),
+			O: NewOption().SetIgnoreReport(true).SetMonitorProgress(true),
 			R: nil,
 		},
 	})
@@ -30,5 +30,6 @@ func TestReportMarshal(t *testing.T) {
 		ass.Equal(int64(102), r.Error().Code())
 		ass.Equal("test error", r.Error().Msg())
 		ass.Equal(true, r.Option().IgnoreReport())
+		ass.Equal(true, r.Option().MonitorProgress())
 	}
 }

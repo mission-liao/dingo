@@ -95,7 +95,7 @@ func (me *DingoTestSuite) TestBasic() {
 	me.Equal(0, remain)
 
 	// call that function
-	reports, err := me.App_.Call("TestBasic", nil, 5)
+	reports, err := me.App_.Call("TestBasic", transport.NewOption().SetMonitorProgress(true), 5)
 	me.Nil(err)
 	me.NotNil(reports)
 

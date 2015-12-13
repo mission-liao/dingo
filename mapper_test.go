@@ -89,7 +89,11 @@ func (me *mapperTestSuite) TestParellelMapping() {
 	// send enough tasks to fill mapper routines & tasks channel
 	for i := 0; i < count; i++ {
 		// compose corresponding task
-		t, err := transport.ComposeTask("ParellelMapping", nil, []interface{}{i})
+		t, err := transport.ComposeTask(
+			"ParellelMapping",
+			transport.NewOption().SetMonitorProgress(true),
+			[]interface{}{i},
+		)
 		me.Nil(err)
 
 		// should not be blocked here

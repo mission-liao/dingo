@@ -61,7 +61,7 @@ func (me *BridgeTestSuite) TearDownTest() {
 // test cases
 //
 
-func (me *BridgeTestSuite) _TestSendTask() {
+func (me *BridgeTestSuite) TestSendTask() {
 	me.trans.Register(
 		"SendTask",
 		func() {},
@@ -92,7 +92,7 @@ func (me *BridgeTestSuite) _TestSendTask() {
 	}
 }
 
-func (me *BridgeTestSuite) _TestAddListener() {
+func (me *BridgeTestSuite) TestAddListener() {
 	me.trans.Register(
 		"AddListener",
 		func() {},
@@ -156,7 +156,7 @@ func (me *BridgeTestSuite) TestMultipleClose() {
 	me.Nil(me.bg.Close())
 }
 
-func (me *BridgeTestSuite) _TestReport() {
+func (me *BridgeTestSuite) TestReport() {
 	me.Nil(me.trans.Register(
 		"Report",
 		func() {},
@@ -197,7 +197,7 @@ func (me *BridgeTestSuite) _TestReport() {
 	}
 }
 
-func (me *BridgeTestSuite) _TestPoll() {
+func (me *BridgeTestSuite) TestPoll() {
 	me.Nil(me.trans.Register(
 		"Poll",
 		func() {},

@@ -264,7 +264,7 @@ func (me *_workers) _worker_routine_(
 		if r.Done() {
 			reports <- r
 		} else {
-			if !r.Option().OnlyResult() {
+			if r.Option().MonitorProgress() {
 				reports <- r
 			}
 		}
