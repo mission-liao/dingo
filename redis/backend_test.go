@@ -1,13 +1,14 @@
-package backend
+package dgredis
 
 import (
 	"testing"
 
+	"github.com/mission-liao/dingo"
 	"github.com/stretchr/testify/suite"
 )
 
 type RedisBackendTestSuite struct {
-	BackendTestSuite
+	dingo.BackendTestSuite
 }
 
 func (me *RedisBackendTestSuite) SetupSuite() {
@@ -15,8 +16,7 @@ func (me *RedisBackendTestSuite) SetupSuite() {
 		err error
 	)
 
-	cfg := Default()
-	me._backend, err = New("redis", cfg)
+	me.Bkd, err = NewBackend(DefaultRedisConfig())
 	me.Nil(err)
 	me.BackendTestSuite.SetupSuite()
 }

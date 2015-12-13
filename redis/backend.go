@@ -1,4 +1,4 @@
-package backend
+package dgredis
 
 import (
 	"errors"
@@ -6,25 +6,16 @@ import (
 	"sync"
 
 	"github.com/garyburd/redigo/redis"
+	"github.com/mission-liao/dingo"
 	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
 
 var _redisResultQueue = "dingo.result"
 
-type _redisConfig struct {
-	common.RedisConfig
-}
-
-func defaultRedisConfig() *_redisConfig {
-	return &_redisConfig{
-		RedisConfig: *common.DefaultRedisConfig(),
-	}
-}
-
-type _redis struct {
+type backend struct {
 	pool *redis.Pool
-	cfg  *Config
+	cfg  *RedisConfig
 
 	// reporter
 	reporters *common.HetroRoutines
@@ -35,14 +26,14 @@ type _redis struct {
 	ridsLock sync.Mutex
 }
 
-func newRedis(cfg *Config) (v *_redis, err error) {
-	v = &_redis{
+func NewBackend(cfg *RedisConfig) (v *backend, err error) {
+	v = &backend{
 		reporters: common.NewHetroRoutines(),
 		rids:      make(map[string]int),
 		stores:    common.NewHetroRoutines(),
 		cfg:       cfg,
 	}
-	v.pool, err = common.NewRedisPool(cfg.Redis.Connection(), cfg.Redis.Password_)
+	v.pool, err = NewRedisPool(cfg.Connection(), cfg.Password_)
 	if err != nil {
 		return
 	}
@@ -54,14 +45,14 @@ func newRedis(cfg *Config) (v *_redis, err error) {
 // common.Object interface
 //
 
-func (me *_redis) Events() ([]<-chan *common.Event, error) {
+func (me *backend) Events() ([]<-chan *common.Event, error) {
 	return []<-chan *common.Event{
 		me.reporters.Events(),
 		me.stores.Events(),
 	}, nil
 }
 
-func (me *_redis) Close() (err error) {
+func (me *backend) Close() (err error) {
 	me.reporters.Close()
 	me.stores.Close()
 	err = me.pool.Close()
@@ -72,7 +63,7 @@ func (me *_redis) Close() (err error) {
 // Reporter interface
 //
 
-func (me *_redis) Report(reports <-chan *Envelope) (id int, err error) {
+func (me *backend) Report(reports <-chan *dingo.ReportEnvelope) (id int, err error) {
 	quit, done, id := me.reporters.New(0)
 	go me._reporter_routine_(quit, done, me.reporters.Events(), reports)
 
@@ -83,7 +74,7 @@ func (me *_redis) Report(reports <-chan *Envelope) (id int, err error) {
 // Store interface
 //
 
-func (me *_redis) Poll(id transport.Meta) (reports <-chan []byte, err error) {
+func (me *backend) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 	quit, done, idx := me.stores.New(0)
 
 	me.ridsLock.Lock()
@@ -97,7 +88,7 @@ func (me *_redis) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 	return
 }
 
-func (me *_redis) Done(id transport.Meta) (err error) {
+func (me *backend) Done(id transport.Meta) (err error) {
 	me.ridsLock.Lock()
 	defer me.ridsLock.Unlock()
 
@@ -115,7 +106,7 @@ func (me *_redis) Done(id transport.Meta) (err error) {
 // routine definition
 //
 
-func (me *_redis) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan *Envelope) {
+func (me *backend) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan *dingo.ReportEnvelope) {
 	var (
 		err error
 	)
@@ -144,7 +135,7 @@ func (me *_redis) _reporter_routine_(quit <-chan int, done chan<- int, events ch
 clean:
 }
 
-func (me *_redis) _store_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports chan<- []byte, id transport.Meta) {
+func (me *backend) _store_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports chan<- []byte, id transport.Meta) {
 	conn := me.pool.Get()
 	defer func() {
 		done <- 1

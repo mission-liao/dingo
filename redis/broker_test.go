@@ -1,23 +1,23 @@
-package broker
+package dgredis
 
 import (
 	"testing"
 
+	"github.com/mission-liao/dingo"
 	"github.com/stretchr/testify/suite"
 )
 
 type RedisBrokerTestSuite struct {
-	BrokerTestSuite
+	dingo.BrokerTestSuite
 }
 
 func (me *RedisBrokerTestSuite) SetupSuite() {
 	var err error
 
-	me.BrokerTestSuite.SetupSuite()
-	obj, err := NewNamed("redis", Default())
+	me.Pdc, err = NewBroker(DefaultRedisConfig())
 	me.Nil(err)
-	me._producer = obj.(Producer)
-	me._namedConsumer = obj.(NamedConsumer)
+	me.Ncsm = me.Pdc.(dingo.NamedConsumer)
+	me.BrokerTestSuite.SetupSuite()
 }
 
 func (me *RedisBrokerTestSuite) TearDownSuite() {

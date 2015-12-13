@@ -1,4 +1,4 @@
-package backend
+package dingo
 
 import (
 	"github.com/mission-liao/dingo/transport"
@@ -9,7 +9,7 @@ type Backend interface {
 	Store
 }
 
-type Envelope struct {
+type ReportEnvelope struct {
 	ID   transport.Meta
 	Body []byte
 }
@@ -27,7 +27,7 @@ type Reporter interface {
 	// - reports: a input channel to receive reports from dingo.
 	// returns:
 	// - err: errors
-	Report(reports <-chan *Envelope) (id int, err error)
+	Report(reports <-chan *ReportEnvelope) (id int, err error)
 }
 
 /*
@@ -47,17 +47,4 @@ type Store interface {
 	// parameters:
 	// - id the meta info of that task/report to stop polling.
 	Done(id transport.Meta) error
-}
-
-func New(name string, cfg *Config) (b Backend, err error) {
-	switch name {
-	case "local":
-		b, err = newLocal(cfg)
-	case "amqp":
-		b, err = newAmqp(cfg)
-	case "redis":
-		b, err = newRedis(cfg)
-	}
-
-	return
 }

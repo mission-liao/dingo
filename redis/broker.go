@@ -1,4 +1,4 @@
-package broker
+package dgredis
 
 import (
 	"errors"
@@ -6,37 +6,28 @@ import (
 	"sync"
 
 	"github.com/garyburd/redigo/redis"
+	"github.com/mission-liao/dingo"
 	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
 
 var _redisTaskQueue = "dingo.tasks"
 
-type _redisConfig struct {
-	common.RedisConfig
-}
-
-func defaultRedisConfig() *_redisConfig {
-	return &_redisConfig{
-		RedisConfig: *common.DefaultRedisConfig(),
-	}
-}
-
 //
 // core component
 //
 
-type _redis struct {
+type broker struct {
 	pool      *redis.Pool
 	listeners *common.Routines
 }
 
-func newRedis(cfg *Config) (v *_redis, err error) {
-	v = &_redis{
+func NewBroker(cfg *RedisConfig) (v *broker, err error) {
+	v = &broker{
 		listeners: common.NewRoutines(),
 	}
 
-	v.pool, err = common.NewRedisPool(cfg.Redis.Connection(), cfg.Redis.Password_)
+	v.pool, err = NewRedisPool(cfg.Connection(), cfg.Password_)
 	if err != nil {
 		return
 	}
@@ -48,13 +39,13 @@ func newRedis(cfg *Config) (v *_redis, err error) {
 // common.Object interface
 //
 
-func (me *_redis) Events() ([]<-chan *common.Event, error) {
+func (me *broker) Events() ([]<-chan *common.Event, error) {
 	return []<-chan *common.Event{
 		me.listeners.Events(),
 	}, nil
 }
 
-func (me *_redis) Close() (err error) {
+func (me *broker) Close() (err error) {
 	me.listeners.Close()
 	err = me.pool.Close()
 
@@ -65,7 +56,7 @@ func (me *_redis) Close() (err error) {
 // Producer interface
 //
 
-func (me *_redis) Send(id transport.Meta, body []byte) (err error) {
+func (me *broker) Send(id transport.Meta, body []byte) (err error) {
 	conn := me.pool.Get()
 	defer conn.Close()
 
@@ -81,7 +72,7 @@ func (me *_redis) Send(id transport.Meta, body []byte) (err error) {
 // Consumer interface
 //
 
-func (me *_redis) AddListener(name string, receipts <-chan *Receipt) (tasks <-chan []byte, err error) {
+func (me *broker) AddListener(name string, receipts <-chan *dingo.TaskReceipt) (tasks <-chan []byte, err error) {
 	t := make(chan []byte, 10)
 	go me._consumer_routine_(me.listeners.New(), me.listeners.Wait(), me.listeners.Events(), t, receipts, name)
 
@@ -89,7 +80,7 @@ func (me *_redis) AddListener(name string, receipts <-chan *Receipt) (tasks <-ch
 	return
 }
 
-func (me *_redis) StopAllListeners() (err error) {
+func (me *broker) StopAllListeners() (err error) {
 	me.listeners.Close()
 	return
 }
@@ -98,12 +89,12 @@ func (me *_redis) StopAllListeners() (err error) {
 // routine definitions
 //
 
-func (me *_redis) _consumer_routine_(
+func (me *broker) _consumer_routine_(
 	quit <-chan int,
 	wait *sync.WaitGroup,
 	events chan<- *common.Event,
 	tasks chan<- []byte,
-	receipts <-chan *Receipt,
+	receipts <-chan *dingo.TaskReceipt,
 	name string,
 ) {
 	defer wait.Done()

@@ -3,7 +3,6 @@ package dingo
 import (
 	"testing"
 
-	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
@@ -17,7 +16,7 @@ type mapperTestSuite struct {
 	_trans          *transport.Mgr
 	_countOfMappers int
 	_receiptsMux    *common.Mux
-	_receipts       chan *broker.Receipt
+	_receipts       chan *TaskReceipt
 }
 
 func TestMapperSuite(t *testing.T) {
@@ -26,7 +25,7 @@ func TestMapperSuite(t *testing.T) {
 		_tasks:          make(chan *transport.Task, 5),
 		_countOfMappers: 3,
 		_receiptsMux:    common.NewMux(),
-		_receipts:       make(chan *broker.Receipt, 1),
+		_receipts:       make(chan *TaskReceipt, 1),
 	})
 }
 
@@ -37,7 +36,7 @@ func (me *mapperTestSuite) SetupSuite() {
 
 	// allocate 3 mapper routines
 	for remain := me._countOfMappers; remain > 0; remain-- {
-		receipts := make(chan *broker.Receipt, 10)
+		receipts := make(chan *TaskReceipt, 10)
 		me._mps.more(me._tasks, receipts)
 		_, err := me._receiptsMux.Register(receipts, 0)
 		me.Nil(err)
@@ -47,7 +46,7 @@ func (me *mapperTestSuite) SetupSuite() {
 	me.Nil(err)
 
 	me._receiptsMux.Handle(func(val interface{}, _ int) {
-		me._receipts <- val.(*broker.Receipt)
+		me._receipts <- val.(*TaskReceipt)
 	})
 }
 

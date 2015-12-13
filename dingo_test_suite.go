@@ -11,19 +11,40 @@ import (
 type DingoTestSuite struct {
 	suite.Suite
 
-	cfg    *Config
-	app    *App
+	App_   *App
+	Brk    Broker
+	Nbrk   NamedBroker
+	Bkd    Backend
 	eid    int
 	events <-chan *common.Event
 }
 
 func (me *DingoTestSuite) SetupSuite() {
 	var err error
-	me.cfg = Default()
-	me.app, err = NewApp("")
+	me.App_, err = NewApp("")
 	me.Nil(err)
-	me.eid, me.events, err = me.app.Listen(common.InstT.ALL, common.ErrLvl.DEBUG, 0)
+
+	// broker
+	if me.Brk != nil {
+		_, used, err := me.App_.Use(me.Brk, common.InstT.DEFAULT)
+		me.Nil(err)
+		me.Equal(common.InstT.PRODUCER|common.InstT.CONSUMER, used)
+	} else {
+		_, used, err := me.App_.Use(me.Nbrk, common.InstT.DEFAULT)
+		me.Nil(err)
+		me.Equal(common.InstT.PRODUCER|common.InstT.CONSUMER, used)
+	}
+
+	// backend
+	_, used, err := me.App_.Use(me.Bkd, common.InstT.DEFAULT)
 	me.Nil(err)
+	me.Equal(common.InstT.REPORTER|common.InstT.STORE, used)
+
+	// events
+	me.eid, me.events, err = me.App_.Listen(common.InstT.ALL, common.ErrLvl.DEBUG, 0)
+	me.Nil(err)
+
+	me.Nil(me.App_.Init(*Default()))
 }
 
 func (me *DingoTestSuite) TearDownTest() {
@@ -50,8 +71,8 @@ func (me *DingoTestSuite) TearDownTest() {
 }
 
 func (me *DingoTestSuite) TearDownSuite() {
-	me.app.StopListen(me.eid)
-	me.Nil(me.app.Close())
+	me.App_.StopListen(me.eid)
+	me.Nil(me.App_.Close())
 }
 
 //
@@ -62,19 +83,19 @@ func (me *DingoTestSuite) TestBasic() {
 	// register a set of workers
 	_ = "breakpoint"
 	called := 0
-	err := me.app.Register("TestBasic",
+	err := me.App_.Register("TestBasic",
 		func(n int) int {
 			called = n
 			return n + 1
 		}, transport.Encode.Default, transport.Encode.Default,
 	)
 	me.Nil(err)
-	remain, err := me.app.Allocate("TestBasic", 1, 1)
+	remain, err := me.App_.Allocate("TestBasic", 1, 1)
 	me.Nil(err)
 	me.Equal(0, remain)
 
 	// call that function
-	reports, err := me.app.Call("TestBasic", nil, 5)
+	reports, err := me.App_.Call("TestBasic", nil, 5)
 	me.Nil(err)
 	me.NotNil(reports)
 

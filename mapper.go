@@ -6,7 +6,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
@@ -26,8 +25,8 @@ type _mappers struct {
 //
 // parameters:
 // - tasks: input channel for transport.Task
-// - receipts: output channel for broker.Receipt
-func (me *_mappers) more(tasks <-chan *transport.Task, receipts chan<- *broker.Receipt) {
+// - receipts: output channel for TaskReceipt
+func (me *_mappers) more(tasks <-chan *transport.Task, receipts chan<- *TaskReceipt) {
 	go me._mapper_routine_(me.mappers.New(), me.mappers.Wait(), me.mappers.Events(), tasks, receipts)
 }
 
@@ -133,7 +132,7 @@ func (m *_mappers) _mapper_routine_(
 	wait *sync.WaitGroup,
 	events chan<- *common.Event,
 	tasks <-chan *transport.Task,
-	receipts chan<- *broker.Receipt,
+	receipts chan<- *TaskReceipt,
 ) {
 	defer wait.Done()
 	defer close(receipts)
@@ -143,24 +142,24 @@ func (m *_mappers) _mapper_routine_(
 		err := m.dispatch(t)
 
 		// compose a receipt
-		var rpt broker.Receipt
+		var rpt TaskReceipt
 		if err != nil {
 			// send an error event
 			events <- common.NewEventFromError(common.InstT.MAPPER, err)
 
 			if err == errWorkerNotFound {
-				rpt = broker.Receipt{
-					Status: broker.Status.WORKER_NOT_FOUND,
+				rpt = TaskReceipt{
+					Status: ReceiptStatus.WORKER_NOT_FOUND,
 				}
 			} else {
-				rpt = broker.Receipt{
-					Status:  broker.Status.NOK,
+				rpt = TaskReceipt{
+					Status:  ReceiptStatus.NOK,
 					Payload: err,
 				}
 			}
 		} else {
-			rpt = broker.Receipt{
-				Status: broker.Status.OK,
+			rpt = TaskReceipt{
+				Status: ReceiptStatus.OK,
 			}
 		}
 		receipts <- &rpt

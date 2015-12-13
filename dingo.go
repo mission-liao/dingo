@@ -10,8 +10,6 @@ import (
 	"time"
 
 	// internal
-	"github.com/mission-liao/dingo/backend"
-	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
@@ -244,7 +242,7 @@ func (me *App) Allocate(name string, count, share int) (remain int, err error) {
 	)
 
 	if me.b.Exists(common.InstT.NAMED_CONSUMER) {
-		receipts := make(chan *broker.Receipt, 10)
+		receipts := make(chan *TaskReceipt, 10)
 		tasks, err = me.b.AddNamedListener(name, receipts)
 		if err != nil {
 			return
@@ -283,7 +281,7 @@ func (me *App) SetOption(name string, opt *transport.Option) error {
 
 /*
  Attach an instance, instance could be any instance implementing
- backend.Reporter, backend.Backend, broker.Producer, broker.Consumer.
+ Reporter, Backend, Producer, Consumer.
 
  parameters:
   - obj: object to be attached
@@ -305,11 +303,11 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 	defer me.objsLock.Unlock()
 
 	var (
-		producer      broker.Producer
-		consumer      broker.Consumer
-		namedConsumer broker.NamedConsumer
-		store         backend.Store
-		reporter      backend.Reporter
+		producer      Producer
+		consumer      Consumer
+		namedConsumer NamedConsumer
+		store         Store
+		reporter      Reporter
 		ok            bool
 	)
 
@@ -328,23 +326,23 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 	}()
 
 	if types == common.InstT.DEFAULT {
-		producer, _ = obj.(broker.Producer)
-		consumer, _ = obj.(broker.Consumer)
-		namedConsumer, _ = obj.(broker.NamedConsumer)
-		store, _ = obj.(backend.Store)
-		reporter, _ = obj.(backend.Reporter)
+		producer, _ = obj.(Producer)
+		consumer, _ = obj.(Consumer)
+		namedConsumer, _ = obj.(NamedConsumer)
+		store, _ = obj.(Store)
+		reporter, _ = obj.(Reporter)
 	} else {
 		if types&common.InstT.PRODUCER == common.InstT.PRODUCER {
-			producer, ok = obj.(broker.Producer)
+			producer, ok = obj.(Producer)
 			if !ok {
 				err = errors.New("producer is not found")
 				return
 			}
 		}
 		if types&common.InstT.CONSUMER == common.InstT.CONSUMER {
-			namedConsumer, ok = obj.(broker.NamedConsumer)
+			namedConsumer, ok = obj.(NamedConsumer)
 			if !ok {
-				consumer, ok = obj.(broker.Consumer)
+				consumer, ok = obj.(Consumer)
 				if !ok {
 					err = errors.New("consumer is not found")
 					return
@@ -352,19 +350,19 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 			}
 		}
 		if types&common.InstT.NAMED_CONSUMER == common.InstT.NAMED_CONSUMER {
-			namedConsumer, ok = obj.(broker.NamedConsumer)
+			namedConsumer, ok = obj.(NamedConsumer)
 			if !ok {
 			}
 		}
 		if types&common.InstT.STORE == common.InstT.STORE {
-			store, ok = obj.(backend.Store)
+			store, ok = obj.(Store)
 			if !ok {
 				err = errors.New("store is not found")
 				return
 			}
 		}
 		if types&common.InstT.REPORTER == common.InstT.REPORTER {
-			reporter, ok = obj.(backend.Reporter)
+			reporter, ok = obj.(Reporter)
 			if !ok {
 				err = errors.New("reporter is not found")
 				return
@@ -404,16 +402,16 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 	return
 }
 
-// TODO: moving config to NewApp
+// TODO: removing this function, moving config to NewApp
 func (me *App) Init(cfg Config) (err error) {
 	var (
 		remain int
 		tasks  <-chan *transport.Task
 	)
-	// integrate mappers and broker.Consumer
+	// integrate mappers and Consumer
 	if me.b.Exists(common.InstT.CONSUMER) {
 		for remain = cfg.Mappers_; remain > 0; remain-- {
-			receipts := make(chan *broker.Receipt, 10)
+			receipts := make(chan *TaskReceipt, 10)
 			tasks, err = me.b.AddListener(receipts)
 			if err != nil {
 				return
@@ -500,10 +498,10 @@ func (me *App) Call(name string, opt *transport.Option, args ...interface{}) (re
  Get the channel to receive events from 'dingo'.
 
  "targets" are instances you want to monitor, they include:
-  - common.InstT.REPORTER: the backend.Reporter instance attached to this App.
-  - common.InstT.STORE: the backend.Store instance attached to this App.
-  - common.InstT.PRODUCER: the broker.Producer instance attached to this App.
-  - common.InstT.CONSUMER: the broker.Consumer/broker.NamedConsumer instance attached to this App.
+  - common.InstT.REPORTER: the Reporter instance attached to this App.
+  - common.InstT.STORE: the Store instance attached to this App.
+  - common.InstT.PRODUCER: the Producer instance attached to this App.
+  - common.InstT.CONSUMER: the Consumer/NamedConsumer instance attached to this App.
   - common.InstT.MAPPER: the internal component, turn if on when debug.
   - common.InstT.WORKER: the internal component, turn it on when debug.
   - common.InstT.BRIDGE: the internal component, turn it on when debug.

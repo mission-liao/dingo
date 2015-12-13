@@ -4,8 +4,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/mission-liao/dingo/backend"
-	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
@@ -16,14 +14,14 @@ import (
 
 type remoteBridge struct {
 	producerLock  sync.RWMutex
-	producer      broker.Producer
+	producer      Producer
 	consumerLock  sync.RWMutex
-	consumer      broker.Consumer
-	namedConsumer broker.NamedConsumer
+	consumer      Consumer
+	namedConsumer NamedConsumer
 	reporterLock  sync.RWMutex
-	reporter      backend.Reporter
+	reporter      Reporter
 	storeLock     sync.RWMutex
-	store         backend.Store
+	store         Store
 
 	listeners *common.Routines
 	reporters *common.Routines
@@ -88,7 +86,7 @@ func (me *remoteBridge) SendTask(t *transport.Task) (err error) {
 	return
 }
 
-func (me *remoteBridge) AddNamedListener(name string, receipts <-chan *broker.Receipt) (tasks <-chan *transport.Task, err error) {
+func (me *remoteBridge) AddNamedListener(name string, receipts <-chan *TaskReceipt) (tasks <-chan *transport.Task, err error) {
 	me.consumerLock.RLock()
 	defer me.consumerLock.RUnlock()
 
@@ -108,7 +106,7 @@ func (me *remoteBridge) AddNamedListener(name string, receipts <-chan *broker.Re
 	return
 }
 
-func (me *remoteBridge) AddListener(rcpt <-chan *broker.Receipt) (tasks <-chan *transport.Task, err error) {
+func (me *remoteBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *transport.Task, err error) {
 	me.consumerLock.RLock()
 	defer me.consumerLock.RUnlock()
 
@@ -154,13 +152,13 @@ func (me *remoteBridge) Report(reports <-chan *transport.Report) (err error) {
 		return
 	}
 
-	r := make(chan *backend.Envelope, 10)
+	r := make(chan *ReportEnvelope, 10)
 	_, err = me.reporter.Report(r)
 	if err != nil {
 		return
 	}
 
-	go func(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, input <-chan *transport.Report, output chan<- *backend.Envelope) {
+	go func(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, input <-chan *transport.Report, output chan<- *ReportEnvelope) {
 		defer wait.Done()
 		out := func(r *transport.Report) {
 			b, err := me.trans.EncodeReport(r)
@@ -168,7 +166,7 @@ func (me *remoteBridge) Report(reports <-chan *transport.Report) (err error) {
 				events <- common.NewEventFromError(common.InstT.BRIDGE, err)
 				return
 			}
-			output <- &backend.Envelope{
+			output <- &ReportEnvelope{
 				ID:   r,
 				Body: b,
 			}
@@ -284,7 +282,7 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 	return
 }
 
-func (me *remoteBridge) AttachReporter(r backend.Reporter) (err error) {
+func (me *remoteBridge) AttachReporter(r Reporter) (err error) {
 	me.reporterLock.Lock()
 	defer me.reporterLock.Unlock()
 
@@ -302,7 +300,7 @@ func (me *remoteBridge) AttachReporter(r backend.Reporter) (err error) {
 	return
 }
 
-func (me *remoteBridge) AttachStore(s backend.Store) (err error) {
+func (me *remoteBridge) AttachStore(s Store) (err error) {
 	me.storeLock.Lock()
 	defer me.storeLock.Unlock()
 
@@ -320,7 +318,7 @@ func (me *remoteBridge) AttachStore(s backend.Store) (err error) {
 	return
 }
 
-func (me *remoteBridge) AttachProducer(p broker.Producer) (err error) {
+func (me *remoteBridge) AttachProducer(p Producer) (err error) {
 	me.producerLock.Lock()
 	defer me.producerLock.Unlock()
 
@@ -337,7 +335,7 @@ func (me *remoteBridge) AttachProducer(p broker.Producer) (err error) {
 	return
 }
 
-func (me *remoteBridge) AttachConsumer(c broker.Consumer, nc broker.NamedConsumer) (err error) {
+func (me *remoteBridge) AttachConsumer(c Consumer, nc NamedConsumer) (err error) {
 	me.consumerLock.Lock()
 	defer me.consumerLock.Unlock()
 

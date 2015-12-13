@@ -1,4 +1,4 @@
-package backend
+package dgamqp
 
 import (
 	// standard
@@ -10,22 +10,13 @@ import (
 	"github.com/streadway/amqp"
 
 	// internal
+	"github.com/mission-liao/dingo"
 	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
 
-type _amqpConfig struct {
-	common.AmqpConfig
-}
-
-func defaultAmqpConfig() *_amqpConfig {
-	return &_amqpConfig{
-		AmqpConfig: *common.DefaultAmqpConfig(),
-	}
-}
-
-type _amqp struct {
-	common.AmqpConnection
+type backend struct {
+	AmqpConnection
 
 	// store
 	stores   *common.HetroRoutines
@@ -34,11 +25,11 @@ type _amqp struct {
 
 	// reporter
 	reporters *common.HetroRoutines
-	cfg       *Config
+	cfg       *AmqpConfig
 }
 
-func newAmqp(cfg *Config) (v *_amqp, err error) {
-	v = &_amqp{
+func NewBackend(cfg *AmqpConfig) (v *backend, err error) {
+	v = &backend{
 		reporters: common.NewHetroRoutines(),
 		rids:      make(map[string]int),
 		cfg:       cfg,
@@ -48,9 +39,9 @@ func newAmqp(cfg *Config) (v *_amqp, err error) {
 	return
 }
 
-func (me *_amqp) init() (err error) {
+func (me *backend) init() (err error) {
 	// call parent's Init
-	err = me.AmqpConnection.Init(me.cfg.Amqp.Connection())
+	err = me.AmqpConnection.Init(me.cfg.Connection())
 	if err != nil {
 		return
 	}
@@ -83,14 +74,14 @@ func (me *_amqp) init() (err error) {
 // common.Object interface
 //
 
-func (me *_amqp) Events() ([]<-chan *common.Event, error) {
+func (me *backend) Events() ([]<-chan *common.Event, error) {
 	return []<-chan *common.Event{
 		me.reporters.Events(),
 		me.stores.Events(),
 	}, nil
 }
 
-func (me *_amqp) Close() (err error) {
+func (me *backend) Close() (err error) {
 	me.reporters.Close()
 	me.stores.Close()
 	err = me.AmqpConnection.Close()
@@ -101,7 +92,7 @@ func (me *_amqp) Close() (err error) {
 // Reporter interface
 //
 
-func (me *_amqp) Report(reports <-chan *Envelope) (id int, err error) {
+func (me *backend) Report(reports <-chan *dingo.ReportEnvelope) (id int, err error) {
 	quit, done, id := me.reporters.New(0)
 	go me._reporter_routine_(quit, done, me.reporters.Events(), reports)
 	return
@@ -111,7 +102,7 @@ func (me *_amqp) Report(reports <-chan *Envelope) (id int, err error) {
 // Store interface
 //
 
-func (me *_amqp) Poll(id transport.Meta) (reports <-chan []byte, err error) {
+func (me *backend) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 	// bind to the queue for this task
 	tag, qName, rKey := getConsumerTag(id), getQueueName(id), getRoutingKey(id)
 	quit, done, idx := me.stores.New(0)
@@ -179,7 +170,7 @@ func (me *_amqp) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 	return
 }
 
-func (me *_amqp) Done(id transport.Meta) (err error) {
+func (me *backend) Done(id transport.Meta) (err error) {
 	me.ridsLock.Lock()
 	defer me.ridsLock.Unlock()
 
@@ -196,12 +187,12 @@ func (me *_amqp) Done(id transport.Meta) (err error) {
 // routine definition
 //
 
-func (me *_amqp) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan *Envelope) {
+func (me *backend) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan *dingo.ReportEnvelope) {
 	defer func() {
 		done <- 1
 	}()
 
-	out := func(e *Envelope) (err error) {
+	out := func(e *dingo.ReportEnvelope) (err error) {
 		// report an error event when leaving
 		defer func() {
 			if err != nil {
@@ -299,12 +290,12 @@ done:
 	}
 }
 
-func (me *_amqp) _store_routine_(
+func (me *backend) _store_routine_(
 	quit <-chan int,
 	done chan<- int,
 	events chan<- *common.Event,
 	reports chan<- []byte,
-	ci *common.AmqpChannel,
+	ci *AmqpChannel,
 	dv <-chan amqp.Delivery,
 	id transport.Meta) {
 

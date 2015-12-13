@@ -1,4 +1,4 @@
-package broker
+package dingo
 
 // TODO: test multiple consumers with multiple producers
 
@@ -38,11 +38,11 @@ type Consumer interface {
 	// create a new listener to receive tasks
 	//
 	// parameters:
-	// - rcpt: a channel that 'dingo' would send 'Receipt' for tasks from 'tasks' channel.
+	// - rcpt: a channel that 'dingo' would send 'TaskReceipt' for tasks from 'tasks' channel.
 	// returns:
 	// - tasks: 'dingo' would consume from this channel for new tasks
 	// - err: any error during initialization
-	AddListener(rcpt <-chan *Receipt) (tasks <-chan []byte, err error)
+	AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan []byte, err error)
 
 	// all listeners are stopped, their corresponding "tasks" channel(returned from AddListener)
 	// would be closed.
@@ -61,18 +61,18 @@ type NamedConsumer interface {
 	//
 	// parameters:
 	// - name: name of task to be received
-	// - rcpt: a channel that 'dingo' would send 'Receipt' for tasks from 'tasks'.
+	// - rcpt: a channel that 'dingo' would send 'TaskReceipt' for tasks from 'tasks'.
 	// returns:
 	// - tasks: 'dingo' would consume from this channel for new tasks
 	// - err: any error during initialization
-	AddListener(name string, rcpt <-chan *Receipt) (tasks <-chan []byte, err error)
+	AddListener(name string, rcpt <-chan *TaskReceipt) (tasks <-chan []byte, err error)
 
 	// all listeners are stopped, their corresponding "tasks" channel(returned from AddListener)
 	// would be closed.
 	StopAllListeners() (err error)
 }
 
-var Status = struct {
+var ReceiptStatus = struct {
 	OK               int
 	NOK              int
 	WORKER_NOT_FOUND int
@@ -84,27 +84,8 @@ var Status = struct {
  Receipt allows "dingo" to reject tasks for any reason, the way to handle
  rejected tasks are Broker(s) dependent.
 */
-type Receipt struct {
+type TaskReceipt struct {
 	ID      string
 	Status  int
 	Payload interface{}
-}
-
-func NewNamed(name string, cfg *Config) (b NamedBroker, err error) {
-	switch name {
-	case "amqp":
-		b, err = newAmqp(cfg)
-	case "redis":
-		b, err = newRedis(cfg)
-	}
-
-	return
-}
-
-func New(name string, cfg *Config) (b Broker, err error) {
-	switch name {
-	case "local":
-		b, err = newLocal(cfg)
-	}
-	return
 }

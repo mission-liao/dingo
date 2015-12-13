@@ -6,7 +6,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
@@ -26,7 +25,7 @@ var (
 //
 
 type worker struct {
-	receipts chan<- *broker.Receipt
+	receipts chan<- *TaskReceipt
 	tasks    <-chan *transport.Task
 	rs       *common.Routines
 	reports  []chan *transport.Report
@@ -50,7 +49,7 @@ type _workers struct {
 // - id: identifier of this group of workers share the same function, matcher...
 // - match: matcher of this group of workers
 // - tasks: input channel
-// - receipts: output 'broker.Receipt' channel
+// - receipts: output 'TaskReceipt' channel
 // - count: count of workers to be initiated
 // - share: the count of workers sharing one report channel
 // returns:
@@ -60,7 +59,7 @@ type _workers struct {
 func (me *_workers) allocate(
 	name string,
 	tasks <-chan *transport.Task,
-	receipts chan<- *broker.Receipt,
+	receipts chan<- *TaskReceipt,
 	count, share int,
 ) (reports []<-chan *transport.Report, remain int, err error) {
 	var (
@@ -236,7 +235,7 @@ func (me *_workers) _worker_routine_(
 	wait *sync.WaitGroup,
 	events chan<- *common.Event,
 	tasks <-chan *transport.Task,
-	receipts chan<- *broker.Receipt,
+	receipts chan<- *TaskReceipt,
 	reports chan<- *transport.Report,
 ) {
 	defer wait.Done()
@@ -310,9 +309,9 @@ func (me *_workers) _worker_routine_(
 			}
 
 			if receipts != nil {
-				receipts <- &broker.Receipt{
+				receipts <- &TaskReceipt{
 					ID:     t.ID(),
-					Status: broker.Status.OK,
+					Status: ReceiptStatus.OK,
 				}
 			}
 

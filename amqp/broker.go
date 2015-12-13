@@ -1,4 +1,4 @@
-package broker
+package dgamqp
 
 import (
 	// standard
@@ -7,39 +7,30 @@ import (
 	"sync"
 
 	// open source
+	"github.com/mission-liao/dingo"
 	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 	"github.com/streadway/amqp"
 )
 
-type _amqpConfig struct {
-	common.AmqpConfig
-}
-
-func defaultAmqpConfig() *_amqpConfig {
-	return &_amqpConfig{
-		AmqpConfig: *common.DefaultAmqpConfig(),
-	}
-}
-
 //
 // major component
 //
 
-type _amqp struct {
-	sender, receiver *common.AmqpConnection
+type broker struct {
+	sender, receiver *AmqpConnection
 	consumerTags     chan int
 	consumers        *common.Routines
 }
 
-func newAmqp(cfg *Config) (v *_amqp, err error) {
-	v = &_amqp{
-		sender:    &common.AmqpConnection{},
-		receiver:  &common.AmqpConnection{},
+func NewBroker(cfg *AmqpConfig) (v *broker, err error) {
+	v = &broker{
+		sender:    &AmqpConnection{},
+		receiver:  &AmqpConnection{},
 		consumers: common.NewRoutines(),
 	}
 
-	conn := cfg.Amqp.Connection()
+	conn := cfg.Connection()
 	err = v.sender.Init(conn)
 	if err != nil {
 		return
@@ -58,7 +49,7 @@ func newAmqp(cfg *Config) (v *_amqp, err error) {
 	return
 }
 
-func (me *_amqp) init() (err error) {
+func (me *broker) init() (err error) {
 	// define relation between queue and exchange
 
 	// get a free channel,
@@ -98,13 +89,13 @@ func (me *_amqp) init() (err error) {
 // common.Object interface
 //
 
-func (me *_amqp) Events() ([]<-chan *common.Event, error) {
+func (me *broker) Events() ([]<-chan *common.Event, error) {
 	return []<-chan *common.Event{
 		me.consumers.Events(),
 	}, nil
 }
 
-func (me *_amqp) Close() (err error) {
+func (me *broker) Close() (err error) {
 	me.consumers.Close()
 
 	err = me.sender.Close()
@@ -121,7 +112,7 @@ func (me *_amqp) Close() (err error) {
 // Producer interface
 //
 
-func (me *_amqp) Send(id transport.Meta, body []byte) (err error) {
+func (me *broker) Send(id transport.Meta, body []byte) (err error) {
 	// acquire a channel
 	ci, err := me.sender.Channel()
 	if err != nil {
@@ -162,7 +153,7 @@ func (me *_amqp) Send(id transport.Meta, body []byte) (err error) {
 // Consumer interface
 //
 
-func (me *_amqp) AddListener(name string, receipts <-chan *Receipt) (tasks <-chan []byte, err error) {
+func (me *broker) AddListener(name string, receipts <-chan *dingo.TaskReceipt) (tasks <-chan []byte, err error) {
 	ci, err := me.receiver.Channel()
 	if err != nil {
 		return
@@ -215,7 +206,7 @@ func (me *_amqp) AddListener(name string, receipts <-chan *Receipt) (tasks <-cha
 	return
 }
 
-func (me *_amqp) StopAllListeners() (err error) {
+func (me *broker) StopAllListeners() (err error) {
 	me.consumers.Close()
 	return
 }
@@ -224,13 +215,13 @@ func (me *_amqp) StopAllListeners() (err error) {
 // routine definitions
 //
 
-func (me *_amqp) _consumer_routine_(
+func (me *broker) _consumer_routine_(
 	quit <-chan int,
 	wait *sync.WaitGroup,
 	events chan<- *common.Event,
 	tasks chan<- []byte,
-	receipts <-chan *Receipt,
-	ci *common.AmqpChannel,
+	receipts <-chan *dingo.TaskReceipt,
+	ci *AmqpChannel,
 	queueName string,
 ) {
 	defer wait.Done()
@@ -268,7 +259,7 @@ func (me *_amqp) _consumer_routine_(
 
 			ok = func() (ok bool) {
 				var (
-					reply *Receipt
+					reply *dingo.TaskReceipt
 					err   error
 				)
 				defer func() {
@@ -294,7 +285,7 @@ func (me *_amqp) _consumer_routine_(
 					err = errors.New(fmt.Sprintf("expected: %v, received: %v", h, reply))
 					return
 				}
-				if reply.Status == Status.WORKER_NOT_FOUND {
+				if reply.Status == dingo.ReceiptStatus.WORKER_NOT_FOUND {
 					err = errors.New(fmt.Sprintf("worker not found: %v", h))
 					return
 				}

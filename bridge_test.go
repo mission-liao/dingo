@@ -3,7 +3,6 @@ package dingo
 import (
 	"fmt"
 
-	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
@@ -70,7 +69,7 @@ func (me *BridgeTestSuite) _TestSendTask() {
 	)
 
 	// add listener
-	receipts := make(chan *broker.Receipt, 0)
+	receipts := make(chan *TaskReceipt, 0)
 	tasks, err := me.bg.AddListener(receipts)
 	me.Nil(err)
 
@@ -87,9 +86,9 @@ func (me *BridgeTestSuite) _TestSendTask() {
 
 	// send a receipt withoug blocked,
 	// which means someone is waiting
-	receipts <- &broker.Receipt{
+	receipts <- &TaskReceipt{
 		ID:     t.ID(),
-		Status: broker.Status.OK,
+		Status: ReceiptStatus.OK,
 	}
 }
 
@@ -101,14 +100,14 @@ func (me *BridgeTestSuite) _TestAddListener() {
 	)
 
 	// prepare listeners
-	r1 := make(chan *broker.Receipt, 0)
+	r1 := make(chan *TaskReceipt, 0)
 	t1, err := me.bg.AddListener(r1)
 	me.Nil(err)
-	r2 := make(chan *broker.Receipt, 0)
+	r2 := make(chan *TaskReceipt, 0)
 	t2, err := me.bg.AddListener(r2)
 	me.Nil(err)
 
-	r3 := make(chan *broker.Receipt, 0)
+	r3 := make(chan *TaskReceipt, 0)
 	t3, err := me.bg.AddListener(r3)
 	me.Nil(err)
 
@@ -121,9 +120,9 @@ func (me *BridgeTestSuite) _TestAddListener() {
 	pass := false
 	var (
 		tReceived *transport.Task
-		receipt   *broker.Receipt = &broker.Receipt{
+		receipt   *TaskReceipt = &TaskReceipt{
 			ID:     t.ID(),
-			Status: broker.Status.OK,
+			Status: ReceiptStatus.OK,
 		}
 	)
 	select {

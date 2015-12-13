@@ -1,4 +1,4 @@
-package broker
+package dingo
 
 import (
 	"errors"
@@ -9,22 +9,7 @@ import (
 	"github.com/mission-liao/dingo/transport"
 )
 
-//
-// configuration
-//
-
-type _localConfig struct {
-}
-
-func defaultLocalConfig() *_localConfig {
-	return &_localConfig{}
-}
-
-//
-//
-//
-
-type _local struct {
+type localBroker struct {
 	cfg *Config
 
 	// broker routine
@@ -36,8 +21,8 @@ type _local struct {
 }
 
 // factory
-func newLocal(cfg *Config) (v *_local, err error) {
-	v = &_local{
+func NewLocalBroker(cfg *Config) (v *localBroker, err error) {
+	v = &localBroker{
 		cfg:       cfg,
 		brk:       common.NewRoutines(),
 		to:        make(chan []byte, 10),
@@ -48,7 +33,7 @@ func newLocal(cfg *Config) (v *_local, err error) {
 	return
 }
 
-func (me *_local) init() (err error) {
+func (me *localBroker) init() (err error) {
 	// broker routine
 	quit := me.brk.New()
 	go me._broker_routine_(quit, me.brk.Wait(), me.brk.Events())
@@ -56,7 +41,7 @@ func (me *_local) init() (err error) {
 	return
 }
 
-func (me *_local) _broker_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event) {
+func (me *localBroker) _broker_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event) {
 	defer wait.Done()
 
 	for {
@@ -74,7 +59,7 @@ func (me *_local) _broker_routine_(quit <-chan int, wait *sync.WaitGroup, events
 clean:
 }
 
-func (me *_local) _consumer_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, input <-chan []byte, output chan<- []byte, receipts <-chan *Receipt) {
+func (me *localBroker) _consumer_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, input <-chan []byte, output chan<- []byte, receipts <-chan *TaskReceipt) {
 	defer wait.Done()
 
 	for {
@@ -114,14 +99,14 @@ clean:
 // common.Object interface
 //
 
-func (me *_local) Events() ([]<-chan *common.Event, error) {
+func (me *localBroker) Events() ([]<-chan *common.Event, error) {
 	return []<-chan *common.Event{
 		me.brk.Events(),
 		me.listeners.Events(),
 	}, nil
 }
 
-func (me *_local) Close() (err error) {
+func (me *localBroker) Close() (err error) {
 	me.brk.Close()
 	me.listeners.Close()
 	close(me.to)
@@ -133,7 +118,7 @@ func (me *_local) Close() (err error) {
 // Producer
 //
 
-func (me *_local) Send(id transport.Meta, body []byte) (err error) {
+func (me *localBroker) Send(id transport.Meta, body []byte) (err error) {
 	me.to <- body
 	return
 }
@@ -142,7 +127,7 @@ func (me *_local) Send(id transport.Meta, body []byte) (err error) {
 // Consumer
 //
 
-func (me *_local) AddListener(receipts <-chan *Receipt) (tasks <-chan []byte, err error) {
+func (me *localBroker) AddListener(receipts <-chan *TaskReceipt) (tasks <-chan []byte, err error) {
 	t := make(chan []byte, 10)
 	go me._consumer_routine_(me.listeners.New(), me.listeners.Wait(), me.listeners.Events(), me.to, t, receipts)
 
@@ -150,7 +135,7 @@ func (me *_local) AddListener(receipts <-chan *Receipt) (tasks <-chan []byte, er
 	return
 }
 
-func (me *_local) StopAllListeners() (err error) {
+func (me *localBroker) StopAllListeners() (err error) {
 	me.listeners.Close()
 	return
 }

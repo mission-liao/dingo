@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mission-liao/dingo/backend"
-	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
@@ -80,12 +78,12 @@ func (me *localBridge) SendTask(t *transport.Task) (err error) {
 	return
 }
 
-func (me *localBridge) AddNamedListener(name string, rcpt <-chan *broker.Receipt) (tasks <-chan *transport.Task, err error) {
+func (me *localBridge) AddNamedListener(name string, rcpt <-chan *TaskReceipt) (tasks <-chan *transport.Task, err error) {
 	err = errors.New("named consumer is not supported by local-bridge")
 	return
 }
 
-func (me *localBridge) AddListener(rcpt <-chan *broker.Receipt) (tasks <-chan *transport.Task, err error) {
+func (me *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *transport.Task, err error) {
 	me.objLock.RLock()
 	defer me.objLock.RUnlock()
 
@@ -103,7 +101,7 @@ func (me *localBridge) AddListener(rcpt <-chan *broker.Receipt) (tasks <-chan *t
 		events chan<- *common.Event,
 		input <-chan *transport.Task,
 		output chan<- *transport.Task,
-		receipts <-chan *broker.Receipt,
+		receipts <-chan *TaskReceipt,
 	) {
 		defer wait.Done()
 		out := func(t *transport.Task) (done bool) {
@@ -120,7 +118,7 @@ func (me *localBridge) AddListener(rcpt <-chan *broker.Receipt) (tasks <-chan *t
 				)
 				return
 			}
-			if reply.Status == broker.Status.WORKER_NOT_FOUND {
+			if reply.Status == ReceiptStatus.WORKER_NOT_FOUND {
 				events <- common.NewEventFromError(
 					common.InstT.CONSUMER,
 					errors.New(fmt.Sprintf("workers not found: %v", t)),
@@ -319,22 +317,22 @@ func (me *localBridge) Poll(t *transport.Task) (reports <-chan *transport.Report
 	return
 }
 
-func (me *localBridge) AttachReporter(r backend.Reporter) (err error) {
+func (me *localBridge) AttachReporter(r Reporter) (err error) {
 	me.needed |= common.InstT.REPORTER
 	return
 }
 
-func (me *localBridge) AttachStore(s backend.Store) (err error) {
+func (me *localBridge) AttachStore(s Store) (err error) {
 	me.needed |= common.InstT.STORE
 	return
 }
 
-func (me *localBridge) AttachProducer(p broker.Producer) (err error) {
+func (me *localBridge) AttachProducer(p Producer) (err error) {
 	me.needed |= common.InstT.PRODUCER
 	return
 }
 
-func (me *localBridge) AttachConsumer(c broker.Consumer, nc broker.NamedConsumer) (err error) {
+func (me *localBridge) AttachConsumer(c Consumer, nc NamedConsumer) (err error) {
 	me.needed |= common.InstT.CONSUMER
 	return
 }

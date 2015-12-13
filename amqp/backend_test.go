@@ -1,21 +1,22 @@
-package backend
+package dgamqp
 
 import (
 	"testing"
 
+	"github.com/mission-liao/dingo"
 	"github.com/stretchr/testify/suite"
 )
 
-type AmqpBackendTestSuite struct {
-	BackendTestSuite
+type amqpBackendTestSuite struct {
+	dingo.BackendTestSuite
 }
 
-func (me *AmqpBackendTestSuite) SetupTest() {
-	me.BackendTestSuite._task = nil
+func (me *amqpBackendTestSuite) SetupTest() {
+	me.BackendTestSuite.Task = nil
 }
 
-func (me *AmqpBackendTestSuite) TearDownTest() {
-	if me.BackendTestSuite._task == nil {
+func (me *amqpBackendTestSuite) TearDownTest() {
+	if me.BackendTestSuite.Task == nil {
 		return
 	}
 
@@ -23,19 +24,19 @@ func (me *AmqpBackendTestSuite) TearDownTest() {
 	func() {
 		// get a channel
 		isClose := true
-		ch, err := me._backend.(*_amqp).Channel()
+		ch, err := me.Bkd.(*backend).Channel()
 		me.Nil(err)
 		defer func() {
 			if isClose {
-				me._backend.(*_amqp).ReleaseChannel(ch)
+				me.Bkd.(*backend).ReleaseChannel(ch)
 			} else {
-				me._backend.(*_amqp).ReleaseChannel(nil)
+				me.Bkd.(*backend).ReleaseChannel(nil)
 			}
 		}()
 
 		// passive-declare, would be fail if queue doesn't exist
 		_, err = ch.Channel.QueueDeclarePassive(
-			getQueueName(me._task),
+			getQueueName(me.Task),
 			true,
 			false,
 			false,
@@ -51,17 +52,16 @@ func (me *AmqpBackendTestSuite) TearDownTest() {
 	}()
 }
 
-func (me *AmqpBackendTestSuite) SetupSuite() {
+func (me *amqpBackendTestSuite) SetupSuite() {
 	var (
 		err error
 	)
 
-	cfg := Default()
-	me._backend, err = New("amqp", cfg)
+	me.Bkd, err = NewBackend(DefaultAmqpConfig())
 	me.Nil(err)
 	me.BackendTestSuite.SetupSuite()
 }
 
 func TestAmqpBackendSuite(t *testing.T) {
-	suite.Run(t, &AmqpBackendTestSuite{})
+	suite.Run(t, &amqpBackendTestSuite{})
 }

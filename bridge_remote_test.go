@@ -3,8 +3,6 @@ package dingo
 import (
 	"testing"
 
-	"github.com/mission-liao/dingo/backend"
-	"github.com/mission-liao/dingo/broker"
 	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
@@ -13,8 +11,8 @@ import (
 type remoteBridgeTestSuite struct {
 	BridgeTestSuite
 
-	brk broker.Broker
-	bkd backend.Backend
+	brk Broker
+	bkd Backend
 }
 
 func (me *remoteBridgeTestSuite) SetupTest() {
@@ -23,16 +21,16 @@ func (me *remoteBridgeTestSuite) SetupTest() {
 	me.BridgeTestSuite.SetupTest()
 
 	// broker
-	me.brk, err = broker.New("local", broker.Default())
+	me.brk, err = NewLocalBroker(Default())
 	me.Nil(err)
-	me.Nil(me.bg.AttachProducer(me.brk.(broker.Producer)))
-	me.Nil(me.bg.AttachConsumer(me.brk.(broker.Consumer), nil))
+	me.Nil(me.bg.AttachProducer(me.brk.(Producer)))
+	me.Nil(me.bg.AttachConsumer(me.brk.(Consumer), nil))
 
 	// backend
-	me.bkd, err = backend.New("local", backend.Default())
+	me.bkd, err = NewLocalBackend(Default())
 	me.Nil(err)
-	me.Nil(me.bg.AttachReporter(me.bkd.(backend.Reporter)))
-	me.Nil(me.bg.AttachStore(me.bkd.(backend.Store)))
+	me.Nil(me.bg.AttachReporter(me.bkd.(Reporter)))
+	me.Nil(me.bg.AttachStore(me.bkd.(Store)))
 }
 
 func (me *remoteBridgeTestSuite) TearDownTest() {

@@ -1,4 +1,4 @@
-package broker
+package dingo
 
 import (
 	"github.com/mission-liao/dingo/common"
@@ -9,33 +9,33 @@ import (
 type BrokerTestSuite struct {
 	suite.Suite
 
-	_producer      Producer
-	_consumer      Consumer
-	_namedConsumer NamedConsumer
+	Pdc  Producer
+	Csm  Consumer
+	Ncsm NamedConsumer
 }
 
 func (me *BrokerTestSuite) SetupSuite() {
 }
 
 func (me *BrokerTestSuite) TearDownSuite() {
-	me.Nil(me._producer.(common.Object).Close())
+	me.Nil(me.Pdc.(common.Object).Close())
 }
 
-func (me *BrokerTestSuite) AddListener(name string, receipts <-chan *Receipt) (tasks <-chan []byte, err error) {
-	if me._consumer != nil {
-		tasks, err = me._consumer.AddListener(receipts)
-	} else if me._namedConsumer != nil {
-		tasks, err = me._namedConsumer.AddListener("", receipts)
+func (me *BrokerTestSuite) AddListener(name string, receipts <-chan *TaskReceipt) (tasks <-chan []byte, err error) {
+	if me.Csm != nil {
+		tasks, err = me.Csm.AddListener(receipts)
+	} else if me.Ncsm != nil {
+		tasks, err = me.Ncsm.AddListener("", receipts)
 	}
 
 	return
 }
 
 func (me *BrokerTestSuite) StopAllListeners() (err error) {
-	if me._consumer != nil {
-		err = me._consumer.StopAllListeners()
-	} else if me._namedConsumer != nil {
-		err = me._namedConsumer.StopAllListeners()
+	if me.Csm != nil {
+		err = me.Csm.StopAllListeners()
+	} else if me.Ncsm != nil {
+		err = me.Ncsm.StopAllListeners()
 	}
 
 	return
@@ -50,7 +50,7 @@ func (me *BrokerTestSuite) TestBasic() {
 		tasks <-chan []byte
 	)
 	// init one listener
-	receipts := make(chan *Receipt, 10)
+	receipts := make(chan *TaskReceipt, 10)
 	tasks, err := me.AddListener("", receipts)
 	me.Nil(err)
 	me.NotNil(tasks)
@@ -75,16 +75,16 @@ func (me *BrokerTestSuite) TestBasic() {
 
 	// send it
 	input := append(hb, []byte("test byte array")...)
-	me.Nil(me._producer.Send(t, input))
+	me.Nil(me.Pdc.Send(t, input))
 
 	// receive it
 	output := <-tasks
 	me.Equal(string(input), string(output))
 
 	// send a receipt
-	receipts <- &Receipt{
+	receipts <- &TaskReceipt{
 		ID:     t.ID(),
-		Status: Status.OK,
+		Status: ReceiptStatus.OK,
 	}
 
 	// stop all listener

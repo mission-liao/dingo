@@ -1,4 +1,4 @@
-package backend
+package dingo
 
 import (
 	"testing"
@@ -14,41 +14,41 @@ import (
 func TestLocalReporter(t *testing.T) {
 	ass := assert.New(t)
 
-	v, err := New("local", Default())
-	reporter := v.(Reporter)
+	var reporter Reporter
+	reporter, err := NewLocalBackend(Default())
 
 	// test case for Report/Unbind
-	reports := make(chan *Envelope, 10)
+	reports := make(chan *ReportEnvelope, 10)
 	_, err = reporter.Report(reports)
 	ass.Nil(err)
 
 	// teardown
-	v.(*_local).Close()
+	reporter.(*localBackend).Close()
 }
 
 //
 // Backend generic test cases
 //
 
-type LocalBackendTestSuite struct {
+type localBackendTestSuite struct {
 	BackendTestSuite
 }
 
-func (me *LocalBackendTestSuite) SetupSuite() {
+func (me *localBackendTestSuite) SetupSuite() {
 	var (
 		err error
 	)
 
 	cfg := Default()
-	me._backend, err = New("local", cfg)
+	me.Bkd, err = NewLocalBackend(cfg)
 	me.Nil(err)
 	me.BackendTestSuite.SetupSuite()
 }
 
-func (me *LocalBackendTestSuite) TearDownSuite() {
+func (me *localBackendTestSuite) TearDownSuite() {
 	me.BackendTestSuite.TearDownSuite()
 }
 
 func TestLocalBackendSuite(t *testing.T) {
-	suite.Run(t, &LocalBackendTestSuite{})
+	suite.Run(t, &localBackendTestSuite{})
 }

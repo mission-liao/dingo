@@ -1,18 +1,7 @@
 package dingo
 
-import (
-	"github.com/mission-liao/dingo/backend"
-	"github.com/mission-liao/dingo/broker"
-)
-
-//
-// dingo
-//
-
 type Config struct {
-	Mappers_ int             `json:"Mappers"`
-	Broker_  *broker.Config  `json:"Broker"`
-	Backend_ *backend.Config `json:"Backend"`
+	Mappers_ int `json:"Mappers"`
 }
 
 func (me *Config) Mappers(count int) *Config {
@@ -20,13 +9,9 @@ func (me *Config) Mappers(count int) *Config {
 	return me
 }
 
-func (me *Config) Broker() *broker.Config   { return me.Broker_ }
-func (me *Config) Backend() *backend.Config { return me.Backend_ }
-
+// TODO: rename to DefaultConfig
 func Default() *Config {
 	return &Config{
-		Broker_:  broker.Default(),
-		Backend_: backend.Default(),
 		Mappers_: 3,
 	}
 }

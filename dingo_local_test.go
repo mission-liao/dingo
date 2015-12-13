@@ -4,9 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/mission-liao/dingo/backend"
-	"github.com/mission-liao/dingo/broker"
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
@@ -20,27 +17,17 @@ type localTestSuite struct {
 }
 
 func (me *localTestSuite) SetupSuite() {
-	me.DingoTestSuite.SetupSuite()
+	var err error
 
 	// broker
-	{
-		v, err := broker.New("local", me.cfg.Broker())
-		me.Nil(err)
-		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
-		me.Nil(err)
-		me.Equal(common.InstT.PRODUCER|common.InstT.CONSUMER, used)
-	}
+	me.Brk, err = NewLocalBroker(Default())
+	me.Nil(err)
 
 	// backend
-	{
-		v, err := backend.New("local", me.cfg.Backend())
-		me.Nil(err)
-		_, used, err := me.app.Use(v, common.InstT.DEFAULT)
-		me.Nil(err)
-		me.Equal(common.InstT.REPORTER|common.InstT.STORE, used)
-	}
+	me.Bkd, err = NewLocalBackend(Default())
+	me.Nil(err)
 
-	me.Nil(me.app.Init(*me.cfg))
+	me.DingoTestSuite.SetupSuite()
 }
 
 func TestDingoLocalSuite(t *testing.T) {
@@ -56,16 +43,16 @@ func TestDingoLocalSuite(t *testing.T) {
 
 func (me *localTestSuite) TestIgnoreReport() {
 	// initiate workers
-	me.Nil(me.app.Register(
+	me.Nil(me.App_.Register(
 		"TestIgnoreReport", func() {},
 		transport.Encode.Default, transport.Encode.Default,
 	))
-	remain, err := me.app.Allocate("TestIgnoreReport", 1, 1)
+	remain, err := me.App_.Allocate("TestIgnoreReport", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
 	// initiate a task with an option(IgnoreReport == true)
-	reports, err := me.app.Call(
+	reports, err := me.App_.Call(
 		"TestIgnoreReport",
 		transport.NewOption().SetIgnoreReport(true),
 	)
@@ -187,20 +174,20 @@ func (me *localTestSuite) TestMyMarshaller() {
 
 	// register marshaller
 	mid := int16(101)
-	err := me.app.AddMarshaller(mid, &struct {
+	err := me.App_.AddMarshaller(mid, &struct {
 		testMyInvoker
 		testMyMarshaller
 	}{})
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.app.Register("TestMyMarshaller", fn, mid, mid))
-	remain, err := me.app.Allocate("TestMyMarshaller", 1, 1)
+	me.Nil(me.App_.Register("TestMyMarshaller", fn, mid, mid))
+	remain, err := me.App_.Allocate("TestMyMarshaller", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
 	// initiate a task with an option(IgnoreReport == true)
-	reports, err := me.app.Call(
+	reports, err := me.App_.Call(
 		"TestMyMarshaller", transport.NewOption().SetOnlyResult(true), 12345, "mission",
 	)
 	me.Nil(err)
@@ -218,7 +205,7 @@ func (me *localTestSuite) TestCustomMarshaller() {
 
 	// register marshaller
 	mid := int16(102)
-	err := me.app.AddMarshaller(mid, &struct {
+	err := me.App_.AddMarshaller(mid, &struct {
 		testMyInvoker
 		transport.CustomMarshaller
 	}{
@@ -261,13 +248,13 @@ func (me *localTestSuite) TestCustomMarshaller() {
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.app.Register("TestCustomMarshaller", fn, mid, mid))
-	remain, err := me.app.Allocate("TestCustomMarshaller", 1, 1)
+	me.Nil(me.App_.Register("TestCustomMarshaller", fn, mid, mid))
+	remain, err := me.App_.Allocate("TestCustomMarshaller", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
 	// initiate a task with an option(IgnoreReport == true)
-	reports, err := me.app.Call(
+	reports, err := me.App_.Call(
 		"TestCustomMarshaller", transport.NewOption(), 12345, "mission",
 	)
 	me.Nil(err)
@@ -309,7 +296,7 @@ func (me *localTestSuite) TestCustomMarshallerWithMinimalFunc() {
 
 	// register marshaller
 	mid := int16(103)
-	err := me.app.AddMarshaller(mid, &struct {
+	err := me.App_.AddMarshaller(mid, &struct {
 		testMyInvoker2
 		transport.CustomMarshaller
 	}{
@@ -326,13 +313,13 @@ func (me *localTestSuite) TestCustomMarshallerWithMinimalFunc() {
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.app.Register("TestCustomMarshallerWithMinimalFunc", fn, mid, mid))
-	remain, err := me.app.Allocate("TestCustomMarshallerWithMinimalFunc", 1, 1)
+	me.Nil(me.App_.Register("TestCustomMarshallerWithMinimalFunc", fn, mid, mid))
+	remain, err := me.App_.Allocate("TestCustomMarshallerWithMinimalFunc", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
 	// initiate a task with an option(IgnoreReport == true)
-	reports, err := me.app.Call(
+	reports, err := me.App_.Call(
 		"TestCustomMarshallerWithMinimalFunc", transport.NewOption(),
 	)
 	me.Nil(err)

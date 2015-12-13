@@ -1,4 +1,4 @@
-package backend
+package dingo
 
 import (
 	"sync"
@@ -11,41 +11,34 @@ import (
 // configuration
 //
 
-type _localConfig struct {
-}
-
-func defaultLocalConfig() *_localConfig {
-	return &_localConfig{}
-}
-
-type _local struct {
+type localBackend struct {
 	cfg       *Config
-	to        chan *Envelope // simulate the wire
+	to        chan *ReportEnvelope // simulate the wire
 	reporters *common.HetroRoutines
 	reports   chan []byte
 	stores    *common.Routines
 	storeLock sync.Mutex
 	toCheck   map[string]chan []byte
-	unSent    []*Envelope
+	unSent    []*ReportEnvelope
 }
 
 // factory
-func newLocal(cfg *Config) (v *_local, err error) {
-	v = &_local{
+func NewLocalBackend(cfg *Config) (v *localBackend, err error) {
+	v = &localBackend{
 		cfg:       cfg,
 		stores:    common.NewRoutines(),
 		reporters: common.NewHetroRoutines(),
-		to:        make(chan *Envelope, 10),
+		to:        make(chan *ReportEnvelope, 10),
 		reports:   make(chan []byte, 10),
 		toCheck:   make(map[string]chan []byte),
-		unSent:    make([]*Envelope, 0, 10),
+		unSent:    make([]*ReportEnvelope, 0, 10),
 	}
 
 	go v._store_routine_(v.stores.New(), v.stores.Wait(), v.stores.Events())
 	return
 }
 
-func (me *_local) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan *Envelope) {
+func (me *localBackend) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan *ReportEnvelope) {
 	defer func() {
 		done <- 1
 	}()
@@ -66,10 +59,10 @@ func (me *_local) _reporter_routine_(quit <-chan int, done chan<- int, events ch
 clean:
 }
 
-func (me *_local) _store_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event) {
+func (me *localBackend) _store_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event) {
 	defer wait.Done()
 
-	out := func(enp *Envelope) {
+	out := func(enp *ReportEnvelope) {
 		me.storeLock.Lock()
 		defer me.storeLock.Unlock()
 
@@ -106,14 +99,14 @@ clean:
 // common.Object interface
 //
 
-func (me *_local) Events() ([]<-chan *common.Event, error) {
+func (me *localBackend) Events() ([]<-chan *common.Event, error) {
 	return []<-chan *common.Event{
 		me.reporters.Events(),
 		me.stores.Events(),
 	}, nil
 }
 
-func (me *_local) Close() (err error) {
+func (me *localBackend) Close() (err error) {
 	me.stores.Close()
 	me.reporters.Close()
 
@@ -127,7 +120,7 @@ func (me *_local) Close() (err error) {
 // Reporter
 //
 
-func (me *_local) Report(reports <-chan *Envelope) (id int, err error) {
+func (me *localBackend) Report(reports <-chan *ReportEnvelope) (id int, err error) {
 	quit, done, id := me.reporters.New(0)
 	go me._reporter_routine_(quit, done, me.reporters.Events(), reports)
 
@@ -138,7 +131,7 @@ func (me *_local) Report(reports <-chan *Envelope) (id int, err error) {
 // Store
 //
 
-func (me *_local) Poll(id transport.Meta) (reports <-chan []byte, err error) {
+func (me *localBackend) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 	me.storeLock.Lock()
 	defer me.storeLock.Unlock()
 
@@ -157,12 +150,12 @@ func (me *_local) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 	}
 
 	// reverse traversing when deleting in slice
-	toSent := []*Envelope{}
+	toSent := []*ReportEnvelope{}
 	for i := len(me.unSent) - 1; i >= 0; i-- {
 		v := me.unSent[i]
 		if v.ID.ID() == id.ID() {
 			// prepend
-			toSent = append([]*Envelope{v}, toSent...)
+			toSent = append([]*ReportEnvelope{v}, toSent...)
 			// delete this element
 			me.unSent = append(me.unSent[:i], me.unSent[i+1:]...)
 		}
@@ -175,7 +168,7 @@ func (me *_local) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 	return
 }
 
-func (me *_local) Done(id transport.Meta) (err error) {
+func (me *localBackend) Done(id transport.Meta) (err error) {
 	me.storeLock.Lock()
 	defer me.storeLock.Unlock()
 
