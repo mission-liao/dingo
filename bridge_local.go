@@ -10,8 +10,8 @@ import (
 	"github.com/mission-liao/dingo/transport"
 )
 
-type poller struct {
-	id      string
+type localStorePoller struct {
+	task    *transport.Task
 	reports chan<- *transport.Report
 }
 
@@ -21,7 +21,7 @@ type localBridge struct {
 	broker    chan *transport.Task
 	listeners *common.Routines
 	reporters *common.Routines
-	pollers   chan *poller
+	pollers   chan *localStorePoller
 	events    chan *common.Event
 	eventMux  *common.Mux
 }
@@ -33,7 +33,7 @@ func newLocalBridge(args ...interface{}) (b *localBridge) {
 		listeners: common.NewRoutines(),
 		reporters: common.NewRoutines(),
 		broker:    make(chan *transport.Task, 10),
-		pollers:   make(chan *poller, 10),
+		pollers:   make(chan *localStorePoller, 10),
 	}
 
 	b.eventMux.Handle(func(val interface{}, _ int) {
@@ -54,6 +54,7 @@ func (me *localBridge) Close() (err error) {
 	defer me.objLock.Unlock()
 
 	me.listeners.Close()
+	me.reporters.Close()
 	me.eventMux.Close()
 
 	close(me.broker)
@@ -188,9 +189,11 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 		return
 	}
 
+	// each time Report is called, a dedicated 'watch', 'unSent' is allocated,
+	// they are natually thread-safe (used in one go routine only)
 	var (
-		watched map[string]chan<- *transport.Report = make(map[string]chan<- *transport.Report)
-		unSent  map[string][]*transport.Report      = make(map[string][]*transport.Report)
+		watched map[string]*localStorePoller   = make(map[string]*localStorePoller)
+		unSent  map[string][]*transport.Report = make(map[string][]*transport.Report)
 	)
 
 	go func(
@@ -198,16 +201,16 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 		wait *sync.WaitGroup,
 		events chan<- *common.Event,
 		inputs <-chan *transport.Report,
-		pollers chan *poller,
+		pollers chan *localStorePoller,
 	) {
 		defer wait.Done()
 		outF := func(r *transport.Report) (found bool) {
 			o, found := watched[r.ID()]
 			if found {
-				o <- r
+				o.reports <- r
 				if r.Done() {
 					delete(watched, r.ID())
-					close(o)
+					close(o.reports)
 				}
 			}
 			return
@@ -221,25 +224,33 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 				if !ok {
 					goto clean
 				}
+				id := p.task.ID()
 
-				if _, ok := watched[p.id]; ok {
+				if _, ok := watched[id]; ok {
 					events <- common.NewEventFromError(
 						common.InstT.STORE,
-						errors.New(fmt.Sprintf("duplicated polling found: %v", p.id)),
+						errors.New(fmt.Sprintf("duplicated polling found: %v", id)),
 					)
 					break
 				}
 
-				if u, ok := unSent[p.id]; ok {
-					watched[p.id] = p.reports
+				// those reports would only be settle down when some
+				// reports coming in.
+				if u, ok := unSent[id]; ok {
+					watched[id] = p
 					for _, unst := range u {
 						outF(unst)
 					}
 					break
 				}
 
+				// if the other ends forgets to send any report', this poller might be
+				// traveled in pollers channelf forever.
 				pollers <- p
-				<-time.After(100 * time.Millisecond) // avoid busy looping
+
+				// avoid busy looping
+				<-time.After(100 * time.Millisecond)
+
 			case v, ok := <-inputs:
 				if !ok {
 					goto clean
@@ -283,11 +294,22 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 			}
 		}
 
-		for k := range watched {
+		for k, v := range watched {
 			events <- common.NewEventFromError(
 				common.InstT.STORE,
 				errors.New(fmt.Sprintf("unclosed reports channel: %v", k)),
 			)
+
+			// send a 'Shutdown' report
+			r, err := v.task.ComposeReport(transport.Status.Shutdown, nil, nil)
+			if err != nil {
+				events <- common.NewEventFromError(common.InstT.STORE, err)
+			} else {
+				v.reports <- r
+			}
+
+			// remember to send t close signal
+			close(v.reports)
 		}
 		for _, v := range unSent {
 			for _, r := range v {
@@ -308,8 +330,8 @@ func (me *localBridge) Poll(t *transport.Task) (reports <-chan *transport.Report
 		return
 	}
 	reports2 := make(chan *transport.Report, transport.Status.Count)
-	me.pollers <- &poller{
-		id:      t.ID(),
+	me.pollers <- &localStorePoller{
+		task:    t,
 		reports: reports2,
 	}
 

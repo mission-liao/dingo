@@ -197,6 +197,7 @@ func (me *_workers) Close() (err error) {
 	for _, v := range ws {
 		v.rs.Close()
 		for _, r := range v.reports {
+			// closing report to raise quit signal
 			close(r)
 		}
 	}

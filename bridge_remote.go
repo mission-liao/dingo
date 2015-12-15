@@ -160,6 +160,8 @@ func (me *remoteBridge) Report(reports <-chan *transport.Report) (err error) {
 
 	go func(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, input <-chan *transport.Report, output chan<- *ReportEnvelope) {
 		defer wait.Done()
+		// raise quit signal to receiver(s).
+		defer close(output)
 		out := func(r *transport.Report) {
 			b, err := me.trans.EncodeReport(r)
 			if err != nil {
@@ -171,18 +173,19 @@ func (me *remoteBridge) Report(reports <-chan *transport.Report) (err error) {
 				Body: b,
 			}
 		}
+	finished:
 		for {
 			select {
 			case _, _ = <-quit:
-				goto cleanup
+				break finished
 			case v, ok := <-input:
 				if !ok {
-					goto cleanup
+					break finished
 				}
 				out(v)
 			}
 		}
-	cleanup:
+
 		for {
 			select {
 			case v, ok := <-input:
@@ -230,11 +233,24 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 			}
 		}()
 
-		out := func(b []byte) (done bool) {
+		var done bool
+		defer func() {
+			if !done {
+				r, err := t.ComposeReport(transport.Status.Shutdown, nil, nil)
+				if err != nil {
+					events <- common.NewEventFromError(common.InstT.STORE, err)
+				} else {
+					outputs <- r
+				}
+			}
+			close(outputs)
+		}()
+
+		out := func(b []byte) bool {
 			r, err := me.trans.DecodeReport(b)
 			if err != nil {
 				events <- common.NewEventFromError(common.InstT.STORE, err)
-				return
+				return done
 			}
 			// fix returns
 			if len(r.Return()) > 0 {
@@ -246,7 +262,7 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 
 			outputs <- r
 			done = r.Done()
-			return
+			return done
 		}
 
 	finished:
@@ -264,19 +280,18 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 			}
 		}
 
-	done:
+	cleared:
 		for {
 			select {
 			case v, ok := <-inputs:
 				if !ok {
-					break done
+					break cleared
 				}
 				out(v)
 			default:
-				break done
+				break cleared
 			}
 		}
-		close(outputs)
 	}(me.storers.New(), me.storers.Wait(), me.storers.Events(), r, reports2)
 
 	return

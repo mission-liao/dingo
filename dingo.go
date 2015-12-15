@@ -148,11 +148,19 @@ func (me *App) Close() (err error) {
 		}
 	}
 
-	// TODO: the right shutdown procedure:
-	// - broadcase 'quit' message to 'all' routines
-	// - await 'all' routines to finish cleanup
-	// right now we would send a quit message to 'one' routine, and wait it done.
+	// stop consuming more request first
+	chk(me.b.StopAllListeners())
 
+	// further reporter(s) should be reported to Reporter(s)
+	// after workers/mappers shutdown
+
+	// shutdown mappers
+	chk(me.mappers.Close())
+
+	// shutdown workers
+	chk(me.workers.Close())
+
+	// stop reporter/store
 	for _, v := range me.objs {
 		s, ok := v.obj.(common.Object)
 		if ok {
@@ -160,14 +168,10 @@ func (me *App) Close() (err error) {
 		}
 	}
 
-	// shutdown mappers
-	if me.mappers != nil {
-		chk(me.mappers.Close())
-		me.mappers = nil
-	}
+	// shutdown mux
+	me.eventMux.Close()
 
 	// shutdown the monitor of error channels
-	me.eventMux.Close()
 	func() {
 		me.eventOutLock.Lock()
 		defer me.eventOutLock.Unlock()
@@ -215,10 +219,15 @@ func (me *App) Register(name string, fn interface{}, taskMash, reportMash int16)
 }
 
 /*
- allocate more workers.
+ allocate more workers. When your Consumer(s) implement NamedConsumer, a new listener (to brokers)
+ would be allocated each time you call this function. All allocated workers would serve
+ that listener.
+
+ If you want to open more channels to consume from brokers, just call this function multiple
+ times.
 
  parameters:
-  - name:
+  - name: the name of tasks.
   - count: count of workers to be initialized.
   - share: the count of workers sharing one report channel.
 

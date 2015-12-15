@@ -43,8 +43,13 @@ func (t *Task) AlmostEqual(other *Task) (same bool) {
 		return
 	}
 
-	// nil and []interface{}{} should be equal, however, dingo prefer []interface{}
-	same = same && len(t.P.A) == len(other.P.A)
+	// nil and []interface{}{} should be equal, some marshaller would have different result
+	// after 'unmarshalled'.
+	if len(t.P.A) == 0 && len(other.P.A) == 0 {
+		return
+	}
+
+	same = same && reflect.DeepEqual(t.P.A, other.P.A)
 	return
 }
 

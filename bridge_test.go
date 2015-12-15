@@ -276,3 +276,38 @@ func (me *BridgeTestSuite) TestExist() {
 	me.False(me.bg.Exists(common.InstT.STORE | common.InstT.REPORTER))
 	me.False(me.bg.Exists(common.InstT.ALL))
 }
+
+func (me *BridgeTestSuite) TestFinalReportWhenShutdown() {
+	// when exiting, remaining polling should be closed,
+	// and a final report with
+
+	// register a marshaller
+	me.Nil(me.trans.Register(
+		"FinalReportWhenShutdown",
+		func() {},
+		transport.Encode.Default, transport.Encode.Default,
+	))
+
+	// a report channel
+	reports := make(chan *transport.Report, 1)
+	me.Nil(me.bg.Report(reports))
+
+	// a sample task
+	task, err := transport.ComposeTask("FinalReportWhenShutdown", nil, nil)
+
+	// poll that task
+	out, err := me.bg.Poll(task)
+	me.Nil(err)
+
+	// send reports: Sent, but not the final one
+	r, err := task.ComposeReport(transport.Status.Sent, nil, nil)
+	me.Nil(err)
+	reports <- r
+	o := <-out
+	me.True(o.AlmostEqual(r))
+
+	// close bridge, a 'Shutdown' report should be received.
+	me.Nil(me.bg.Close())
+	o = <-out
+	me.Equal(transport.Status.Shutdown, o.Status())
+}
