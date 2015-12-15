@@ -81,7 +81,6 @@ func (me *DingoTestSuite) TearDownSuite() {
 
 func (me *DingoTestSuite) TestBasic() {
 	// register a set of workers
-	_ = "breakpoint"
 	called := 0
 	err := me.App_.Register("TestBasic",
 		func(n int) int {

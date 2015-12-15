@@ -141,7 +141,7 @@ type jsonSafeMarshallerTestSuite struct {
 func TestJsonSafeMarshallerSuite(t *testing.T) {
 	suite.Run(t, &jsonSafeMarshallerTestSuite{
 		MarshallerTestSuite{
-			m: &JsonSafeMarshaller{},
+			m: &CustomMarshaller{Codec: &JsonSafeCodec{}},
 		},
 	})
 }

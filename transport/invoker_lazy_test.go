@@ -76,7 +76,7 @@ func (s *invokerLazyGobTestSuite) TestReturn() {
 //
 
 func ioJsonSafe() func(f interface{}, args ...interface{}) (v []interface{}, err error) {
-	m := JsonSafeMarshaller{}
+	m := &JsonSafeCodec{}
 	return func(f interface{}, args ...interface{}) (v []interface{}, err error) {
 		// encode
 		bs, err := m.encode(args)

@@ -36,18 +36,22 @@ func NewMgr() (c *Mgr) {
 		GenericInvoker
 	}{}
 
+	// JsonSafeMarshaller is ok with LazyInvoker
+	ms[Encode.JSONSAFE] = &struct {
+		CustomMarshaller
+		LazyInvoker
+	}{
+		CustomMarshaller{Codec: &JsonSafeCodec{}},
+		LazyInvoker{},
+	}
+
 	// LazyInvoker 'should' be faster than GenericInvoker
 	ms[Encode.GOB] = &struct {
 		GobMarshaller
 		LazyInvoker
 	}{}
-	ms[Encode.Default] = ms[Encode.JSON]
+	ms[Encode.Default] = ms[Encode.JSONSAFE]
 
-	// JsonSafeMarshaller is ok with LazyInvoker
-	ms[Encode.JSONSAFE] = &struct {
-		JsonSafeMarshaller
-		LazyInvoker
-	}{}
 	c.ms.Store(ms)
 
 	// init map from name of function to options

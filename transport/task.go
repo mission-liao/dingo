@@ -37,6 +37,16 @@ func (t *Task) Name() string           { return t.H.N }
 func (t *Task) Option() *Option        { return t.P.O }
 func (t *Task) Args() []interface{}    { return t.P.A }
 func (t *Task) Equal(other *Task) bool { return reflect.DeepEqual(t, other) }
+func (t *Task) AlmostEqual(other *Task) (same bool) {
+	same = t.H.I == other.H.I && t.H.N == other.H.N && reflect.DeepEqual(t.P.O, other.P.O)
+	if !same {
+		return
+	}
+
+	// nil and []interface{}{} should be equal, however, dingo prefer []interface{}
+	same = same && len(t.P.A) == len(other.P.A)
+	return
+}
 
 //
 // APIs

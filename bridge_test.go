@@ -82,7 +82,7 @@ func (me *BridgeTestSuite) TestSendTask() {
 
 	// make sure task is received through listeners
 	tReceived := <-tasks
-	me.Equal(t, tReceived)
+	me.True(t.AlmostEqual(tReceived))
 
 	// send a receipt withoug blocked,
 	// which means someone is waiting
@@ -137,7 +137,7 @@ func (me *BridgeTestSuite) TestAddListener() {
 		pass = true
 	}
 	me.True(pass)
-	me.Equal(t, tReceived)
+	me.True(t.AlmostEqual(tReceived))
 
 	// close all listeners
 	me.Nil(me.bg.StopAllListeners())

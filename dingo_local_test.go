@@ -197,6 +197,38 @@ func (me *localTestSuite) TestMyMarshaller() {
 	me.Equal(int(12346), r.Return()[1].(int))
 }
 
+type testMyCodec struct{}
+
+func (me *testMyCodec) Prepare(name string, fn interface{}) (err error) { return }
+func (me *testMyCodec) EncodeArgument(fn interface{}, val []interface{}) ([][]byte, error) {
+	bN, _ := json.Marshal(val[0])
+	bName, _ := json.Marshal(val[1])
+	return [][]byte{bN, bName}, nil
+}
+func (me *testMyCodec) EncodeReturn(fn interface{}, val []interface{}) ([][]byte, error) {
+	bMsg, _ := json.Marshal(val[0])
+	bCount, _ := json.Marshal(val[1])
+	return [][]byte{bMsg, bCount}, nil
+}
+func (me *testMyCodec) DecodeArgument(fn interface{}, bs [][]byte) ([]interface{}, error) {
+	var (
+		n    int
+		name string
+	)
+	json.Unmarshal(bs[0], &n)
+	json.Unmarshal(bs[1], &name)
+	return []interface{}{n, name}, nil
+}
+func (me *testMyCodec) DecodeReturn(fn interface{}, bs [][]byte) ([]interface{}, error) {
+	var (
+		msg   string
+		count int
+	)
+	json.Unmarshal(bs[0], &msg)
+	json.Unmarshal(bs[1], &count)
+	return []interface{}{msg, count}, nil
+}
+
 func (me *localTestSuite) TestCustomMarshaller() {
 	fn := func(n int, name string) (msg string, count int) {
 		msg = name + "_'s message"
@@ -211,40 +243,7 @@ func (me *localTestSuite) TestCustomMarshaller() {
 		transport.CustomMarshaller
 	}{
 		testMyInvoker{},
-		transport.CustomMarshaller{
-			Encode: func(output bool, val []interface{}) (bs [][]byte, err error) {
-				if output {
-					bMsg, _ := json.Marshal(val[0])
-					bCount, _ := json.Marshal(val[1])
-					bs = [][]byte{bMsg, bCount}
-				} else {
-					bN, _ := json.Marshal(val[0])
-					bName, _ := json.Marshal(val[1])
-					bs = [][]byte{bN, bName}
-				}
-				return
-			},
-			Decode: func(output bool, bs [][]byte) (val []interface{}, err error) {
-				if output {
-					var (
-						msg string
-						n   int
-					)
-					json.Unmarshal(bs[0], &msg)
-					json.Unmarshal(bs[1], &n)
-					val = []interface{}{msg, n}
-				} else {
-					var (
-						n    int
-						name string
-					)
-					json.Unmarshal(bs[0], &n)
-					json.Unmarshal(bs[1], &name)
-					val = []interface{}{n, name}
-				}
-				return
-			},
-		},
+		transport.CustomMarshaller{Codec: &testMyCodec{}},
 	})
 	me.Nil(err)
 
@@ -289,6 +288,22 @@ func (me *testMyInvoker2) Return(f interface{}, returns []interface{}) ([]interf
 	return returns, nil
 }
 
+type testMyMinimalCodec struct{}
+
+func (me *testMyMinimalCodec) Prepare(name string, fn interface{}) (err error) { return }
+func (me *testMyMinimalCodec) EncodeArgument(fn interface{}, val []interface{}) (bs [][]byte, err error) {
+	return
+}
+func (me *testMyMinimalCodec) EncodeReturn(fn interface{}, val []interface{}) (bs [][]byte, err error) {
+	return
+}
+func (me *testMyMinimalCodec) DecodeArgument(fn interface{}, bs [][]byte) (val []interface{}, err error) {
+	return
+}
+func (me *testMyMinimalCodec) DecodeReturn(fn interface{}, bs [][]byte) (val []interface{}, err error) {
+	return
+}
+
 func (me *localTestSuite) TestCustomMarshallerWithMinimalFunc() {
 	called := false
 	fn := func() {
@@ -302,14 +317,7 @@ func (me *localTestSuite) TestCustomMarshallerWithMinimalFunc() {
 		transport.CustomMarshaller
 	}{
 		testMyInvoker2{},
-		transport.CustomMarshaller{
-			Encode: func(output bool, val []interface{}) (bs [][]byte, err error) {
-				return
-			},
-			Decode: func(output bool, bs [][]byte) (val []interface{}, err error) {
-				return
-			},
-		},
+		transport.CustomMarshaller{Codec: &testMyMinimalCodec{}},
 	})
 	me.Nil(err)
 
