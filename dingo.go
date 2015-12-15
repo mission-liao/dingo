@@ -480,22 +480,25 @@ func (me *App) Call(name string, opt *transport.Option, args ...interface{}) (re
 			return
 		}
 	}
+
 	t, err := transport.ComposeTask(name, opt, args)
 	if err != nil {
 		return
 	}
 
+	// polling before calling.
+	//
+	// if we poll after calling, we may lose some report if
+	// the task finished very quickly.
+	if !opt.IgnoreReport() {
+		reports, err = me.b.Poll(t)
+		if err != nil {
+			return
+		}
+	}
+
 	// a blocking call to broker component
 	err = me.b.SendTask(t)
-	if err != nil {
-		return
-	}
-
-	if opt.IgnoreReport() {
-		return
-	}
-
-	reports, err = me.b.Poll(t)
 	if err != nil {
 		return
 	}

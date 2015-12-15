@@ -207,39 +207,12 @@ func (me *backend) _reporter_routine_(quit <-chan int, done chan<- int, events c
 		}
 		defer me.AmqpConnection.ReleaseChannel(ci)
 
-		qName, rKey := getQueueName(e.ID), getRoutingKey(e.ID)
-
-		// TODO: rework here, a new interface API should be added for preparation.
-		// declare a queue for this task
-		_, err = ci.Channel.QueueDeclare(
-			qName, // name of queue
-			true,  // durable
-			false, // auto-delete
-			false, // exclusive
-			false, // nowait
-			nil,   // args
-		)
-		if err != nil {
-			return
-		}
-
-		// bind queue to result-exchange
-		err = ci.Channel.QueueBind(
-			qName,            // name of queue
-			rKey,             // routing key
-			"dingo.x.result", // name of exchange
-			false,            // nowait
-			nil,              // args
-		)
-		if err != nil {
-			return
-		}
-
+		// QueueDeclare and QueueBind should be done in Poll(...)
 		err = ci.Channel.Publish(
-			"dingo.x.result", // name of exchange
-			rKey,             // routing key
-			false,            // madatory
-			false,            // immediate
+			"dingo.x.result",    // name of exchange
+			getRoutingKey(e.ID), // routing key
+			false,               // madatory
+			false,               // immediate
 			amqp.Publishing{
 				DeliveryMode: amqp.Persistent,
 				ContentType:  "text/json",

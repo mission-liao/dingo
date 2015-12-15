@@ -46,6 +46,11 @@ func (me *BackendTestSuite) TestBasic() {
 	me.Task, err = transport.ComposeTask("basic", nil, []interface{}{})
 	me.Nil(err)
 
+	// poll first
+	reports, err := me.Sto.Poll(me.Task)
+	me.Nil(err)
+	me.NotNil(reports)
+
 	// send a report
 	report, err := me.Task.ComposeReport(transport.Status.Sent, make([]interface{}, 0), nil)
 	me.Nil(err)
@@ -58,10 +63,7 @@ func (me *BackendTestSuite) TestBasic() {
 		}
 	}
 
-	// poll corresponding task
-	reports, err := me.Sto.Poll(me.Task)
-	me.Nil(err)
-	me.NotNil(reports)
+	// await it
 	select {
 	case v, ok := <-reports:
 		me.True(ok)

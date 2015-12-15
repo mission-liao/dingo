@@ -21,7 +21,7 @@ type ReportEnvelope struct {
  Reporter(s) and dingo are asynchronous by channels.
 */
 type Reporter interface {
-	// send report to backend
+	// attach a report channel to backend.
 	//
 	// parameters:
 	// - reports: a input channel to receive reports from dingo.
