@@ -32,8 +32,8 @@ type remoteBridge struct {
 	trans     *transport.Mgr
 }
 
-func newRemoteBridge(trans *transport.Mgr) (b *remoteBridge) {
-	b = &remoteBridge{
+func newRemoteBridge(trans *transport.Mgr) (b bridge) {
+	v := &remoteBridge{
 		listeners: common.NewRoutines(),
 		reporters: common.NewRoutines(),
 		storers:   common.NewRoutines(),
@@ -42,9 +42,10 @@ func newRemoteBridge(trans *transport.Mgr) (b *remoteBridge) {
 		doners:    make(chan transport.Meta, 10),
 		trans:     trans,
 	}
+	b = v
 
-	b.eventMux.Handle(func(val interface{}, _ int) {
-		b.events <- val.(*common.Event)
+	v.eventMux.Handle(func(val interface{}, _ int) {
+		v.events <- val.(*common.Event)
 	})
 
 	return
@@ -410,6 +411,18 @@ func (me *remoteBridge) Exists(it int) (ext bool) {
 		}()
 	}
 
+	return
+}
+
+func (me *remoteBridge) ReporterHook(eventID int, payload interface{}) (err error) {
+	me.reporterLock.Lock()
+	defer me.reporterLock.Unlock()
+
+	if me.reporter == nil {
+		return
+	}
+
+	err = me.reporter.ReporterHook(eventID, payload)
 	return
 }
 

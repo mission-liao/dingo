@@ -120,6 +120,10 @@ func (me *localBackend) Close() (err error) {
 // Reporter
 //
 
+func (me *localBackend) ReporterHook(eventID int, payload interface{}) (err error) {
+	return
+}
+
 func (me *localBackend) Report(reports <-chan *ReportEnvelope) (id int, err error) {
 	quit, done, id := me.reporters.New(0)
 	go me._reporter_routine_(quit, done, me.reporters.Events(), reports)

@@ -46,10 +46,11 @@ func (me *BackendTestSuite) TestBasic() {
 	me.Task, err = transport.ComposeTask("basic", nil, []interface{}{})
 	me.Nil(err)
 
-	// poll first
-	reports, err := me.Sto.Poll(me.Task)
-	me.Nil(err)
-	me.NotNil(reports)
+	// trigger hook
+	me.Nil(me.Rpt.ReporterHook(ReporterEvent.BeforeReport, me.Task))
+	defer func() {
+		me.Nil(me.Rpt.ReporterHook(ReporterEvent.FinishReport, me.Task))
+	}()
 
 	// send a report
 	report, err := me.Task.ComposeReport(transport.Status.Sent, make([]interface{}, 0), nil)
@@ -63,7 +64,10 @@ func (me *BackendTestSuite) TestBasic() {
 		}
 	}
 
-	// await it
+	// polling
+	reports, err := me.Sto.Poll(me.Task)
+	me.Nil(err)
+	me.NotNil(reports)
 	select {
 	case v, ok := <-reports:
 		me.True(ok)

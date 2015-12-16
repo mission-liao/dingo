@@ -77,7 +77,7 @@ func NewApp(nameOfBridge string) (app *App, err error) {
 	}
 
 	// init mappers
-	v.mappers, err = newMappers(v.trans)
+	v.mappers, err = newMappers(v.trans, v.b.(exHooks))
 	if err != nil {
 		return
 	}
@@ -87,7 +87,7 @@ func NewApp(nameOfBridge string) (app *App, err error) {
 	}
 
 	// init workers
-	v.workers, err = newWorkers(v.trans)
+	v.workers, err = newWorkers(v.trans, v.b.(exHooks))
 	if err != nil {
 		return
 	}

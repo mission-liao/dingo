@@ -14,6 +14,7 @@ type mapperTestSuite struct {
 	_mps            *_mappers
 	_tasks          chan *transport.Task
 	_trans          *transport.Mgr
+	_hooks          exHooks
 	_countOfMappers int
 	_receiptsMux    *common.Mux
 	_receipts       chan *TaskReceipt
@@ -22,6 +23,7 @@ type mapperTestSuite struct {
 func TestMapperSuite(t *testing.T) {
 	suite.Run(t, &mapperTestSuite{
 		_trans:          transport.NewMgr(),
+		_hooks:          newLocalBridge().(exHooks),
 		_tasks:          make(chan *transport.Task, 5),
 		_countOfMappers: 3,
 		_receiptsMux:    common.NewMux(),
@@ -31,7 +33,7 @@ func TestMapperSuite(t *testing.T) {
 
 func (me *mapperTestSuite) SetupSuite() {
 	var err error
-	me._mps, err = newMappers(me._trans)
+	me._mps, err = newMappers(me._trans, me._hooks)
 	me.Nil(err)
 
 	// allocate 3 mapper routines

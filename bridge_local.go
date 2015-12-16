@@ -26,8 +26,8 @@ type localBridge struct {
 	eventMux  *common.Mux
 }
 
-func newLocalBridge(args ...interface{}) (b *localBridge) {
-	b = &localBridge{
+func newLocalBridge(args ...interface{}) (b bridge) {
+	v := &localBridge{
 		events:    make(chan *common.Event, 10),
 		eventMux:  common.NewMux(),
 		listeners: common.NewRoutines(),
@@ -35,9 +35,10 @@ func newLocalBridge(args ...interface{}) (b *localBridge) {
 		broker:    make(chan *transport.Task, 10),
 		pollers:   make(chan *localStorePoller, 10),
 	}
+	b = v
 
-	b.eventMux.Handle(func(val interface{}, _ int) {
-		b.events <- val.(*common.Event)
+	v.eventMux.Handle(func(val interface{}, _ int) {
+		v.events <- val.(*common.Event)
 	})
 
 	return
@@ -373,4 +374,9 @@ func (me *localBridge) Exists(it int) bool {
 	}
 
 	return false
+}
+
+func (me *localBridge) ReporterHook(eventID int, payload interface{}) (err error) {
+	// there is no external object 'really' attached.
+	return
 }

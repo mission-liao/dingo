@@ -14,16 +14,19 @@ type workerTestSuite struct {
 
 	_ws    *_workers
 	_trans *transport.Mgr
+	_hooks exHooks
 }
 
 func TestWorkerSuite(t *testing.T) {
-	suite.Run(t, &workerTestSuite{})
+	suite.Run(t, &workerTestSuite{
+		_trans: transport.NewMgr(),
+		_hooks: newLocalBridge().(exHooks),
+	})
 }
 
 func (me *workerTestSuite) SetupSuite() {
 	var err error
-	me._trans = transport.NewMgr()
-	me._ws, err = newWorkers(me._trans)
+	me._ws, err = newWorkers(me._trans, me._hooks)
 	me.Nil(err)
 }
 

@@ -108,8 +108,8 @@ func (m *_mappers) Close() (err error) {
 // - tasks: input channel
 // returns:
 // ...
-func newMappers(trans *transport.Mgr) (m *_mappers, err error) {
-	w, err := newWorkers(trans)
+func newMappers(trans *transport.Mgr, hooks exHooks) (m *_mappers, err error) {
+	w, err := newWorkers(trans, hooks)
 	if err != nil {
 		return
 	}

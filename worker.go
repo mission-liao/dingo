@@ -41,6 +41,7 @@ type _workers struct {
 	events      chan *common.Event
 	eventMux    *common.Mux
 	trans       *transport.Mgr
+	hooks       exHooks
 }
 
 // allocating a new group of workers
@@ -207,11 +208,12 @@ func (me *_workers) Close() (err error) {
 }
 
 // factory function
-func newWorkers(trans *transport.Mgr) (w *_workers, err error) {
+func newWorkers(trans *transport.Mgr, hooks exHooks) (w *_workers, err error) {
 	w = &_workers{
 		events:   make(chan *common.Event, 10),
 		eventMux: common.NewMux(),
 		trans:    trans,
+		hooks:    hooks,
 	}
 
 	w.workers.Store(make(map[string]*worker))
@@ -240,7 +242,8 @@ func (me *_workers) _worker_routine_(
 	reports chan<- *transport.Report,
 ) {
 	defer wait.Done()
-	rep := func(task *transport.Task, status int16, payload []interface{}, err error) {
+	rep := func(task *transport.Task, status int16, payload []interface{}, err error, alreadySent bool) (sent bool) {
+		sent = alreadySent
 		if task.Option().IgnoreReport() {
 			return
 		}
@@ -262,18 +265,28 @@ func (me *_workers) _worker_routine_(
 			}
 		}
 
-		if r.Done() {
-			reports <- r
-		} else {
-			if r.Option().MonitorProgress() {
-				reports <- r
+		if r.Done() || r.Option().MonitorProgress() {
+			if !sent {
+				sent = true
+				me.hooks.ReporterHook(ReporterEvent.BeforeReport, task)
 			}
+
+			reports <- r
 		}
+
+		return
 	}
 	call := func(t *transport.Task) {
+		atLeastOneReport := false
+		defer func() {
+			if atLeastOneReport {
+				me.hooks.ReporterHook(ReporterEvent.FinishReport, t)
+			}
+		}()
+
 		defer func() {
 			if r := recover(); r != nil {
-				rep(t, transport.Status.Panic, nil, transport.NewErr(0, errors.New(fmt.Sprintf("%v", r))))
+				rep(t, transport.Status.Panic, nil, transport.NewErr(0, errors.New(fmt.Sprintf("%v", r))), atLeastOneReport)
 			}
 		}()
 
@@ -284,10 +297,10 @@ func (me *_workers) _worker_routine_(
 		)
 
 		// compose a report -- sent
-		rep(t, transport.Status.Sent, nil, nil)
+		atLeastOneReport = rep(t, transport.Status.Sent, nil, nil, atLeastOneReport)
 
 		// compose a report -- progress
-		rep(t, transport.Status.Progress, nil, nil)
+		atLeastOneReport = rep(t, transport.Status.Progress, nil, nil, atLeastOneReport)
 
 		// call the actuall function, where is the magic
 		ret, err = me.trans.Call(t)
@@ -299,7 +312,7 @@ func (me *_workers) _worker_routine_(
 		} else {
 			status = transport.Status.Success
 		}
-		rep(t, status, ret, err)
+		atLeastOneReport = rep(t, status, ret, err, atLeastOneReport)
 	}
 
 	for {

@@ -45,6 +45,15 @@ type bridge interface {
 	Exists(it int) bool
 }
 
+// exporting hooks of external objects(backend, broker
+// to internal object(workers, mappers).
+//
+// instead of exposing the whole 'bridge' interface to internal objects,
+// just exposing 'exHooks' to them.
+type exHooks interface {
+	ReporterHook(eventID int, payload interface{}) (err error)
+}
+
 func newBridge(which string, trans *transport.Mgr, args ...interface{}) bridge {
 	switch which {
 	case "local":

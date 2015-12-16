@@ -92,6 +92,56 @@ func (me *backend) Close() (err error) {
 // Reporter interface
 //
 
+func (me *backend) ReporterHook(eventID int, payload interface{}) (err error) {
+	switch eventID {
+	case dingo.ReporterEvent.BeforeReport:
+		func() {
+			ci, err := me.AmqpConnection.Channel()
+			if err != nil {
+				return
+			}
+			defer func() {
+				if err != nil {
+					me.AmqpConnection.ReleaseChannel(ci)
+				} else {
+					me.AmqpConnection.ReleaseChannel(nil)
+				}
+			}()
+
+			id := payload.(transport.Meta)
+			qName, rKey := getQueueName(id), getRoutingKey(id)
+
+			// TODO: rework here, a new interface API should be added for preparation.
+			// declare a queue for this task
+			_, err = ci.Channel.QueueDeclare(
+				qName, // name of queue
+				true,  // durable
+				false, // auto-delete
+				false, // exclusive
+				false, // nowait
+				nil,   // args
+			)
+			if err != nil {
+				return
+			}
+
+			// bind queue to result-exchange
+			err = ci.Channel.QueueBind(
+				qName,            // name of queue
+				rKey,             // routing key
+				"dingo.x.result", // name of exchange
+				false,            // nowait
+				nil,              // args
+			)
+			if err != nil {
+				return
+			}
+		}()
+	}
+
+	return
+}
+
 func (me *backend) Report(reports <-chan *dingo.ReportEnvelope) (id int, err error) {
 	quit, done, id := me.reporters.New(0)
 	go me._reporter_routine_(quit, done, me.reporters.Events(), reports)

@@ -14,6 +14,13 @@ type ReportEnvelope struct {
 	Body []byte
 }
 
+var ReporterEvent = struct {
+	BeforeReport int
+	FinishReport int
+}{
+	1, 2,
+}
+
 // TODO: add test case for consecutive calling to Reporter.Report, and make sure their order wouldn't be wrong.
 
 /*
@@ -21,6 +28,14 @@ type ReportEnvelope struct {
  Reporter(s) and dingo are asynchronous by channels.
 */
 type Reporter interface {
+	// hook for listening events from dingo
+	// parameter:
+	// - eventID: which event?
+	// - payload: corresponding payload, its type depends on 'eventID'
+	// returns:
+	// - err: errors
+	ReporterHook(eventID int, payload interface{}) (err error)
+
 	// attach a report channel to backend.
 	//
 	// parameters:
