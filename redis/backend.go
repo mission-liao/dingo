@@ -93,17 +93,25 @@ func (me *backend) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 }
 
 func (me *backend) Done(id transport.Meta) (err error) {
-	me.ridsLock.Lock()
-	defer me.ridsLock.Unlock()
+	var v int
+	err = func() (err error) {
+		var ok bool
+		me.ridsLock.Lock()
+		defer me.ridsLock.Unlock()
 
-	v, ok := me.rids[id.ID()]
-	if !ok {
-		err = errors.New("store id not found")
+		v, ok = me.rids[id.ID()]
+		if !ok {
+			err = errors.New("store id not found")
+			return
+		}
+
+		delete(me.rids, id.ID())
 		return
+	}()
+	if err == nil {
+		err = me.stores.Stop(v)
 	}
-
-	delete(me.rids, id.ID())
-	return me.stores.Stop(v)
+	return
 }
 
 //
@@ -156,10 +164,11 @@ func (me *backend) _store_routine_(quit <-chan int, done chan<- int, events chan
 		}
 	}()
 
+finished:
 	for {
 		select {
 		case _, _ = <-quit:
-			goto clean
+			break finished
 		default:
 			// blocking call to redis
 			reply, err := conn.Do("BRPOP", getKey(id), 1) // TODO: configuration, in seconds
@@ -200,7 +209,6 @@ func (me *backend) _store_routine_(quit <-chan int, done chan<- int, events chan
 			reports <- b
 		}
 	}
-clean:
 }
 
 //

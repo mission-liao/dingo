@@ -20,8 +20,6 @@ var ReporterEvent = struct {
 	1,
 }
 
-// TODO: add test case for consecutive calling to Reporter.Report, and make sure their order wouldn't be wrong.
-
 /*
  Reporter(s) is responsible for sending reports to backend(s). The interaction between
  Reporter(s) and dingo are asynchronous by channels.
