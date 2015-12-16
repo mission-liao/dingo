@@ -45,10 +45,13 @@ func (me *localBackendTestSuite) SetupSuite() {
 	me.BackendTestSuite.SetupSuite()
 }
 
-func (me *localBackendTestSuite) TearDownSuite() {
-	me.BackendTestSuite.TearDownSuite()
-}
-
 func TestLocalBackendSuite(t *testing.T) {
-	suite.Run(t, &localBackendTestSuite{})
+	suite.Run(t, &localBackendTestSuite{
+		BackendTestSuite{
+			Gen: func() (b Backend, err error) {
+				b, err = NewLocalBackend(Default())
+				return
+			},
+		},
+	})
 }

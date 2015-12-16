@@ -16,22 +16,19 @@ type localTestSuite struct {
 	DingoTestSuite
 }
 
-func (me *localTestSuite) SetupSuite() {
-	var err error
-
-	// broker
-	me.Brk, err = NewLocalBroker(Default())
-	me.Nil(err)
-
-	// backend
-	me.Bkd, err = NewLocalBackend(Default())
-	me.Nil(err)
-
-	me.DingoTestSuite.SetupSuite()
-}
-
 func TestDingoLocalSuite(t *testing.T) {
-	suite.Run(t, &localTestSuite{})
+	suite.Run(t, &localTestSuite{
+		DingoTestSuite{
+			GenBroker: func() (v interface{}, err error) {
+				v, err = NewLocalBroker(Default())
+				return
+			},
+			GenBackend: func() (b Backend, err error) {
+				b, err = NewLocalBackend(Default())
+				return
+			},
+		},
+	})
 }
 
 //

@@ -9,15 +9,29 @@ import (
 type BrokerTestSuite struct {
 	suite.Suite
 
+	Gen  func() (interface{}, error)
 	Pdc  Producer
 	Csm  Consumer
 	Ncsm NamedConsumer
 }
 
-func (me *BrokerTestSuite) SetupSuite() {
+func (me *BrokerTestSuite) SetupTest() {
+	var ok bool
+	v, err := me.Gen()
+	me.Nil(err)
+
+	// producer
+	me.Pdc = v.(Producer)
+
+	// named consumer
+	me.Ncsm, ok = v.(NamedConsumer)
+	if !ok {
+		// consumer
+		me.Csm = v.(Consumer)
+	}
 }
 
-func (me *BrokerTestSuite) TearDownSuite() {
+func (me *BrokerTestSuite) TearDownTest() {
 	me.Nil(me.Pdc.(common.Object).Close())
 }
 

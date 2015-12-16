@@ -11,29 +11,47 @@ import (
 type BackendTestSuite struct {
 	suite.Suite
 
+	Gen     func() (Backend, error)
 	Trans   *transport.Mgr
 	Bkd     Backend
 	Rpt     Reporter
 	Sto     Store
 	Reports chan *ReportEnvelope
-	Task    *transport.Task
+	Tasks   []*transport.Task
 }
 
 func (me *BackendTestSuite) SetupSuite() {
-	var err error
-
-	me.NotNil(me.Bkd)
 	me.Trans = transport.NewMgr()
-	me.Reports = make(chan *ReportEnvelope, 10)
-	me.Rpt, me.Sto = me.Bkd.(Reporter), me.Bkd.(Store)
-	me.NotNil(me.Rpt)
-	me.NotNil(me.Sto)
-	_, err = me.Rpt.Report(me.Reports)
-	me.Nil(err)
+	me.NotNil(me.Gen)
 }
 
 func (me *BackendTestSuite) TearDownSuite() {
+}
+
+func (me *BackendTestSuite) SetupTest() {
+	var err error
+
+	me.Bkd, err = me.Gen()
+	me.Nil(err)
+	me.Rpt, me.Sto = me.Bkd.(Reporter), me.Bkd.(Store)
+	me.NotNil(me.Rpt)
+	me.NotNil(me.Sto)
+
+	me.Reports = make(chan *ReportEnvelope, 10)
+	_, err = me.Rpt.Report(me.Reports)
+	me.Nil(err)
+
+	me.Tasks = []*transport.Task{}
+}
+
+func (me *BackendTestSuite) TearDownTest() {
 	me.Nil(me.Bkd.(common.Object).Close())
+	me.Bkd, me.Rpt, me.Sto = nil, nil, nil
+
+	close(me.Reports)
+	me.Reports = nil
+
+	me.Tasks = nil
 }
 
 //
@@ -41,20 +59,18 @@ func (me *BackendTestSuite) TearDownSuite() {
 //
 
 func (me *BackendTestSuite) TestBasic() {
-	var err error
-
 	// register an encoding for this method
 	me.Nil(me.Trans.Register("basic", func() {}, transport.Encode.Default, transport.Encode.Default))
 
 	// compose a dummy task
-	me.Task, err = transport.ComposeTask("basic", nil, []interface{}{})
+	task, err := transport.ComposeTask("basic", nil, []interface{}{})
 	me.Nil(err)
 
 	// trigger hook
-	me.Nil(me.Rpt.ReporterHook(ReporterEvent.BeforeReport, me.Task))
+	me.Nil(me.Rpt.ReporterHook(ReporterEvent.BeforeReport, task))
 
 	// send a report
-	report, err := me.Task.ComposeReport(transport.Status.Sent, make([]interface{}, 0), nil)
+	report, err := task.ComposeReport(transport.Status.Sent, make([]interface{}, 0), nil)
 	me.Nil(err)
 	{
 		b, err := me.Trans.EncodeReport(report)
@@ -66,7 +82,7 @@ func (me *BackendTestSuite) TestBasic() {
 	}
 
 	// polling
-	reports, err := me.Sto.Poll(me.Task)
+	reports, err := me.Sto.Poll(task)
 	me.Nil(err)
 	me.NotNil(reports)
 	select {
@@ -81,7 +97,9 @@ func (me *BackendTestSuite) TestBasic() {
 	}
 
 	// done polling
-	me.Nil(me.Sto.Done(me.Task))
+	me.Nil(me.Sto.Done(task))
+
+	me.Tasks = append(me.Tasks, task)
 }
 
 func (me *BackendTestSuite) TestOrder() {
@@ -154,4 +172,6 @@ func (me *BackendTestSuite) TestOrder() {
 	}
 	// wait for all chks routine
 	wait.Wait()
+
+	me.Tasks = append(me.Tasks, tasks...)
 }

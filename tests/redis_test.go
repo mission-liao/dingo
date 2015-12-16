@@ -30,5 +30,16 @@ func (me *redisTestSuite) SetupSuite() {
 }
 
 func TestDingoRedisSuite(t *testing.T) {
-	suite.Run(t, &redisTestSuite{})
+	suite.Run(t, &redisTestSuite{
+		dingo.DingoTestSuite{
+			GenBroker: func() (v interface{}, err error) {
+				v, err = dgredis.NewBroker(dgredis.DefaultRedisConfig())
+				return
+			},
+			GenBackend: func() (b dingo.Backend, err error) {
+				b, err = dgredis.NewBackend(dgredis.DefaultRedisConfig())
+				return
+			},
+		},
+	})
 }

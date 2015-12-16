@@ -31,5 +31,16 @@ func (me *amqpTestSuite) SetupSuite() {
 }
 
 func TestDingoAmqpSuite(t *testing.T) {
-	suite.Run(t, &amqpTestSuite{})
+	suite.Run(t, &amqpTestSuite{
+		dingo.DingoTestSuite{
+			GenBroker: func() (v interface{}, err error) {
+				v, err = dgamqp.NewBroker(dgamqp.DefaultAmqpConfig())
+				return
+			},
+			GenBackend: func() (b dingo.Backend, err error) {
+				b, err = dgamqp.NewBackend(dgamqp.DefaultAmqpConfig())
+				return
+			},
+		},
+	})
 }

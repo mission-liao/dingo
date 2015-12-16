@@ -11,20 +11,13 @@ type RedisBackendTestSuite struct {
 	dingo.BackendTestSuite
 }
 
-func (me *RedisBackendTestSuite) SetupSuite() {
-	var (
-		err error
-	)
-
-	me.Bkd, err = NewBackend(DefaultRedisConfig())
-	me.Nil(err)
-	me.BackendTestSuite.SetupSuite()
-}
-
-func (me *RedisBackendTestSuite) TearDownSuite() {
-	me.BackendTestSuite.TearDownSuite()
-}
-
 func TestRedisBackendSuite(t *testing.T) {
-	suite.Run(t, &RedisBackendTestSuite{})
+	suite.Run(t, &RedisBackendTestSuite{
+		dingo.BackendTestSuite{
+			Gen: func() (b dingo.Backend, err error) {
+				b, err = NewBackend(DefaultRedisConfig())
+				return
+			},
+		},
+	})
 }

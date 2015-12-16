@@ -17,19 +17,17 @@ type amqpRedisTestSuite struct {
 	dingo.DingoTestSuite
 }
 
-func (me *amqpRedisTestSuite) SetupSuite() {
-	var err error
-	// broker
-	me.Nbrk, err = dgamqp.NewBroker(dgamqp.DefaultAmqpConfig())
-	me.Nil(err)
-
-	// backend
-	me.Bkd, err = dgredis.NewBackend(dgredis.DefaultRedisConfig())
-	me.Nil(err)
-
-	me.DingoTestSuite.SetupSuite()
-}
-
 func TestDingoAmqpRedisSuite(t *testing.T) {
-	suite.Run(t, &amqpRedisTestSuite{})
+	suite.Run(t, &amqpRedisTestSuite{
+		dingo.DingoTestSuite{
+			GenBroker: func() (v interface{}, err error) {
+				v, err = dgamqp.NewBroker(dgamqp.DefaultAmqpConfig())
+				return
+			},
+			GenBackend: func() (b dingo.Backend, err error) {
+				b, err = dgredis.NewBackend(dgredis.DefaultRedisConfig())
+				return
+			},
+		},
+	})
 }

@@ -11,18 +11,31 @@ import (
 type DingoTestSuite struct {
 	suite.Suite
 
-	App_   *App
-	Brk    Broker
-	Nbrk   NamedBroker
-	Bkd    Backend
-	eid    int
-	events <-chan *common.Event
+	GenBroker  func() (interface{}, error)
+	GenBackend func() (Backend, error)
+	App_       *App
+	Brk        Broker
+	Nbrk       NamedBroker
+	Bkd        Backend
+	eid        int
+	events     <-chan *common.Event
 }
 
 func (me *DingoTestSuite) SetupSuite() {
-	var err error
+	var (
+		err error
+		ok  bool
+	)
 	me.App_, err = NewApp("")
 	me.Nil(err)
+
+	// broker
+	v, err := me.GenBroker()
+	me.Nil(err)
+	me.Brk, ok = v.(Broker)
+	if !ok {
+		me.Nbrk = v.(NamedBroker)
+	}
 
 	// broker
 	if me.Brk != nil {
@@ -30,12 +43,15 @@ func (me *DingoTestSuite) SetupSuite() {
 		me.Nil(err)
 		me.Equal(common.InstT.PRODUCER|common.InstT.CONSUMER, used)
 	} else {
+		me.NotNil(me.Nbrk)
 		_, used, err := me.App_.Use(me.Nbrk, common.InstT.DEFAULT)
 		me.Nil(err)
 		me.Equal(common.InstT.PRODUCER|common.InstT.CONSUMER, used)
 	}
 
 	// backend
+	me.Bkd, err = me.GenBackend()
+	me.Nil(err)
 	_, used, err := me.App_.Use(me.Bkd, common.InstT.DEFAULT)
 	me.Nil(err)
 	me.Equal(common.InstT.REPORTER|common.InstT.STORE, used)
