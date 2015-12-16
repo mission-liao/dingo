@@ -111,7 +111,6 @@ func (me *backend) ReporterHook(eventID int, payload interface{}) (err error) {
 			id := payload.(transport.Meta)
 			qName, rKey := getQueueName(id), getRoutingKey(id)
 
-			// TODO: rework here, a new interface API should be added for preparation.
 			// declare a queue for this task
 			_, err = ci.Channel.QueueDeclare(
 				qName, // name of queue
@@ -221,16 +220,23 @@ func (me *backend) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 }
 
 func (me *backend) Done(id transport.Meta) (err error) {
-	me.ridsLock.Lock()
-	defer me.ridsLock.Unlock()
+	var v int
+	err = func() (err error) {
+		me.ridsLock.Lock()
+		defer me.ridsLock.Unlock()
 
-	v, ok := me.rids[id.ID()]
-	if !ok {
-		err = errors.New("store id not found")
+		var ok bool
+		v, ok = me.rids[id.ID()]
+		if !ok {
+			err = errors.New("store id not found")
+			return
+		}
 		return
+	}()
+	if err == nil {
+		err = me.stores.Stop(v)
 	}
-
-	return me.stores.Stop(v)
+	return
 }
 
 //
