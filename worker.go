@@ -277,16 +277,10 @@ func (me *_workers) _worker_routine_(
 		return
 	}
 	call := func(t *transport.Task) {
-		atLeastOneReport := false
-		defer func() {
-			if atLeastOneReport {
-				me.hooks.ReporterHook(ReporterEvent.FinishReport, t)
-			}
-		}()
-
+		reported := false
 		defer func() {
 			if r := recover(); r != nil {
-				rep(t, transport.Status.Panic, nil, transport.NewErr(0, errors.New(fmt.Sprintf("%v", r))), atLeastOneReport)
+				reported = rep(t, transport.Status.Panic, nil, transport.NewErr(0, errors.New(fmt.Sprintf("%v", r))), reported)
 			}
 		}()
 
@@ -297,10 +291,10 @@ func (me *_workers) _worker_routine_(
 		)
 
 		// compose a report -- sent
-		atLeastOneReport = rep(t, transport.Status.Sent, nil, nil, atLeastOneReport)
+		reported = rep(t, transport.Status.Sent, nil, nil, reported)
 
 		// compose a report -- progress
-		atLeastOneReport = rep(t, transport.Status.Progress, nil, nil, atLeastOneReport)
+		reported = rep(t, transport.Status.Progress, nil, nil, reported)
 
 		// call the actuall function, where is the magic
 		ret, err = me.trans.Call(t)
@@ -312,7 +306,7 @@ func (me *_workers) _worker_routine_(
 		} else {
 			status = transport.Status.Success
 		}
-		atLeastOneReport = rep(t, status, ret, err, atLeastOneReport)
+		reported = rep(t, status, ret, err, reported)
 	}
 
 	for {

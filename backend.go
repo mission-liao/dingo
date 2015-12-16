@@ -16,9 +16,8 @@ type ReportEnvelope struct {
 
 var ReporterEvent = struct {
 	BeforeReport int
-	FinishReport int
 }{
-	1, 2,
+	1,
 }
 
 // TODO: add test case for consecutive calling to Reporter.Report, and make sure their order wouldn't be wrong.
