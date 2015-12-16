@@ -113,19 +113,27 @@ func (me *HetroRoutines) New(want int) (quit <-chan int, done chan<- int, idx in
 }
 
 func (me *HetroRoutines) Stop(idx int) (err error) {
-	me.ctrlsLock.Lock()
-	defer me.ctrlsLock.Unlock()
+	var c *_control
+	err = func() (err error) {
+		me.ctrlsLock.Lock()
+		defer me.ctrlsLock.Unlock()
 
-	c, ok := me.ctrls[idx]
-	if !ok {
-		err = errors.New(fmt.Sprintf("Index not found: %v", idx))
+		var ok bool
+		c, ok = me.ctrls[idx]
+		if !ok {
+			err = errors.New(fmt.Sprintf("Index not found: %v", idx))
+			return
+		}
+
+		delete(me.ctrls, idx)
 		return
-	}
+	}()
 
-	delete(me.ctrls, idx)
-	c.quit <- 1
-	close(c.quit)
-	_, _ = <-c.done
+	if c != nil {
+		c.quit <- 1
+		close(c.quit)
+		_, _ = <-c.done
+	}
 	return
 }
 
