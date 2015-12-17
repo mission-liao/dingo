@@ -56,6 +56,10 @@ func (me *broker) Close() (err error) {
 // Producer interface
 //
 
+func (me *broker) DeclareTask(name string) (err error) {
+	return
+}
+
 func (me *broker) Send(id transport.Meta, body []byte) (err error) {
 	conn := me.pool.Get()
 	defer conn.Close()

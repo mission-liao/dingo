@@ -67,6 +67,10 @@ func (me *localBridge) Register(name string, fn interface{}) (err error) {
 	return
 }
 
+func (me *localBridge) DeclareTask(name string) (err error) {
+	return
+}
+
 func (me *localBridge) SendTask(t *transport.Task) (err error) {
 	me.objLock.RLock()
 	defer me.objLock.RUnlock()

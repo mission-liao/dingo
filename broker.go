@@ -18,6 +18,13 @@ type NamedBroker interface {
  Producer(s) is responsibe for sending tasks to broker(s).
 */
 type Producer interface {
+	// declare a new kind of tasks, this function would be called when
+	// users register a new task to dingo.
+	//
+	// parameters:
+	// - name: name of tasks
+	DeclareTask(name string) error
+
 	// send a task to brokers, it should be a blocking call.
 	//
 	// parameters:

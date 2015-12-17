@@ -69,6 +69,14 @@ func (me *remoteBridge) Events() ([]<-chan *common.Event, error) {
 	}, nil
 }
 
+func (me *remoteBridge) DeclareTask(name string) (err error) {
+	if me.producer != nil {
+		err = me.producer.DeclareTask(name)
+	}
+
+	return
+}
+
 func (me *remoteBridge) SendTask(t *transport.Task) (err error) {
 	me.producerLock.RLock()
 	defer me.producerLock.RUnlock()

@@ -93,6 +93,9 @@ func (me *BrokerTestSuite) TestBasic() {
 		return
 	}
 
+	// declare this task to broker before sending
+	me.Nil(me.Pdc.DeclareTask(""))
+
 	// send it
 	input := append(hb, []byte("test byte array")...)
 	me.Nil(me.Pdc.Send(t, input))
@@ -127,7 +130,6 @@ done:
 		case _, _ = <-quit:
 			break done
 		case t, ok := <-tasks:
-			_ = "breakpoint"
 			if !ok {
 				break done
 			}
@@ -186,6 +188,9 @@ func (me *BrokerTestSuite) TestNamed() {
 		tasks, err := c.AddListener(name, rc)
 		me.Nil(err)
 
+		// declare this task through Producer
+		me.Nil(me.Pdc.DeclareTask(name))
+
 		// a simplified mapper routine
 		go me._simplified_mapper_(rs.New(), rs.Wait(), tasks, rc, name,
 			func(h *transport.Header) {
@@ -213,6 +218,7 @@ func (me *BrokerTestSuite) TestNamed() {
 	p, err := me.Gen()
 	me.Nil(err)
 	sender := p.(Producer)
+	// declare this task to broker
 	sented.Add(countOfTasks)
 	for i := 0; i < countOfTasks; i++ {
 		// 0 ~ 1024 -> 0x0 ~ 0x400
@@ -273,12 +279,16 @@ func (me *BrokerTestSuite) TestDuplicated() {
 		)
 		v, err := me.Gen()
 		me.Nil(err)
+
+		name = fmt.Sprintf("duplicated.%d", i)
+		me.Nil(me.Pdc.DeclareTask(name))
+
 		if _, ok := v.(NamedConsumer); ok {
-			name = fmt.Sprintf("duplicated.%d", i)
 			tasks, err = v.(NamedConsumer).AddListener(name, rc)
 			me.ConsumerNames = append(me.ConsumerNames, name)
 		} else {
 			tasks, err = v.(Consumer).AddListener(rc)
+			name = ""
 		}
 		me.Nil(err)
 

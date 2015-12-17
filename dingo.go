@@ -214,8 +214,18 @@ func (me *App) AddMarshaller(expectedId int16, m transport.Marshaller) error {
  returns:
   - err: any error produced
 */
-func (me *App) Register(name string, fn interface{}, taskMash, reportMash int16) error {
-	return me.trans.Register(name, fn, taskMash, reportMash)
+func (me *App) Register(name string, fn interface{}, taskMash, reportMash int16) (err error) {
+	err = me.trans.Register(name, fn, taskMash, reportMash)
+	if err != nil {
+		return
+	}
+
+	err = me.b.DeclareTask(name)
+	if err != nil {
+		return
+	}
+
+	return
 }
 
 /*

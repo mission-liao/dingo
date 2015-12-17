@@ -137,6 +137,10 @@ func (me *localBroker) Close() (err error) {
 // Producer
 //
 
+func (me *localBroker) DeclareTask(name string) (err error) {
+	return
+}
+
 func (me *localBroker) Send(id transport.Meta, body []byte) (err error) {
 	me.to <- body
 	return

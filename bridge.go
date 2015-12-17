@@ -12,6 +12,7 @@ type bridge interface {
 	//
 	// proxy for Producer
 	//
+	DeclareTask(name string) (err error)
 	SendTask(t *transport.Task) (err error)
 
 	//

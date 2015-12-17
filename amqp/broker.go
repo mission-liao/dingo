@@ -108,11 +108,53 @@ func (me *broker) Close() (err error) {
 	return
 }
 
-// TODO: a new API for Producer(s) to declare queue
-
 //
 // Producer interface
 //
+
+func (me *broker) DeclareTask(name string) (err error) {
+	ci, err := me.sender.Channel()
+	if err != nil {
+		return
+	}
+	// remember to return channel to pool
+	defer func() {
+		if err == nil {
+			me.sender.ReleaseChannel(ci)
+		} else {
+			me.sender.ReleaseChannel(nil)
+		}
+	}()
+
+	queueName := getConsumerQueueName(name)
+
+	// init queue
+	_, err = ci.Channel.QueueDeclare(
+		queueName, // name of queue
+		true,      // durable
+		false,     // auto-delete
+		false,     // exclusive
+		false,     // noWait
+		nil,       // args
+	)
+	if err != nil {
+		return
+	}
+
+	// bind queue to exchange
+	err = ci.Channel.QueueBind(
+		queueName,
+		name,
+		"dingo.x.task",
+		false, // noWait
+		nil,   // args
+	)
+	if err != nil {
+		return
+	}
+
+	return
+}
 
 func (me *broker) Send(id transport.Meta, body []byte) (err error) {
 	// acquire a channel
@@ -228,6 +270,8 @@ func (me *broker) _consumer_routine_(
 ) {
 	defer wait.Done()
 	defer me.receiver.ReleaseChannel(ci)
+
+	_ = "breakpoint"
 
 	// acquire an tag
 	id := <-me.consumerTags
