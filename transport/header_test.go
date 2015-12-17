@@ -23,15 +23,6 @@ func TestHeader(t *testing.T) {
 		ass.Equal(id, h.ID())
 	}
 
-	// zero length id
-	{
-		id := ""
-		name := "test"
-
-		_, err := NewHeader(id, name).Flush(0)
-		ass.NotNil(err)
-	}
-
 	// zero length name, should be ok
 	{
 		id := "4c257820-9b6e-11e5-b7d5-0002a5d5c51b"
@@ -68,7 +59,7 @@ func TestHeader(t *testing.T) {
 		b, err := NewHeader(id, name).Flush(0)
 		ass.Nil(err)
 
-		h, err := DecodeHeader(b[:48])
+		h, err := DecodeHeader(b[:17])
 		ass.NotNil(err)
 		ass.Nil(h)
 	}

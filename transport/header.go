@@ -12,7 +12,7 @@ type Meta interface {
 	Name() string
 }
 
-const idLen int = 36
+const maxUint32 = uint64(^uint32(0))
 const maxCountOfRegistries uint64 = uint64(^uint32(0))
 
 /*
@@ -70,7 +70,7 @@ type Header struct {
 func (me *Header) Type() int16    { return me.T }
 func (me *Header) ID() string     { return me.I }
 func (me *Header) Name() string   { return me.N }
-func (me *Header) Length() uint64 { return uint64(50 + 8*len(me.R) + len(me.N)) }
+func (me *Header) Length() uint64 { return uint64(18 + 8*len(me.R) + len(me.N) + len(me.I)) }
 
 /*
 Flush the header to a byte stream. Note: after flushing, all registries would be reset.
@@ -78,37 +78,41 @@ Flush the header to a byte stream. Note: after flushing, all registries would be
 func (me *Header) Flush(prealloc uint64) ([]byte, error) {
 	defer me.Reset()
 
-	if len(me.I) != idLen {
-		return nil, errors.New(fmt.Sprintf("length of id should be equal to %v, not [%v]", idLen, me.I))
-	}
-
-	// type(2) || total-length(8) || id(36) || count of registries(4) || registries(?) || name(?)
+	// type(2) || total-length(8) || length Of ID(4) || count of registries(4) || registries(?) || ID(?) || name(?)
 	length := me.Length()
 	b := make([]byte, length, length+prealloc)
 
-	// type -- 4 bytes
+	// type -- 2 bytes
 	binary.PutVarint(b[:2], int64(me.T))
 
 	// total header length -- 8 bytes
 	binary.PutUvarint(b[2:10], uint64(length))
 
-	// id -- 36 bytes
-	copy(b[10:46], me.I)
+	// length of ID -- 4 byte
+	L := uint64(len(me.I))
+	if L >= maxUint32 {
+		return nil, errors.New(fmt.Sprintf("length of ID exceeding max: %v", L))
+	}
+	binary.PutUvarint(b[10:14], L)
 
 	// count of registries -- 4 bytes
 	cntOfRegistries := uint64(len(me.R))
 	if cntOfRegistries >= maxCountOfRegistries {
 		return nil, errors.New(fmt.Sprintf("count of registries exceeds maximum: %v", cntOfRegistries))
 	}
-	binary.PutUvarint(b[46:50], cntOfRegistries)
+	binary.PutUvarint(b[14:18], cntOfRegistries)
 
 	// registries
 	for i, v := range me.R {
-		binary.PutUvarint(b[50+i*8:], v)
+		binary.PutUvarint(b[18+i*8:], v)
 	}
 
+	// id
+	var cur uint64 = uint64(18 + len(me.R)*8)
+	copy(b[cur:cur+L], me.I)
+
 	// name
-	copy(b[50+len(me.R)*8:length], me.N)
+	copy(b[cur+L:length], me.N)
 
 	return b, nil
 }
@@ -129,7 +133,7 @@ func DecodeHeader(b []byte) (h *Header, err error) {
 		err = errors.New("nil buffer")
 		return
 	}
-	if len(b) < 50 {
+	if len(b) < 18 {
 		err = errors.New(fmt.Sprintf("length is not enough :%v", string(b)))
 		return
 	}
@@ -149,13 +153,19 @@ func DecodeHeader(b []byte) (h *Header, err error) {
 	if err != nil {
 		return
 	}
-	if L < 50 {
+	if L < 18 {
 		err = errors.New(fmt.Sprintf("invalid header length: %v", string(b)))
 		return
 	}
 
+	// length of ID
+	IL, err := binary.ReadUvarint(bytes.NewBuffer(b[10:14]))
+	if err != nil {
+		return
+	}
+
 	// count of registries
-	C, err := binary.ReadUvarint(bytes.NewBuffer(b[46:50]))
+	C, err := binary.ReadUvarint(bytes.NewBuffer(b[14:18]))
 	if (50 + C*8) > L {
 		err = errors.New(fmt.Sprintf("registries count is %v, when length is %v", C, L))
 		return
@@ -165,17 +175,19 @@ func DecodeHeader(b []byte) (h *Header, err error) {
 	Rs := []uint64{}
 	var R uint64
 	for i := uint64(0); i < C; i++ {
-		R, err = binary.ReadUvarint(bytes.NewBuffer(b[50+i*8 : 50+(i+1)*8]))
+		R, err = binary.ReadUvarint(bytes.NewBuffer(b[18+i*8 : 18+(i+1)*8]))
 		if err != nil {
 			return
 		}
 		Rs = append(Rs, R)
 	}
 
+	var cur uint64 = 18 + C*8
+
 	h = &Header{
 		T: int16(T),
-		I: string(b[10:46]),
-		N: string(b[50+C*8 : L]),
+		I: string(b[cur : cur+IL]),
+		N: string(b[cur+IL : L]),
 		R: Rs,
 	}
 	return
