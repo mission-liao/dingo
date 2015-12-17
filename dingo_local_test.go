@@ -20,11 +20,11 @@ func TestDingoLocalSuite(t *testing.T) {
 	suite.Run(t, &localTestSuite{
 		DingoTestSuite{
 			GenBroker: func() (v interface{}, err error) {
-				v, err = NewLocalBroker(Default(), nil)
+				v, err = NewLocalBroker(DefaultConfig(), nil)
 				return
 			},
 			GenBackend: func() (b Backend, err error) {
-				b, err = NewLocalBackend(Default())
+				b, err = NewLocalBackend(DefaultConfig())
 				return
 			},
 		},

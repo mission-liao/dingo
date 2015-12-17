@@ -9,8 +9,7 @@ func (me *Config) Mappers(count int) *Config {
 	return me
 }
 
-// TODO: rename to DefaultConfig
-func Default() *Config {
+func DefaultConfig() *Config {
 	return &Config{
 		Mappers_: 3,
 	}

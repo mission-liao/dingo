@@ -19,7 +19,7 @@ func TestLocalBrokerSuite(t *testing.T) {
 	suite.Run(t, &localBrokerTestSuite{
 		BrokerTestSuite{
 			Gen: func() (v interface{}, err error) {
-				v, err = NewLocalBroker(Default(), to)
+				v, err = NewLocalBroker(DefaultConfig(), to)
 				return
 			},
 		},

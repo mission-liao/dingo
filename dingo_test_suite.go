@@ -26,7 +26,7 @@ func (me *DingoTestSuite) SetupSuite() {
 		err error
 		ok  bool
 	)
-	me.App_, err = NewApp("", Default())
+	me.App_, err = NewApp("", DefaultConfig())
 	me.Nil(err)
 
 	// broker

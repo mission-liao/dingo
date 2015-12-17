@@ -21,13 +21,13 @@ func (me *remoteBridgeTestSuite) SetupTest() {
 	me.BridgeTestSuite.SetupTest()
 
 	// broker
-	me.brk, err = NewLocalBroker(Default(), nil)
+	me.brk, err = NewLocalBroker(DefaultConfig(), nil)
 	me.Nil(err)
 	me.Nil(me.bg.AttachProducer(me.brk.(Producer)))
 	me.Nil(me.bg.AttachConsumer(me.brk.(Consumer), nil))
 
 	// backend
-	me.bkd, err = NewLocalBackend(Default())
+	me.bkd, err = NewLocalBackend(DefaultConfig())
 	me.Nil(err)
 	me.Nil(me.bg.AttachReporter(me.bkd.(Reporter)))
 	me.Nil(me.bg.AttachStore(me.bkd.(Store)))
