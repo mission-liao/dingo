@@ -42,11 +42,12 @@ type App struct {
   - "local": an App works in local mode, which is similar to other background worker framework.
   - "remote": an App works in remote mode, brokers(ex. AMQP...) and backends(ex. redis..., if required) would be needed to work.
 */
-func NewApp(nameOfBridge string) (app *App, err error) {
+func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 	v := &App{
 		objs:     make(map[int]*_object),
 		eventMux: common.NewMux(),
 		trans:    transport.NewMgr(),
+		cfg:      *cfg,
 	}
 	v.b = newBridge(nameOfBridge, v.trans)
 
@@ -401,6 +402,21 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 		if err != nil && types != common.InstT.DEFAULT {
 			return
 		}
+		if err == nil && me.b.Exists(common.InstT.CONSUMER) {
+			var (
+				remain int
+				tasks  <-chan *transport.Task
+			)
+			for remain = me.cfg.Mappers_; remain > 0; remain-- {
+				receipts := make(chan *TaskReceipt, 10)
+				tasks, err = me.b.AddListener(receipts)
+				if err != nil {
+					return
+				}
+
+				me.mappers.more(tasks, receipts)
+			}
+		}
 		used |= common.InstT.CONSUMER
 	}
 	if reporter != nil {
@@ -416,28 +432,6 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 			return
 		}
 		used |= common.InstT.STORE
-	}
-
-	return
-}
-
-// TODO: removing this function, moving config to NewApp
-func (me *App) Init(cfg Config) (err error) {
-	var (
-		remain int
-		tasks  <-chan *transport.Task
-	)
-	// integrate mappers and Consumer
-	if me.b.Exists(common.InstT.CONSUMER) {
-		for remain = cfg.Mappers_; remain > 0; remain-- {
-			receipts := make(chan *TaskReceipt, 10)
-			tasks, err = me.b.AddListener(receipts)
-			if err != nil {
-				return
-			}
-
-			me.mappers.more(tasks, receipts)
-		}
 	}
 
 	return

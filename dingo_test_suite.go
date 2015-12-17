@@ -26,7 +26,7 @@ func (me *DingoTestSuite) SetupSuite() {
 		err error
 		ok  bool
 	)
-	me.App_, err = NewApp("")
+	me.App_, err = NewApp("", Default())
 	me.Nil(err)
 
 	// broker
@@ -59,8 +59,6 @@ func (me *DingoTestSuite) SetupSuite() {
 	// events
 	me.eid, me.events, err = me.App_.Listen(common.InstT.ALL, common.ErrLvl.DEBUG, 0)
 	me.Nil(err)
-
-	me.Nil(me.App_.Init(*Default()))
 }
 
 func (me *DingoTestSuite) TearDownTest() {
