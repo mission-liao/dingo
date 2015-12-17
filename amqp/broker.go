@@ -108,6 +108,8 @@ func (me *broker) Close() (err error) {
 	return
 }
 
+// TODO: a new API for Producer(s) to declare queue
+
 //
 // Producer interface
 //
@@ -158,7 +160,7 @@ func (me *broker) AddListener(name string, receipts <-chan *dingo.TaskReceipt) (
 	if err != nil {
 		return
 	}
-	qn := fmt.Sprintf("dingo.q.task.%v", name)
+	qn := getConsumerQueueName(name)
 
 	// remember to return channel to pool
 	defer func() {
@@ -327,4 +329,8 @@ clean:
 	close(tasks)
 
 	return
+}
+
+func getConsumerQueueName(name string) string {
+	return fmt.Sprintf("dingo.q.task.%v", name)
 }

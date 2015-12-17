@@ -21,7 +21,7 @@ func (me *remoteBridgeTestSuite) SetupTest() {
 	me.BridgeTestSuite.SetupTest()
 
 	// broker
-	me.brk, err = NewLocalBroker(Default())
+	me.brk, err = NewLocalBroker(Default(), nil)
 	me.Nil(err)
 	me.Nil(me.bg.AttachProducer(me.brk.(Producer)))
 	me.Nil(me.bg.AttachConsumer(me.brk.(Consumer), nil))

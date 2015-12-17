@@ -1,7 +1,5 @@
 package dingo
 
-// TODO: test multiple consumers with multiple producers
-
 import (
 	"github.com/mission-liao/dingo/transport"
 )

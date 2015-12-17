@@ -14,19 +14,32 @@ type localBroker struct {
 
 	// broker routine
 	brk *common.Routines
-	to  chan []byte
+
+	// channels
+	fromUser chan []byte
+	to       chan []byte
 
 	// listener routine
 	listeners *common.Routines
 }
 
-// factory
-func NewLocalBroker(cfg *Config) (v *localBroker, err error) {
+/*
+ A Broker implementation based on 'channel'. Users can provide a channel and
+ share it between multiple Producer(s) and Consumer(s) to connect them.
+
+ This one only implements Consumer interface, not the NamedConsumer one.
+*/
+func NewLocalBroker(cfg *Config, to chan []byte) (v *localBroker, err error) {
 	v = &localBroker{
 		cfg:       cfg,
 		brk:       common.NewRoutines(),
-		to:        make(chan []byte, 10),
+		fromUser:  to,
+		to:        to,
 		listeners: common.NewRoutines(),
+	}
+
+	if v.fromUser == nil {
+		v.to = make(chan []byte, 10)
 	}
 
 	v.init()
@@ -109,8 +122,14 @@ func (me *localBroker) Events() ([]<-chan *common.Event, error) {
 func (me *localBroker) Close() (err error) {
 	me.brk.Close()
 	me.listeners.Close()
-	close(me.to)
-	me.to = make(chan []byte, 10)
+	if me.fromUser == nil {
+		// close it only when it's not provided by callers.
+		close(me.to)
+	}
+	me.to = me.fromUser
+	if me.to == nil {
+		me.to = make(chan []byte, 10)
+	}
 	return
 }
 
