@@ -76,7 +76,7 @@ func TestMuxChannelClose(t *testing.T) {
 	ass := assert.New(t)
 
 	m := NewMux()
-	remain, err := m.More(3)
+	remain, err := m.More(1)
 	ass.Equal(0, remain)
 	ass.Nil(err)
 	defer m.Close()
