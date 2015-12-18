@@ -20,14 +20,16 @@ var _redisTaskQueue = "dingo.tasks"
 type broker struct {
 	pool      *redis.Pool
 	listeners *common.Routines
+	cfg       RedisConfig
 }
 
 func NewBroker(cfg *RedisConfig) (v *broker, err error) {
 	v = &broker{
 		listeners: common.NewRoutines(),
+		cfg:       *cfg,
 	}
 
-	v.pool, err = NewRedisPool(cfg.Connection(), cfg.Password_)
+	v.pool, err = newRedisPool(&v.cfg)
 	if err != nil {
 		return
 	}
@@ -114,7 +116,7 @@ func (me *broker) _consumer_routine_(
 			goto clean
 		default:
 			// blocking call on redis server
-			reply, err := conn.Do("BRPOP", qn, 1) // TODO: configuration, in seconds
+			reply, err := conn.Do("BRPOP", qn, me.cfg.GetListenTimeout())
 			if err != nil {
 				events <- common.NewEventFromError(common.InstT.CONSUMER, err)
 				break

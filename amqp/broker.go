@@ -21,46 +21,40 @@ type broker struct {
 	sender, receiver *AmqpConnection
 	consumerTags     chan int
 	consumers        *common.Routines
+	cfg              AmqpConfig
 }
 
 func NewBroker(cfg *AmqpConfig) (v *broker, err error) {
 	v = &broker{
-		sender:    &AmqpConnection{},
-		receiver:  &AmqpConnection{},
 		consumers: common.NewRoutines(),
+		cfg:       *cfg,
 	}
 
-	conn := cfg.Connection()
-	err = v.sender.Init(conn)
+	v.sender, err = newConnection(&v.cfg)
 	if err != nil {
 		return
 	}
 
-	err = v.receiver.Init(conn)
+	v.receiver, err = newConnection(&v.cfg)
 	if err != nil {
 		return
 	}
-
-	err = v.init()
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func (me *broker) init() (err error) {
-	// define relation between queue and exchange
 
 	// get a free channel,
 	// either sender/receiver's channel would works
-	ci, err := me.sender.Channel()
+	ci, err := v.sender.Channel()
 	if err != nil {
 		return
 	}
 
 	// remember to return channel to pool
-	defer me.sender.ReleaseChannel(ci)
+	defer func() {
+		if err != nil {
+			v.sender.ReleaseChannel(nil)
+		} else {
+			v.sender.ReleaseChannel(ci)
+		}
+	}()
 
 	// init exchange
 	err = ci.Channel.ExchangeDeclare(
@@ -76,10 +70,9 @@ func (me *broker) init() (err error) {
 		return
 	}
 
-	// TODO: get number from MaxChannel
-	me.consumerTags = make(chan int, 200)
-	for i := 0; i < 200; i++ {
-		me.consumerTags <- i
+	v.consumerTags = make(chan int, v.receiver.maxChannel)
+	for i := 0; i < v.receiver.maxChannel; i++ {
+		v.consumerTags <- i
 	}
 
 	return
@@ -100,7 +93,7 @@ func (me *broker) Close() (err error) {
 
 	err = me.sender.Close()
 	err_ := me.receiver.Close()
-	if err == nil && err_ != nil {
+	if err == nil {
 		// error from sender is propagated first
 		err = err_
 	}

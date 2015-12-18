@@ -21,13 +21,13 @@ func (me *amqpBackendTestSuite) TearDownTest() {
 		func() {
 			// get a channel
 			isClose := true
-			ch, err := me.Bkd.(*backend).Channel()
+			ch, err := me.Bkd.(*backend).sender.Channel()
 			me.Nil(err)
 			defer func() {
 				if isClose {
-					me.Bkd.(*backend).ReleaseChannel(ch)
+					me.Bkd.(*backend).sender.ReleaseChannel(ch)
 				} else {
-					me.Bkd.(*backend).ReleaseChannel(nil)
+					me.Bkd.(*backend).sender.ReleaseChannel(nil)
 				}
 			}()
 

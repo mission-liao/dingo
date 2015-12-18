@@ -15,7 +15,7 @@ var _redisResultQueue = "dingo.result"
 
 type backend struct {
 	pool *redis.Pool
-	cfg  *RedisConfig
+	cfg  RedisConfig
 
 	// reporter
 	reporters *common.HetroRoutines
@@ -31,9 +31,9 @@ func NewBackend(cfg *RedisConfig) (v *backend, err error) {
 		reporters: common.NewHetroRoutines(),
 		rids:      make(map[string]int),
 		stores:    common.NewHetroRoutines(),
-		cfg:       cfg,
+		cfg:       *cfg,
 	}
-	v.pool, err = NewRedisPool(cfg.Connection(), cfg.Password_)
+	v.pool, err = newRedisPool(&v.cfg)
 	if err != nil {
 		return
 	}
@@ -171,7 +171,7 @@ finished:
 			break finished
 		default:
 			// blocking call to redis
-			reply, err := conn.Do("BRPOP", getKey(id), 1) // TODO: configuration, in seconds
+			reply, err := conn.Do("BRPOP", getKey(id), me.cfg.GetPollTimeout())
 			if err != nil {
 				events <- common.NewEventFromError(common.InstT.STORE, err)
 				break

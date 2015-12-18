@@ -27,38 +27,32 @@ type AmqpConnection struct {
 	conn *amqp.Connection
 
 	// watch dogs
-	cLock       sync.Mutex
-	channels    chan *AmqpChannel // channel pool
-	maxChannel  int
-	cntChannels int
-	noMore      bool // we already created maxChannels
+	cLock                   sync.Mutex
+	channels                chan *AmqpChannel // channel pool
+	cntChannels, maxChannel int
+	noMore                  bool // we already created maxChannels
 }
 
-//
-// common.Server interface
-//
+func newConnection(cfg *AmqpConfig) (c *AmqpConnection, err error) {
+	c = &AmqpConnection{
+		maxChannel:  cfg.GetMaxChannel(),
+		cntChannels: 0,
+	}
 
-func (me *AmqpConnection) Init(conn string) (err error) {
-	me.maxChannel = 1024 // TODO: configurable
-	me.cntChannels = 0
-
-	// connect to AMQP
-	me.conn, err = amqp.Dial(conn)
+	c.conn, err = amqp.Dial(cfg.Connection())
 	if err != nil {
 		return
 	}
 
-	// create channels
-	me.channels = make(chan *AmqpChannel, me.maxChannel)
-
+	c.channels = make(chan *AmqpChannel, c.maxChannel)
 	initCount := 16
 	for ; initCount > 0; initCount-- {
 		var ch *AmqpChannel
-		ch, err = me.Channel()
+		ch, err = c.Channel()
 		if err != nil {
 			return
 		}
-		me.ReleaseChannel(ch)
+		c.ReleaseChannel(ch)
 	}
 
 	return

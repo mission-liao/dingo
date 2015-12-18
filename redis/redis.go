@@ -9,16 +9,17 @@ import (
 // A redis pool
 //
 
-func NewRedisPool(server, password string) (pool *redis.Pool, err error) {
+func newRedisPool(cfg *RedisConfig) (pool *redis.Pool, err error) {
 	return &redis.Pool{
-		MaxIdle:     3,                 // TODO: configuration
-		IdleTimeout: 240 * time.Second, // TODO: configuration
+		MaxIdle:     cfg.GetMaxIdle(),
+		IdleTimeout: cfg.GetIdleTimeout(),
 		Dial: func() (conn redis.Conn, err error) {
-			conn, err = redis.Dial("tcp", server)
+			conn, err = redis.Dial("tcp", cfg.Connection())
 			if err != nil {
 				return
 			}
 
+			password := cfg.GetPassword()
 			if len(password) > 0 {
 				_, err = conn.Do("AUTH", password)
 				if err != nil {

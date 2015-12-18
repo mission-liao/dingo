@@ -6,6 +6,9 @@ import (
 	"github.com/satori/go.uuid"
 )
 
+// TODO: IDMaker
+// TODO: TimeGetter
+
 type TaskPayload struct {
 	O *Option
 	A []interface{}

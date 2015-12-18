@@ -16,7 +16,7 @@ import (
 )
 
 type backend struct {
-	AmqpConnection
+	sender, receiver *AmqpConnection
 
 	// store
 	stores   *common.HetroRoutines
@@ -25,33 +25,39 @@ type backend struct {
 
 	// reporter
 	reporters *common.HetroRoutines
-	cfg       *AmqpConfig
+	cfg       AmqpConfig
 }
 
 func NewBackend(cfg *AmqpConfig) (v *backend, err error) {
 	v = &backend{
 		reporters: common.NewHetroRoutines(),
 		rids:      make(map[string]int),
-		cfg:       cfg,
+		cfg:       *cfg,
 		stores:    common.NewHetroRoutines(),
 	}
-	err = v.init()
-	return
-}
 
-func (me *backend) init() (err error) {
-	// call parent's Init
-	err = me.AmqpConnection.Init(me.cfg.Connection())
+	v.sender, err = newConnection(&v.cfg)
+	if err != nil {
+		return
+	}
+
+	v.receiver, err = newConnection(&v.cfg)
 	if err != nil {
 		return
 	}
 
 	// define exchange
-	ci, err := me.AmqpConnection.Channel()
+	ci, err := v.sender.Channel()
 	if err != nil {
 		return
 	}
-	defer me.AmqpConnection.ReleaseChannel(ci)
+	defer func() {
+		if err != nil {
+			v.sender.ReleaseChannel(nil)
+		} else {
+			v.sender.ReleaseChannel(ci)
+		}
+	}()
 
 	// init exchange
 	err = ci.Channel.ExchangeDeclare(
@@ -84,7 +90,13 @@ func (me *backend) Events() ([]<-chan *common.Event, error) {
 func (me *backend) Close() (err error) {
 	me.reporters.Close()
 	me.stores.Close()
-	err = me.AmqpConnection.Close()
+
+	err = me.sender.Close()
+	err_ := me.receiver.Close()
+	if err == nil {
+		err = err_
+	}
+
 	return
 }
 
@@ -96,15 +108,15 @@ func (me *backend) ReporterHook(eventID int, payload interface{}) (err error) {
 	switch eventID {
 	case dingo.ReporterEvent.BeforeReport:
 		func() {
-			ci, err := me.AmqpConnection.Channel()
+			ci, err := me.sender.Channel()
 			if err != nil {
 				return
 			}
 			defer func() {
 				if err != nil {
-					me.AmqpConnection.ReleaseChannel(ci)
+					me.sender.ReleaseChannel(ci)
 				} else {
-					me.AmqpConnection.ReleaseChannel(nil)
+					me.sender.ReleaseChannel(nil)
 				}
 			}()
 
@@ -161,7 +173,7 @@ func (me *backend) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 	me.rids[id.ID()] = idx
 
 	// acquire a free channel
-	ci, err := me.AmqpConnection.Channel()
+	ci, err := me.receiver.Channel()
 	if err != nil {
 		return
 	}
@@ -171,7 +183,7 @@ func (me *backend) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 	)
 	defer func() {
 		if err != nil {
-			me.AmqpConnection.ReleaseChannel(ci)
+			me.receiver.ReleaseChannel(ci)
 		} else {
 			go me._store_routine_(quit, done, me.stores.Events(), r, ci, dv, id)
 		}
@@ -257,11 +269,11 @@ func (me *backend) _reporter_routine_(quit <-chan int, done chan<- int, events c
 		}()
 
 		// acquire a channel
-		ci, err := me.AmqpConnection.Channel()
+		ci, err := me.sender.Channel()
 		if err != nil {
 			return
 		}
-		defer me.AmqpConnection.ReleaseChannel(ci)
+		defer me.sender.ReleaseChannel(ci)
 
 		// QueueDeclare and QueueBind should be done in Poll(...)
 		err = ci.Channel.Publish(
@@ -280,7 +292,6 @@ func (me *backend) _reporter_routine_(quit <-chan int, done chan<- int, events c
 		}
 
 		// block until amqp.Channel.NotifyPublish
-		// TODO: time out, retry
 		cf := <-ci.Confirm
 		if !cf.Ack {
 			err = errors.New("Unable to publish to server")
@@ -337,9 +348,9 @@ func (me *backend) _store_routine_(
 		if isChannelError {
 			// when error occurs, this channel is
 			// automatically closed.
-			me.AmqpConnection.ReleaseChannel(nil)
+			me.receiver.ReleaseChannel(nil)
 		} else {
-			me.AmqpConnection.ReleaseChannel(ci)
+			me.receiver.ReleaseChannel(ci)
 		}
 		done <- 1
 		close(done)
