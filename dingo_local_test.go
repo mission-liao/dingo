@@ -42,7 +42,7 @@ func (me *localTestSuite) TestIgnoreReport() {
 	// initiate workers
 	me.Nil(me.App_.Register(
 		"TestIgnoreReport", func() {},
-		transport.Encode.Default, transport.Encode.Default,
+		transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
 	))
 	remain, err := me.App_.Allocate("TestIgnoreReport", 1, 1)
 	me.Equal(0, remain)
@@ -170,7 +170,7 @@ func (me *localTestSuite) TestMyMarshaller() {
 	}
 
 	// register marshaller
-	mid := int16(101)
+	mid := int(101)
 	err := me.App_.AddMarshaller(mid, &struct {
 		testMyInvoker
 		testMyMarshaller
@@ -178,7 +178,7 @@ func (me *localTestSuite) TestMyMarshaller() {
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.App_.Register("TestMyMarshaller", fn, mid, mid))
+	me.Nil(me.App_.Register("TestMyMarshaller", fn, mid, mid, transport.ID.Default))
 	remain, err := me.App_.Allocate("TestMyMarshaller", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
@@ -234,7 +234,7 @@ func (me *localTestSuite) TestCustomMarshaller() {
 	}
 
 	// register marshaller
-	mid := int16(102)
+	mid := int(102)
 	err := me.App_.AddMarshaller(mid, &struct {
 		testMyInvoker
 		transport.CustomMarshaller
@@ -245,7 +245,7 @@ func (me *localTestSuite) TestCustomMarshaller() {
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.App_.Register("TestCustomMarshaller", fn, mid, mid))
+	me.Nil(me.App_.Register("TestCustomMarshaller", fn, mid, mid, transport.ID.Default))
 	remain, err := me.App_.Allocate("TestCustomMarshaller", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
@@ -308,7 +308,7 @@ func (me *localTestSuite) TestCustomMarshallerWithMinimalFunc() {
 	}
 
 	// register marshaller
-	mid := int16(103)
+	mid := int(103)
 	err := me.App_.AddMarshaller(mid, &struct {
 		testMyInvoker2
 		transport.CustomMarshaller
@@ -319,7 +319,7 @@ func (me *localTestSuite) TestCustomMarshallerWithMinimalFunc() {
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.App_.Register("TestCustomMarshallerWithMinimalFunc", fn, mid, mid))
+	me.Nil(me.App_.Register("TestCustomMarshallerWithMinimalFunc", fn, mid, mid, transport.ID.Default))
 	remain, err := me.App_.Allocate("TestCustomMarshallerWithMinimalFunc", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)

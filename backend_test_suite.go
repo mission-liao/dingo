@@ -1,6 +1,7 @@
 package dingo
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/mission-liao/dingo/common"
@@ -60,10 +61,10 @@ func (me *BackendTestSuite) TearDownTest() {
 
 func (me *BackendTestSuite) TestBasic() {
 	// register an encoding for this method
-	me.Nil(me.Trans.Register("basic", func() {}, transport.Encode.Default, transport.Encode.Default))
+	me.Nil(me.Trans.Register("basic", func() {}, transport.Encode.Default, transport.Encode.Default, transport.ID.Default))
 
 	// compose a dummy task
-	task, err := transport.ComposeTask("basic", nil, []interface{}{})
+	task, err := me.Trans.ComposeTask("basic", nil, []interface{}{})
 	me.Nil(err)
 
 	// trigger hook
@@ -102,62 +103,65 @@ func (me *BackendTestSuite) TestBasic() {
 	me.Tasks = append(me.Tasks, task)
 }
 
+func (me *BackendTestSuite) send(task *transport.Task, s int16) {
+	r, err := task.ComposeReport(s, nil, nil)
+	me.Nil(err)
+
+	b, err := me.Trans.EncodeReport(r)
+	me.Nil(err)
+
+	me.Reports <- &ReportEnvelope{task, b}
+}
+
+func (me *BackendTestSuite) chk(task *transport.Task, b []byte, s int16) {
+	r, err := me.Trans.DecodeReport(b)
+	me.Nil(err)
+
+	if r != nil {
+		me.Equal(task.ID(), r.ID())
+		me.Equal(task.Name(), r.Name())
+		me.Equal(s, r.Status())
+	}
+}
+
+func (me *BackendTestSuite) gen(task *transport.Task, wait *sync.WaitGroup) {
+	defer wait.Done()
+
+	me.Nil(me.Rpt.ReporterHook(ReporterEvent.BeforeReport, task))
+
+	me.send(task, transport.Status.Sent)
+	me.send(task, transport.Status.Progress)
+	me.send(task, transport.Status.Success)
+}
+
+func (me *BackendTestSuite) chks(task *transport.Task, wait *sync.WaitGroup) {
+	defer wait.Done()
+
+	r, err := me.Sto.Poll(task)
+	me.Nil(err)
+
+	me.chk(task, <-r, transport.Status.Sent)
+	me.chk(task, <-r, transport.Status.Progress)
+	me.chk(task, <-r, transport.Status.Success)
+
+	me.Nil(me.Sto.Done(task))
+}
+
 func (me *BackendTestSuite) TestOrder() {
 	// send reports of tasks, make sure their order correct
-	me.Nil(me.Trans.Register("order", func() {}, transport.Encode.Default, transport.Encode.Default))
+	me.Nil(me.Trans.Register("order", func() {}, transport.Encode.Default, transport.Encode.Default, transport.ID.Default))
 
 	var (
 		tasks []*transport.Task
 		wait  sync.WaitGroup
 	)
 
-	send := func(task *transport.Task, s int16) {
-		r, err := task.ComposeReport(s, nil, nil)
-		me.Nil(err)
-
-		b, err := me.Trans.EncodeReport(r)
-		me.Nil(err)
-
-		me.Reports <- &ReportEnvelope{task, b}
-	}
-	chk := func(task *transport.Task, b []byte, s int16) {
-		r, err := me.Trans.DecodeReport(b)
-		me.Nil(err)
-
-		if r != nil {
-			me.Equal(task.ID(), r.ID())
-			me.Equal(task.Name(), r.Name())
-			me.Equal(s, r.Status())
-		}
-	}
-	gen := func(task *transport.Task, wait *sync.WaitGroup) {
-		defer wait.Done()
-
-		me.Nil(me.Rpt.ReporterHook(ReporterEvent.BeforeReport, task))
-
-		send(task, transport.Status.Sent)
-		send(task, transport.Status.Progress)
-		send(task, transport.Status.Success)
-	}
-	chks := func(task *transport.Task, wait *sync.WaitGroup) {
-		defer wait.Done()
-
-		r, err := me.Sto.Poll(task)
-		me.Nil(err)
-
-		chk(task, <-r, transport.Status.Sent)
-		chk(task, <-r, transport.Status.Progress)
-		chk(task, <-r, transport.Status.Success)
-
-		me.Nil(me.Sto.Done(task))
-	}
-
 	for i := 0; i < 100; i++ {
-		t, err := transport.ComposeTask("order", nil, nil)
+		t, err := me.Trans.ComposeTask("order", nil, nil)
 		me.Nil(err)
 		if t != nil {
 			wait.Add(1)
-			go gen(t, &wait)
+			go me.gen(t, &wait)
 
 			tasks = append(tasks, t)
 		}
@@ -168,7 +172,58 @@ func (me *BackendTestSuite) TestOrder() {
 
 	for _, v := range tasks {
 		wait.Add(1)
-		go chks(v, &wait)
+		go me.chks(v, &wait)
+	}
+	// wait for all chks routine
+	wait.Wait()
+
+	me.Tasks = append(me.Tasks, tasks...)
+}
+
+type testSeqID struct {
+	cur int
+}
+
+func (me *testSeqID) NewID() string {
+	me.cur++
+	return fmt.Sprintf("%d", me.cur)
+}
+
+func (me *BackendTestSuite) TestSameID() {
+	// different type of tasks, with the same id,
+	// backend(s) should not get mass.
+
+	var (
+		countOfTypes int = 10
+		countOfTasks int = 10
+		tasks        []*transport.Task
+		wait         sync.WaitGroup
+	)
+
+	// register idMaker, task
+	for i := 0; i < countOfTypes; i++ {
+		name := fmt.Sprintf("SameID.%d", i)
+		me.Nil(me.Trans.AddIdMaker(100+i, &testSeqID{}))
+		me.Nil(me.Trans.Register(name, func() {}, transport.Encode.Default, transport.Encode.Default, 100+i))
+
+		for j := 0; j < countOfTasks; j++ {
+			t, err := me.Trans.ComposeTask(name, nil, nil)
+			me.Nil(err)
+			if t != nil {
+				wait.Add(1)
+				go me.gen(t, &wait)
+
+				tasks = append(tasks, t)
+			}
+		}
+	}
+
+	// wait for all routines finished
+	wait.Wait()
+
+	for _, v := range tasks {
+		wait.Add(1)
+		go me.chks(v, &wait)
 	}
 	// wait for all chks routine
 	wait.Wait()

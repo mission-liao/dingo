@@ -49,14 +49,14 @@ type Store interface {
 	// polling reports for tasks
 	//
 	// parameters:
-	// - id: the meta info of that task to be polled.
+	// - meta: the meta info of that task to be polled.
 	// returns:
 	// - reports: the output channel for dingo to receive reports.
-	Poll(id transport.Meta) (reports <-chan []byte, err error)
+	Poll(meta transport.Meta) (reports <-chan []byte, err error)
 
 	// Stop monitoring that task
 	//
 	// parameters:
 	// - id the meta info of that task/report to stop polling.
-	Done(id transport.Meta) error
+	Done(meta transport.Meta) error
 }

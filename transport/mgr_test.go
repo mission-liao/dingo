@@ -11,8 +11,8 @@ import (
 func TestMgrMarshallers(t *testing.T) {
 	ass := assert.New(t)
 	trans := NewMgr()
-	ass.Nil(trans.Register("TestMgrMarshallers", func() {}, Encode.JSON, Encode.GOB))
-	task, err := ComposeTask("TestMgrMarshallers", nil, []interface{}{float64(1)})
+	ass.Nil(trans.Register("TestMgrMarshallers", func() {}, Encode.JSON, Encode.GOB, ID.Default))
+	task, err := trans.ComposeTask("TestMgrMarshallers", nil, []interface{}{float64(1)})
 	task.H.I = "a2a2da60-9cba-11e5-b690-0002a5d5c51b" // fix ID for testing
 	ass.Nil(err)
 
@@ -64,10 +64,10 @@ func TestMgrInvokers(t *testing.T) {
 
 	ass := assert.New(t)
 	trans := NewMgr()
-	ass.Nil(trans.Register("TestMgrInvokers", fn, Encode.JSON, Encode.JSON))
+	ass.Nil(trans.Register("TestMgrInvokers", fn, Encode.JSON, Encode.JSON, ID.Default))
 
 	// compose a task, with wrong type of input
-	task, err := ComposeTask("TestMgrInvokers", nil, []interface{}{int32(3)})
+	task, err := trans.ComposeTask("TestMgrInvokers", nil, []interface{}{int32(3)})
 	ass.Nil(err)
 
 	// Call it
@@ -100,7 +100,7 @@ func TestMgrOption(t *testing.T) {
 	ass.Nil(opt)
 
 	// regist a record
-	ass.Nil(trans.Register("TestMgrOption", func() {}, Encode.Default, Encode.Default))
+	ass.Nil(trans.Register("TestMgrOption", func() {}, Encode.Default, Encode.Default, ID.Default))
 
 	// ok
 	ass.Nil(trans.SetOption("TestMgrOption", NewOption()))
@@ -119,11 +119,11 @@ func TestMgrRegister(t *testing.T) {
 	trans := NewMgr()
 
 	// register a function, with not-existed marshaller id.
-	ass.NotNil(trans.Register("TestMgrResgister", func() {}, 100, 100))
+	ass.NotNil(trans.Register("TestMgrResgister", func() {}, 100, 100, 100))
 
 	// register a function with default marshaller id
-	ass.Nil(trans.Register("TestMgrMarshallers1", func() {}, Encode.Default, Encode.Default))
+	ass.Nil(trans.Register("TestMgrMarshallers1", func() {}, Encode.Default, Encode.Default, ID.Default))
 
 	// register something already registered
-	ass.NotNil(trans.Register("TestMgrMarshallers1", func() {}, Encode.Default, Encode.Default))
+	ass.NotNil(trans.Register("TestMgrMarshallers1", func() {}, Encode.Default, Encode.Default, ID.Default))
 }

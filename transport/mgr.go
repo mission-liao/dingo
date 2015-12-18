@@ -10,14 +10,17 @@ import (
 type fnOpt struct {
 	fn   interface{}
 	mash struct {
-		task, report int16
+		task, report int
 	}
-	opt *Option
+	idMaker int
+	opt     *Option
 }
 
 type Mgr struct {
 	msLock     sync.Mutex
 	ms         atomic.Value
+	imsLock    sync.Mutex
+	ims        atomic.Value
 	fn2optLock sync.Mutex
 	fn2opt     atomic.Value
 }
@@ -26,7 +29,7 @@ func NewMgr() (c *Mgr) {
 	c = &Mgr{}
 
 	// init for marshaller's'
-	ms := make(map[int16]Marshaller)
+	ms := make(map[int]Marshaller)
 	c.msLock.Lock()
 	defer c.msLock.Unlock()
 
@@ -54,6 +57,15 @@ func NewMgr() (c *Mgr) {
 
 	c.ms.Store(ms)
 
+	// init for id-maker's'
+	ims := make(map[int]IDMaker)
+	c.imsLock.Lock()
+	defer c.imsLock.Unlock()
+
+	ims[ID.UUID] = &uuidMaker{}
+	ims[ID.Default] = ims[ID.UUID]
+	c.ims.Store(ims)
+
 	// init map from name of function to options
 	c.fn2optLock.Lock()
 	defer c.fn2optLock.Unlock()
@@ -62,7 +74,26 @@ func NewMgr() (c *Mgr) {
 	return
 }
 
-func (me *Mgr) AddMarshaller(id int16, m Marshaller) (err error) {
+func (me *Mgr) AddIdMaker(id int, m IDMaker) (err error) {
+	me.imsLock.Lock()
+	defer me.imsLock.Unlock()
+
+	ims := me.ims.Load().(map[int]IDMaker)
+	if v, ok := ims[id]; ok {
+		err = errors.New(fmt.Sprintf("marshaller id %v already exists %v", id, v))
+		return
+	}
+
+	nims := make(map[int]IDMaker)
+	for k := range ims {
+		nims[k] = ims[k]
+	}
+	nims[id] = m
+	me.ims.Store(nims)
+	return
+}
+
+func (me *Mgr) AddMarshaller(id int, m Marshaller) (err error) {
 	// a Marshaller should depend on an Invoker
 	_, ok := m.(Invoker)
 	if !ok {
@@ -73,13 +104,13 @@ func (me *Mgr) AddMarshaller(id int16, m Marshaller) (err error) {
 	me.msLock.Lock()
 	defer me.msLock.Unlock()
 
-	ms := me.ms.Load().(map[int16]Marshaller)
+	ms := me.ms.Load().(map[int]Marshaller)
 	if v, ok := ms[id]; ok {
 		err = errors.New(fmt.Sprintf("marshaller id %v already exists %v", id, v))
 		return
 	}
 
-	nms := make(map[int16]Marshaller)
+	nms := make(map[int]Marshaller)
 	for k := range ms {
 		nms[k] = ms[k]
 	}
@@ -88,15 +119,15 @@ func (me *Mgr) AddMarshaller(id int16, m Marshaller) (err error) {
 	return
 }
 
-func (me *Mgr) Register(name string, fn interface{}, msTask, msReport int16) (err error) {
-	if uint16(len(name)) >= ^uint16(0) {
+func (me *Mgr) Register(name string, fn interface{}, msTask, msReport int, idMaker int) (err error) {
+	if uint(len(name)) >= ^uint(0) {
 		err = errors.New(fmt.Sprintf("length of name exceeds maximum: %v", len(name)))
 		return
 	}
 
 	// check existence of marshaller IDs
-	ms := me.ms.Load().(map[int16]Marshaller)
-	chk := func(id int16) (err error) {
+	ms := me.ms.Load().(map[int]Marshaller)
+	chk := func(id int) (err error) {
 		if v, ok := ms[id]; ok {
 			err = v.Prepare(name, fn)
 			if err != nil {
@@ -117,6 +148,13 @@ func (me *Mgr) Register(name string, fn interface{}, msTask, msReport int16) (er
 		return
 	}
 
+	// check existence of idMaker's ID
+	ims := me.ims.Load().(map[int]IDMaker)
+	if _, ok := ims[idMaker]; !ok {
+		err = errors.New(fmt.Sprintf("idmaker id:%v is not registered", idMaker))
+		return
+	}
+
 	// insert the newly created record
 	me.fn2optLock.Lock()
 	defer me.fn2optLock.Unlock()
@@ -134,8 +172,9 @@ func (me *Mgr) Register(name string, fn interface{}, msTask, msReport int16) (er
 		fn:  fn,
 		opt: NewOption(),
 		mash: struct {
-			task, report int16
+			task, report int
 		}{msTask, msReport},
+		idMaker: idMaker,
 	}
 	me.fn2opt.Store(nfns)
 	return
@@ -176,6 +215,35 @@ func (me *Mgr) GetOption(name string) (opt *Option, err error) {
 	return
 }
 
+func (me *Mgr) ComposeTask(name string, o *Option, args []interface{}) (t *Task, err error) {
+	fn := me.fn2opt.Load().(map[string]*fnOpt)
+	opt, ok := fn[name]
+	if !ok {
+		err = errors.New(fmt.Sprintf("idMaker option not found: %v %v", name, opt))
+		return
+	}
+
+	ims := me.ims.Load().(map[int]IDMaker)
+	m, ok := ims[opt.idMaker]
+	if !ok {
+		err = errors.New(fmt.Sprintf("idMaker not found: %v %v", name, opt))
+		return
+	}
+
+	if o == nil {
+		o = NewOption()
+	}
+
+	t = &Task{
+		H: NewHeader(m.NewID(), name),
+		P: &TaskPayload{
+			O: o,
+			A: args,
+		},
+	}
+	return
+}
+
 func (me *Mgr) EncodeTask(task *Task) (b []byte, err error) {
 	fn := me.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[task.Name()]
@@ -184,7 +252,7 @@ func (me *Mgr) EncodeTask(task *Task) (b []byte, err error) {
 		return
 	}
 
-	ms := me.ms.Load().(map[int16]Marshaller)
+	ms := me.ms.Load().(map[int]Marshaller)
 	m, ok := ms[opt.mash.task]
 	if !ok {
 		err = errors.New(fmt.Sprintf("marshaller not found: %v %v", task, opt))
@@ -210,7 +278,7 @@ func (me *Mgr) DecodeTask(b []byte) (task *Task, err error) {
 	}
 
 	// looking for marshaller
-	ms := me.ms.Load().(map[int16]Marshaller)
+	ms := me.ms.Load().(map[int]Marshaller)
 	m, ok := ms[opt.mash.task]
 	if !ok {
 		err = errors.New(fmt.Sprintf("marshaller not found: %v", h))
@@ -231,7 +299,7 @@ func (me *Mgr) EncodeReport(report *Report) (b []byte, err error) {
 	}
 
 	// looking for marshaller
-	ms := me.ms.Load().(map[int16]Marshaller)
+	ms := me.ms.Load().(map[int]Marshaller)
 	m, ok := ms[opt.mash.report]
 	if !ok {
 		err = errors.New(fmt.Sprintf("marshaller not found: %v %v", report, opt))
@@ -257,7 +325,7 @@ func (me *Mgr) DecodeReport(b []byte) (report *Report, err error) {
 	}
 
 	// looking for marshaller
-	ms := me.ms.Load().(map[int16]Marshaller)
+	ms := me.ms.Load().(map[int]Marshaller)
 	m, ok := ms[opt.mash.report]
 	if !ok {
 		err = errors.New(fmt.Sprintf("marshaller not found: %v", h))
@@ -278,7 +346,7 @@ func (me *Mgr) Call(t *Task) (ret []interface{}, err error) {
 	}
 
 	// looking for the marshaller
-	ms := me.ms.Load().(map[int16]Marshaller)
+	ms := me.ms.Load().(map[int]Marshaller)
 	m, ok := ms[opt.mash.task]
 	if !ok {
 		err = errors.New(fmt.Sprintf("marshaller not found: %v %v", t, opt))
@@ -299,7 +367,7 @@ func (me *Mgr) Return(r *Report) (err error) {
 	}
 
 	// looking for marshaller
-	ms := me.ms.Load().(map[int16]Marshaller)
+	ms := me.ms.Load().(map[int]Marshaller)
 	m, ok := ms[opt.mash.report]
 	if !ok {
 		err = errors.New(fmt.Sprintf("marshaller not found: %v %v", r, opt))

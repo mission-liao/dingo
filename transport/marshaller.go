@@ -1,10 +1,10 @@
 package transport
 
 var Encode = struct {
-	Default  int16
-	JSON     int16
-	GOB      int16
-	JSONSAFE int16
+	Default  int
+	JSON     int
+	GOB      int
+	JSONSAFE int
 }{
 	0, 1, 2, 3,
 }

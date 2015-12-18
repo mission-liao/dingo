@@ -194,13 +194,6 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 		return
 	}
 
-	// each time Report is called, a dedicated 'watch', 'unSent' is allocated,
-	// they are natually thread-safe (used in one go routine only)
-	var (
-		watched map[string]*localStorePoller   = make(map[string]*localStorePoller)
-		unSent  map[string][]*transport.Report = make(map[string][]*transport.Report)
-	)
-
 	go func(
 		quit <-chan int,
 		wait *sync.WaitGroup,
@@ -208,16 +201,32 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 		inputs <-chan *transport.Report,
 		pollers chan *localStorePoller,
 	) {
+		// each time Report is called, a dedicated 'watch', 'unSent' is allocated,
+		// they are natually thread-safe (used in one go routine only)
+		var (
+			// map (name, id) to poller
+			watched map[string]map[string]*localStorePoller = make(map[string]map[string]*localStorePoller)
+
+			// map (name, id) to slice of unsent reports.
+			unSent map[string]map[string][]*transport.Report = make(map[string]map[string][]*transport.Report)
+
+			id, name string
+			poller   *localStorePoller
+		)
+
 		defer wait.Done()
 		outF := func(r *transport.Report) (found bool) {
-			o, found := watched[r.ID()]
-			if found {
-				o.reports <- r
-				if r.Done() {
-					delete(watched, r.ID())
-					close(o.reports)
+			id, name = r.ID(), r.Name()
+			if ids, ok := watched[name]; ok {
+				if poller, found = ids[id]; found {
+					poller.reports <- r
+					if r.Done() {
+						delete(ids, id)
+						close(poller.reports)
+					}
 				}
 			}
+
 			return
 		}
 
@@ -229,24 +238,33 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 				if !ok {
 					goto clean
 				}
-				id := p.task.ID()
+				id, name = p.task.ID(), p.task.Name()
 
-				if _, ok := watched[id]; ok {
-					events <- common.NewEventFromError(
-						common.InstT.STORE,
-						errors.New(fmt.Sprintf("duplicated polling found: %v", id)),
-					)
-					break
+				if ids, ok := watched[name]; ok {
+					if _, ok := ids[id]; ok {
+						events <- common.NewEventFromError(
+							common.InstT.STORE,
+							errors.New(fmt.Sprintf("duplicated polling found: %v", id)),
+						)
+						break
+					}
 				}
 
 				// those reports would only be settle down when some
 				// reports coming in.
-				if u, ok := unSent[id]; ok {
-					watched[id] = p
-					for _, unst := range u {
-						outF(unst)
+				if ids, ok := unSent[name]; ok {
+					if unst, ok := ids[id]; ok {
+						if w, ok := watched[name]; ok {
+							w[id] = p
+						} else {
+							watched[name] = map[string]*localStorePoller{id: p}
+						}
+						for _, u := range unst {
+							outF(u)
+						}
+						delete(ids, id)
+						break
 					}
-					break
 				}
 
 				// if the other ends forgets to send any report', this poller might be
@@ -265,12 +283,16 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 					break
 				}
 
+				id, name = v.ID(), v.Name()
 				// store it in un-sent array
-				rs, ok := unSent[v.ID()]
-				if !ok {
-					unSent[v.ID()] = []*transport.Report{v}
+				if rs, ok := unSent[name]; ok {
+					if unSentReports, ok := rs[id]; ok {
+						rs[id] = append(unSentReports, v)
+					} else {
+						rs[id] = []*transport.Report{v}
+					}
 				} else {
-					unSent[v.ID()] = append(rs, v)
+					unSent[name] = map[string][]*transport.Report{id: []*transport.Report{v}}
 				}
 			}
 		}
@@ -300,28 +322,32 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 		}
 
 		for k, v := range watched {
-			events <- common.NewEventFromError(
-				common.InstT.STORE,
-				errors.New(fmt.Sprintf("unclosed reports channel: %v", k)),
-			)
-
-			// send a 'Shutdown' report
-			r, err := v.task.ComposeReport(transport.Status.Shutdown, nil, nil)
-			if err != nil {
-				events <- common.NewEventFromError(common.InstT.STORE, err)
-			} else {
-				v.reports <- r
-			}
-
-			// remember to send t close signal
-			close(v.reports)
-		}
-		for _, v := range unSent {
-			for _, r := range v {
+			for kk, vv := range v {
 				events <- common.NewEventFromError(
 					common.InstT.STORE,
-					errors.New(fmt.Sprintf("unsent report: %v", r)),
+					errors.New(fmt.Sprintf("unclosed reports channel: %v:%v", k, kk)),
 				)
+
+				// send a 'Shutdown' report
+				r, err := vv.task.ComposeReport(transport.Status.Shutdown, nil, nil)
+				if err != nil {
+					events <- common.NewEventFromError(common.InstT.STORE, err)
+				} else {
+					vv.reports <- r
+				}
+
+				// remember to send t close signal
+				close(vv.reports)
+			}
+		}
+		for _, v := range unSent {
+			for _, vv := range v {
+				for _, r := range vv {
+					events <- common.NewEventFromError(
+						common.InstT.STORE,
+						errors.New(fmt.Sprintf("unsent report: %v", r)),
+					)
+				}
 			}
 		}
 	}(me.reporters.New(), me.reporters.Wait(), me.reporters.Events(), reports, me.pollers)

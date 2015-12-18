@@ -22,14 +22,14 @@ type backend struct {
 
 	// store
 	stores   *common.HetroRoutines
-	rids     map[string]int
+	rids     map[string]map[string]int
 	ridsLock sync.Mutex
 }
 
 func NewBackend(cfg *RedisConfig) (v *backend, err error) {
 	v = &backend{
 		reporters: common.NewHetroRoutines(),
-		rids:      make(map[string]int),
+		rids:      make(map[string]map[string]int),
 		stores:    common.NewHetroRoutines(),
 		cfg:       *cfg,
 	}
@@ -78,34 +78,44 @@ func (me *backend) Report(reports <-chan *dingo.ReportEnvelope) (id int, err err
 // Store interface
 //
 
-func (me *backend) Poll(id transport.Meta) (reports <-chan []byte, err error) {
+func (me *backend) Poll(meta transport.Meta) (reports <-chan []byte, err error) {
 	quit, done, idx := me.stores.New(0)
 
 	me.ridsLock.Lock()
 	defer me.ridsLock.Unlock()
-	me.rids[id.ID()] = idx
+	if v, ok := me.rids[meta.Name()]; ok {
+		v[meta.ID()] = idx
+	} else {
+		me.rids[meta.Name()] = map[string]int{meta.ID(): idx}
+	}
 
 	r := make(chan []byte, 10)
 	reports = r
-	go me._store_routine_(quit, done, me.stores.Events(), r, id)
+	go me._store_routine_(quit, done, me.stores.Events(), r, meta)
 
 	return
 }
 
-func (me *backend) Done(id transport.Meta) (err error) {
+func (me *backend) Done(meta transport.Meta) (err error) {
 	var v int
 	err = func() (err error) {
-		var ok bool
+		var (
+			ok  bool
+			ids map[string]int
+		)
+
 		me.ridsLock.Lock()
 		defer me.ridsLock.Unlock()
 
-		v, ok = me.rids[id.ID()]
+		if ids, ok = me.rids[meta.Name()]; ok {
+			v, ok = ids[meta.ID()]
+			delete(ids, meta.ID())
+		}
 		if !ok {
 			err = errors.New("store id not found")
 			return
 		}
 
-		delete(me.rids, id.ID())
 		return
 	}()
 	if err == nil {
@@ -215,6 +225,6 @@ finished:
 // private function
 //
 
-func getKey(id transport.Meta) string {
-	return fmt.Sprintf("%v.%d", _redisResultQueue, id.ID())
+func getKey(meta transport.Meta) string {
+	return fmt.Sprintf("%v.%s.%s", _redisResultQueue, meta.Name(), meta.ID())
 }

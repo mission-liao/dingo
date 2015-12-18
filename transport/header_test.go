@@ -106,4 +106,18 @@ func TestHeader(t *testing.T) {
 		ass.Nil(err)
 		ass.Len(h.Registry(), 0)
 	}
+
+	// short id
+	{
+		id := "0"
+		name := "test"
+
+		b, err := NewHeader(id, name).Flush(0)
+		ass.Nil(err)
+
+		h, err := DecodeHeader(b)
+		ass.Nil(err)
+		ass.Equal(name, h.Name())
+		ass.Equal(id, h.ID())
+	}
 }

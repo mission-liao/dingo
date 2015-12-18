@@ -20,7 +20,7 @@ type backend struct {
 
 	// store
 	stores   *common.HetroRoutines
-	rids     map[string]int
+	rids     map[string]map[string]int
 	ridsLock sync.Mutex
 
 	// reporter
@@ -31,7 +31,7 @@ type backend struct {
 func NewBackend(cfg *AmqpConfig) (v *backend, err error) {
 	v = &backend{
 		reporters: common.NewHetroRoutines(),
-		rids:      make(map[string]int),
+		rids:      make(map[string]map[string]int),
 		cfg:       *cfg,
 		stores:    common.NewHetroRoutines(),
 	}
@@ -163,14 +163,18 @@ func (me *backend) Report(reports <-chan *dingo.ReportEnvelope) (id int, err err
 // Store interface
 //
 
-func (me *backend) Poll(id transport.Meta) (reports <-chan []byte, err error) {
+func (me *backend) Poll(meta transport.Meta) (reports <-chan []byte, err error) {
 	// bind to the queue for this task
-	tag, qName, rKey := getConsumerTag(id), getQueueName(id), getRoutingKey(id)
+	tag, qName, rKey := getConsumerTag(meta), getQueueName(meta), getRoutingKey(meta)
 	quit, done, idx := me.stores.New(0)
 
 	me.ridsLock.Lock()
 	defer me.ridsLock.Unlock()
-	me.rids[id.ID()] = idx
+	if v, ok := me.rids[meta.Name()]; ok {
+		v[meta.ID()] = idx
+	} else {
+		me.rids[meta.Name()] = map[string]int{meta.ID(): idx}
+	}
 
 	// acquire a free channel
 	ci, err := me.receiver.Channel()
@@ -185,7 +189,7 @@ func (me *backend) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 		if err != nil {
 			me.receiver.ReleaseChannel(ci)
 		} else {
-			go me._store_routine_(quit, done, me.stores.Events(), r, ci, dv, id)
+			go me._store_routine_(quit, done, me.stores.Events(), r, ci, dv, meta)
 		}
 	}()
 	// declare a queue for this task
@@ -231,14 +235,21 @@ func (me *backend) Poll(id transport.Meta) (reports <-chan []byte, err error) {
 	return
 }
 
-func (me *backend) Done(id transport.Meta) (err error) {
+func (me *backend) Done(meta transport.Meta) (err error) {
 	var v int
 	err = func() (err error) {
+		var (
+			ok  bool
+			ids map[string]int
+		)
+
 		me.ridsLock.Lock()
 		defer me.ridsLock.Unlock()
 
-		var ok bool
-		v, ok = me.rids[id.ID()]
+		if ids, ok = me.rids[meta.Name()]; ok {
+			v, ok = ids[meta.ID()]
+			delete(ids, meta.ID())
+		}
 		if !ok {
 			err = errors.New("store id not found")
 			return
@@ -429,16 +440,16 @@ done:
 //
 
 //
-func getQueueName(id transport.Meta) string {
-	return fmt.Sprintf("dingo.q.%q", id.ID())
+func getQueueName(meta transport.Meta) string {
+	return fmt.Sprintf("dingo.q.%s.%s", meta.Name(), meta.ID())
 }
 
 //
-func getRoutingKey(id transport.Meta) string {
-	return fmt.Sprintf("dingo.rkey.%q", id.ID())
+func getRoutingKey(meta transport.Meta) string {
+	return fmt.Sprintf("dingo.rkey.%s.%s", meta.Name(), meta.ID())
 }
 
 //
-func getConsumerTag(id transport.Meta) string {
-	return fmt.Sprintf("dingo.consumer.%q", id.ID())
+func getConsumerTag(meta transport.Meta) string {
+	return fmt.Sprintf("dingo.consumer.%s.%s", meta.Name(), meta.ID())
 }

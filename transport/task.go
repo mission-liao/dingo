@@ -2,11 +2,8 @@ package transport
 
 import (
 	"reflect"
-
-	"github.com/satori/go.uuid"
 )
 
-// TODO: IDMaker
 // TODO: TimeGetter
 
 type TaskPayload struct {
@@ -19,12 +16,12 @@ type Task struct {
 	P *TaskPayload
 }
 
-func ComposeTask(name string, opt *Option, args []interface{}) (*Task, error) {
+func composeTask(name string, opt *Option, args []interface{}) (*Task, error) {
 	if opt == nil {
 		opt = NewOption() // make sure it's the default option
 	}
 	return &Task{
-		H: NewHeader(uuid.NewV4().String(), name),
+		H: NewHeader((&uuidMaker{}).NewID(), name),
 		P: &TaskPayload{
 			O: opt,
 			A: args,

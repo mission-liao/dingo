@@ -200,8 +200,24 @@ func (me *App) Close() (err error) {
  need to sync the Marshaller-ID between producers and consumers. 0~3 are occupied by builtin
  Marshaller(s). Suggested "expectedId" should begin from 100.
 */
-func (me *App) AddMarshaller(expectedId int16, m transport.Marshaller) error {
+func (me *App) AddMarshaller(expectedId int, m transport.Marshaller) error {
 	return me.trans.AddMarshaller(expectedId, m)
+}
+
+/*
+ Register a customized IDMaker, input should be an object implements transport.IDMaker.
+
+ You can register different id-makers to different tasks, internally, dingo would take both
+ (name, id) as identity of a task.
+
+ The requirement of IDMaker:
+  - uniqueness of generated string among all generated tasks.
+  - routine(thread) safe.
+
+ The default IDMaker used by dingo is implemented by uuid4.
+*/
+func (me *App) AddIdMaker(expectedId int, m transport.IDMaker) error {
+	return me.trans.AddIdMaker(expectedId, m)
 }
 
 /*
@@ -211,12 +227,13 @@ func (me *App) AddMarshaller(expectedId int16, m transport.Marshaller) error {
   - name: name of tasks
   - fn: the function that actually perform the task.
   - taskMash, reportMash: id of transport.Marshaller for 'transport.Task' and 'transport.Report'
+  - idmaker: id of transport.IDMaker you would like to use when generating tasks.
 
  returns:
   - err: any error produced
 */
-func (me *App) Register(name string, fn interface{}, taskMash, reportMash int16) (err error) {
-	err = me.trans.Register(name, fn, taskMash, reportMash)
+func (me *App) Register(name string, fn interface{}, taskMash, reportMash, idmaker int) (err error) {
+	err = me.trans.Register(name, fn, taskMash, reportMash, idmaker)
 	if err != nil {
 		return
 	}
@@ -485,7 +502,7 @@ func (me *App) Call(name string, opt *transport.Option, args ...interface{}) (re
 		}
 	}
 
-	t, err := transport.ComposeTask(name, opt, args)
+	t, err := me.trans.ComposeTask(name, opt, args)
 	if err != nil {
 		return
 	}

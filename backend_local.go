@@ -18,7 +18,7 @@ type localBackend struct {
 	reports   chan []byte
 	stores    *common.Routines
 	storeLock sync.Mutex
-	toCheck   map[string]chan []byte
+	toCheck   map[string]map[string]chan []byte // mapping (name, id) to report channel
 	unSent    []*ReportEnvelope
 }
 
@@ -30,7 +30,7 @@ func NewLocalBackend(cfg *Config) (v *localBackend, err error) {
 		reporters: common.NewHetroRoutines(),
 		to:        make(chan *ReportEnvelope, 10),
 		reports:   make(chan []byte, 10),
-		toCheck:   make(map[string]chan []byte),
+		toCheck:   make(map[string]map[string]chan []byte),
 		unSent:    make([]*ReportEnvelope, 0, 10),
 	}
 
@@ -67,11 +67,10 @@ func (me *localBackend) _store_routine_(quit <-chan int, wait *sync.WaitGroup, e
 		defer me.storeLock.Unlock()
 
 		found := false
-		for k, v := range me.toCheck {
-			if k == enp.ID.ID() {
-				found = true
-				v <- enp.Body
-				break
+		if ids, ok := me.toCheck[enp.ID.Name()]; ok {
+			var ch chan []byte
+			if ch, found = ids[enp.ID.ID()]; found {
+				ch <- enp.Body
 			}
 		}
 
@@ -88,11 +87,21 @@ func (me *localBackend) _store_routine_(quit <-chan int, wait *sync.WaitGroup, e
 			if !ok {
 				goto clean
 			}
-
 			out(v)
 		}
 	}
 clean:
+	for {
+		select {
+		case v, ok := <-me.to:
+			if !ok {
+				break clean
+			}
+			out(v)
+		default:
+			break clean
+		}
+	}
 }
 
 //
@@ -135,29 +144,38 @@ func (me *localBackend) Report(reports <-chan *ReportEnvelope) (id int, err erro
 // Store
 //
 
-func (me *localBackend) Poll(id transport.Meta) (reports <-chan []byte, err error) {
+func (me *localBackend) Poll(meta transport.Meta) (reports <-chan []byte, err error) {
 	me.storeLock.Lock()
 	defer me.storeLock.Unlock()
 
-	var r chan []byte
+	var (
+		r    chan []byte
+		id   string = meta.ID()
+		name string = meta.Name()
+	)
 
 	found := false
-	for k, v := range me.toCheck {
-		if k == id.ID() {
-			found, r = true, v
-		}
+	if ids, ok := me.toCheck[name]; ok {
+		r, found = ids[id]
 	}
 
 	if !found {
 		r = make(chan []byte, 10)
-		me.toCheck[id.ID()], reports = r, r
+		ids, ok := me.toCheck[name]
+		if !ok {
+			ids = map[string]chan []byte{id: r}
+			me.toCheck[name] = ids
+		} else {
+			ids[id] = r
+		}
+		reports = r
 	}
 
 	// reverse traversing when deleting in slice
 	toSent := []*ReportEnvelope{}
 	for i := len(me.unSent) - 1; i >= 0; i-- {
 		v := me.unSent[i]
-		if v.ID.ID() == id.ID() {
+		if v.ID.ID() == id && v.ID.Name() == name {
 			// prepend
 			toSent = append([]*ReportEnvelope{v}, toSent...)
 			// delete this element
@@ -172,17 +190,24 @@ func (me *localBackend) Poll(id transport.Meta) (reports <-chan []byte, err erro
 	return
 }
 
-func (me *localBackend) Done(id transport.Meta) (err error) {
+func (me *localBackend) Done(meta transport.Meta) (err error) {
+	var (
+		id   string = meta.ID()
+		name string = meta.Name()
+	)
+
 	me.storeLock.Lock()
 	defer me.storeLock.Unlock()
 
 	// clearing toCheck list
-	delete(me.toCheck, id.ID())
+	if ids, ok := me.toCheck[name]; ok {
+		delete(ids, id)
+	}
 
 	// clearing unSent
 	for i := len(me.unSent) - 1; i >= 0; i-- {
 		v := me.unSent[i]
-		if v.ID.ID() == id.ID() {
+		if v.ID.ID() == id && v.ID.Name() == name {
 			// delete this element
 			me.unSent = append(me.unSent[:i], me.unSent[i+1:]...)
 		}

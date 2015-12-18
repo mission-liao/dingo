@@ -12,6 +12,7 @@ import (
 type BrokerTestSuite struct {
 	suite.Suite
 
+	Trans         *transport.Mgr
 	Gen           func() (interface{}, error)
 	Pdc           Producer
 	Csm           Consumer
@@ -35,6 +36,7 @@ func (me *BrokerTestSuite) SetupTest() {
 	}
 
 	me.ConsumerNames = []string{}
+	me.Trans = transport.NewMgr()
 }
 
 func (me *BrokerTestSuite) TearDownTest() {
@@ -69,6 +71,7 @@ func (me *BrokerTestSuite) TestBasic() {
 	var (
 		tasks <-chan []byte
 	)
+	me.Nil(me.Trans.Register("", func() {}, transport.Encode.Default, transport.Encode.Default, transport.ID.Default))
 	// init one listener
 	receipts := make(chan *TaskReceipt, 10)
 	tasks, err := me.AddListener("", receipts)
@@ -79,7 +82,7 @@ func (me *BrokerTestSuite) TestBasic() {
 	}
 
 	// compose a task
-	t, err := transport.ComposeTask("", nil, []interface{}{})
+	t, err := me.Trans.ComposeTask("", nil, []interface{}{})
 	me.Nil(err)
 	me.NotNil(t)
 	if t == nil {

@@ -264,8 +264,6 @@ func (me *broker) _consumer_routine_(
 	defer wait.Done()
 	defer me.receiver.ReleaseChannel(ci)
 
-	_ = "breakpoint"
-
 	// acquire an tag
 	id := <-me.consumerTags
 	tag := fmt.Sprintf("dingo.consumer.%d", id)

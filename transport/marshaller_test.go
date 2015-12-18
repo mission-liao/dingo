@@ -18,7 +18,7 @@ type MarshallerTestSuite struct {
 }
 
 func (me *MarshallerTestSuite) TestTask() {
-	task, err := ComposeTask(
+	task, err := composeTask(
 		"test", NewOption().SetIgnoreReport(true).SetMonitorProgress(true),
 		[]interface{}{float64(1.5), "user", "password"},
 	)
@@ -58,7 +58,7 @@ func (me *MarshallerTestSuite) TestTask() {
 }
 
 func (me *MarshallerTestSuite) TestReport() {
-	task, err := ComposeTask("test", NewOption().SetIgnoreReport(true).SetMonitorProgress(true), nil)
+	task, err := composeTask("test", NewOption().SetIgnoreReport(true).SetMonitorProgress(true), nil)
 	me.Nil(err)
 	if err != nil {
 		return

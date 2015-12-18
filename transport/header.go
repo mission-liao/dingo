@@ -166,7 +166,7 @@ func DecodeHeader(b []byte) (h *Header, err error) {
 
 	// count of registries
 	C, err := binary.ReadUvarint(bytes.NewBuffer(b[14:18]))
-	if (50 + C*8) > L {
+	if (18 + C*8) > L {
 		err = errors.New(fmt.Sprintf("registries count is %v, when length is %v", C, L))
 		return
 	}

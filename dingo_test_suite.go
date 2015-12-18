@@ -100,7 +100,7 @@ func (me *DingoTestSuite) TestBasic() {
 		func(n int) int {
 			called = n
 			return n + 1
-		}, transport.Encode.Default, transport.Encode.Default,
+		}, transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
 	)
 	me.Nil(err)
 	remain, err := me.App_.Allocate("TestBasic", 1, 1)

@@ -57,11 +57,11 @@ func (me *remoteBridgeTestSuite) TestReturnFix() {
 	me.Nil(me.trans.Register(
 		"ReturnFix",
 		func() float64 { return 0 },
-		transport.Encode.Default, transport.Encode.Default,
+		transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
 	))
 
 	// compose a task
-	t, err := transport.ComposeTask("ReturnFix", nil, nil)
+	t, err := me.trans.ComposeTask("ReturnFix", nil, nil)
 	me.Nil(err)
 
 	// compose a corresponding report
