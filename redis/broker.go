@@ -58,7 +58,7 @@ func (me *broker) Close() (err error) {
 // Producer interface
 //
 
-func (me *broker) DeclareTask(name string) (err error) {
+func (me *broker) ProducerHook(eventID int, payload interface{}) (err error) {
 	return
 }
 

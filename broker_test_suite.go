@@ -97,7 +97,7 @@ func (me *BrokerTestSuite) TestBasic() {
 	}
 
 	// declare this task to broker before sending
-	me.Nil(me.Pdc.DeclareTask(""))
+	me.Nil(me.Pdc.ProducerHook(ProducerEvent.DeclareTask, ""))
 
 	// send it
 	input := append(hb, []byte("test byte array")...)
@@ -192,7 +192,7 @@ func (me *BrokerTestSuite) TestNamed() {
 		me.Nil(err)
 
 		// declare this task through Producer
-		me.Nil(me.Pdc.DeclareTask(name))
+		me.Nil(me.Pdc.ProducerHook(ProducerEvent.DeclareTask, name))
 
 		// a simplified mapper routine
 		go me._simplified_mapper_(rs.New(), rs.Wait(), tasks, rc, name,
@@ -284,7 +284,7 @@ func (me *BrokerTestSuite) TestDuplicated() {
 		me.Nil(err)
 
 		name = fmt.Sprintf("duplicated.%d", i)
-		me.Nil(me.Pdc.DeclareTask(name))
+		me.Nil(me.Pdc.ProducerHook(ProducerEvent.DeclareTask, name))
 
 		if _, ok := v.(NamedConsumer); ok {
 			tasks, err = v.(NamedConsumer).AddListener(name, rc)

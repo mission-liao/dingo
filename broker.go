@@ -14,16 +14,23 @@ type NamedBroker interface {
 	NamedConsumer
 }
 
+var ProducerEvent = struct {
+	DeclareTask int
+}{
+	1,
+}
+
 /*
  Producer(s) is responsibe for sending tasks to broker(s).
 */
 type Producer interface {
-	// declare a new kind of tasks, this function would be called when
-	// users register a new task to dingo.
-	//
-	// parameters:
-	// - name: name of tasks
-	DeclareTask(name string) error
+	// hook for listening event from dingo
+	// parameter:
+	// - eventID: which event?
+	// - payload: corresponding payload, its type depends on 'eventID'
+	// returns:
+	// - err: errors
+	ProducerHook(eventID int, payload interface{}) (err error)
 
 	// send a task to brokers, it should be a blocking call.
 	//

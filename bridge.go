@@ -5,14 +5,25 @@ import (
 	"github.com/mission-liao/dingo/transport"
 )
 
+// exporting hooks of external objects(backend, broker
+// to internal object(workers, mappers).
+//
+// instead of exposing the whole 'bridge' interface to internal objects,
+// just exposing 'exHooks' to them.
+type exHooks interface {
+	ReporterHook(eventID int, payload interface{}) (err error)
+	ProducerHook(eventID int, payload interface{}) (err error)
+}
+
 type bridge interface {
+	exHooks
+
 	Close() (err error)
 	Events() ([]<-chan *common.Event, error)
 
 	//
 	// proxy for Producer
 	//
-	DeclareTask(name string) (err error)
 	SendTask(t *transport.Task) (err error)
 
 	//
@@ -44,15 +55,6 @@ type bridge interface {
 	// existence checker
 	//
 	Exists(it int) bool
-}
-
-// exporting hooks of external objects(backend, broker
-// to internal object(workers, mappers).
-//
-// instead of exposing the whole 'bridge' interface to internal objects,
-// just exposing 'exHooks' to them.
-type exHooks interface {
-	ReporterHook(eventID int, payload interface{}) (err error)
 }
 
 func newBridge(which string, trans *transport.Mgr, args ...interface{}) bridge {

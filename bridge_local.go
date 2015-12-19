@@ -67,10 +67,6 @@ func (me *localBridge) Register(name string, fn interface{}) (err error) {
 	return
 }
 
-func (me *localBridge) DeclareTask(name string) (err error) {
-	return
-}
-
 func (me *localBridge) SendTask(t *transport.Task) (err error) {
 	me.objLock.RLock()
 	defer me.objLock.RUnlock()
@@ -407,6 +403,11 @@ func (me *localBridge) Exists(it int) bool {
 }
 
 func (me *localBridge) ReporterHook(eventID int, payload interface{}) (err error) {
+	// there is no external object 'really' attached.
+	return
+}
+
+func (me *localBridge) ProducerHook(eventID int, payload interface{}) (err error) {
 	// there is no external object 'really' attached.
 	return
 }

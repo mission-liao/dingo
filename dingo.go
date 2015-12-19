@@ -238,7 +238,7 @@ func (me *App) Register(name string, fn interface{}, taskMash, reportMash, idmak
 		return
 	}
 
-	err = me.b.DeclareTask(name)
+	err = me.b.ProducerHook(ProducerEvent.DeclareTask, name)
 	if err != nil {
 		return
 	}

@@ -137,7 +137,7 @@ func (me *localBroker) Close() (err error) {
 // Producer
 //
 
-func (me *localBroker) DeclareTask(name string) (err error) {
+func (me *localBroker) ProducerHook(eventID int, payload interface{}) (err error) {
 	return
 }
 
