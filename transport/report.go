@@ -45,16 +45,10 @@ var Status = struct {
 	// the task execution is failed.
 	Fail int16
 
-	// the task panic
-	Panic int16
-
-	// dingo is about to shutdown
-	Shutdown int16
-
 	// this field should always the last one
 	Count int16
 }{
-	0, 1, 2, 3, 4, 5, 6, 7,
+	0, 1, 2, 3, 4, 5,
 }
 
 func (r *Report) ID() string    { return r.H.I }
@@ -70,13 +64,9 @@ func (r *Report) SetReturn(ret []interface{}) { r.P.R = ret }
 // checker
 //
 
-func (r *Report) Done() bool {
-	return r.P.S == Status.Success || r.P.S == Status.Fail || r.P.S == Status.Panic || r.P.S == Status.Shutdown
-}
+func (r *Report) Done() bool               { return r.P.S == Status.Success || r.P.S == Status.Fail }
 func (r *Report) OK() bool                 { return r.P.S == Status.Success }
 func (r *Report) Fail() bool               { return r.P.S == Status.Fail }
-func (r *Report) Panic() bool              { return r.P.S == Status.Panic }
-func (r *Report) Shutdown() bool           { return r.P.S == Status.Shutdown }
 func (r *Report) Equal(other *Report) bool { return reflect.DeepEqual(r, other) }
 func (r *Report) AlmostEqual(other *Report) (same bool) {
 	same = r.H.I == other.H.I &&

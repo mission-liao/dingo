@@ -249,14 +249,10 @@ func (me *_workers) _worker_routine_(
 		}
 
 		var (
-			e    *transport.Error
 			r    *transport.Report
 			err_ error
 		)
-		if err != nil {
-			e = transport.NewErr(0, err)
-		}
-		r, err_ = task.ComposeReport(status, payload, e)
+		r, err_ = task.ComposeReport(status, payload, err)
 		if err_ != nil {
 			r, err_ = task.ComposeReport(transport.Status.Fail, nil, transport.NewErr(0, err_))
 			if err_ != nil {
@@ -280,7 +276,7 @@ func (me *_workers) _worker_routine_(
 		reported := false
 		defer func() {
 			if r := recover(); r != nil {
-				reported = rep(t, transport.Status.Panic, nil, transport.NewErr(0, errors.New(fmt.Sprintf("%v", r))), reported)
+				reported = rep(t, transport.Status.Fail, nil, transport.NewErr(transport.ErrCode.Panic, errors.New(fmt.Sprintf("%v", r))), reported)
 			}
 		}()
 

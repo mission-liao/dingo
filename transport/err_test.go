@@ -17,7 +17,7 @@ func TestErrMarshal(t *testing.T) {
 	err = json.Unmarshal(body, &e)
 	ass.Nil(err)
 
-	ass.Equal(int64(0), e.Code())
+	ass.Equal(int32(0), e.Code())
 	ass.Equal("test string", e.Msg())
 }
 

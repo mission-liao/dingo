@@ -122,6 +122,12 @@ func (me *broker) ProducerHook(eventID int, payload interface{}) (err error) {
 				}
 			}()
 
+			name, ok := payload.(string)
+			if !ok {
+				err = errors.New(fmt.Sprintf("payload is not a string, but %v", payload))
+				return
+			}
+
 			queueName := getConsumerQueueName(name)
 
 			// init queue

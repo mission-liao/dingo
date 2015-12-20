@@ -325,7 +325,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 				)
 
 				// send a 'Shutdown' report
-				r, err := vv.task.ComposeReport(transport.Status.Shutdown, nil, nil)
+				r, err := vv.task.ComposeReport(transport.Status.Fail, nil, transport.NewErr(transport.ErrCode.Shutdown, errors.New("dingo is shutdown")))
 				if err != nil {
 					events <- common.NewEventFromError(common.InstT.STORE, err)
 				} else {

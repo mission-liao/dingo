@@ -344,7 +344,8 @@ func (me *BridgeTestSuite) TestFinalReportWhenShutdown() {
 	// close bridge, a 'Shutdown' report should be received.
 	me.Nil(me.bg.Close())
 	o = <-out
-	me.Equal(transport.Status.Shutdown, o.Status())
+	me.Equal(transport.Status.Fail, o.Status())
+	me.Equal(transport.ErrCode.Shutdown, o.Error().Code())
 }
 
 func (me *BridgeTestSuite) TestDifferentReportsWithSameID() {

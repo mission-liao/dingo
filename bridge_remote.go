@@ -237,7 +237,7 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 		var done bool
 		defer func() {
 			if !done {
-				r, err := t.ComposeReport(transport.Status.Shutdown, nil, nil)
+				r, err := t.ComposeReport(transport.Status.Fail, nil, transport.NewErr(transport.ErrCode.Shutdown, errors.New("dingo is shutdown")))
 				if err != nil {
 					events <- common.NewEventFromError(common.InstT.STORE, err)
 				} else {

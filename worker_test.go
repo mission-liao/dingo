@@ -100,7 +100,8 @@ func (me *workerTestSuite) TestPanic() {
 		// await for reports
 		r := <-reports[0]
 		// should be a failed one
-		me.True(r.Panic())
+		me.True(r.Fail())
+		me.Equal(transport.ErrCode.Panic, r.Error().Code())
 	}
 }
 
