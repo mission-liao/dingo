@@ -11,7 +11,6 @@ import (
 
 	// internal
 	"github.com/mission-liao/dingo"
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
 
@@ -19,21 +18,21 @@ type backend struct {
 	sender, receiver *AmqpConnection
 
 	// store
-	stores   *common.HetroRoutines
+	stores   *dingo.HetroRoutines
 	rids     map[string]map[string]int
 	ridsLock sync.Mutex
 
 	// reporter
-	reporters *common.HetroRoutines
+	reporters *dingo.HetroRoutines
 	cfg       AmqpConfig
 }
 
 func NewBackend(cfg *AmqpConfig) (v *backend, err error) {
 	v = &backend{
-		reporters: common.NewHetroRoutines(),
+		reporters: dingo.NewHetroRoutines(),
 		rids:      make(map[string]map[string]int),
 		cfg:       *cfg,
-		stores:    common.NewHetroRoutines(),
+		stores:    dingo.NewHetroRoutines(),
 	}
 
 	v.sender, err = newConnection(&v.cfg)
@@ -77,11 +76,11 @@ func NewBackend(cfg *AmqpConfig) (v *backend, err error) {
 }
 
 //
-// common.Object interface
+// dingo.Object interface
 //
 
-func (me *backend) Events() ([]<-chan *common.Event, error) {
-	return []<-chan *common.Event{
+func (me *backend) Events() ([]<-chan *dingo.Event, error) {
+	return []<-chan *dingo.Event{
 		me.reporters.Events(),
 		me.stores.Events(),
 	}, nil
@@ -266,7 +265,7 @@ func (me *backend) Done(meta transport.Meta) (err error) {
 // routine definition
 //
 
-func (me *backend) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan *dingo.ReportEnvelope) {
+func (me *backend) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *dingo.Event, reports <-chan *dingo.ReportEnvelope) {
 	defer func() {
 		done <- 1
 	}()
@@ -275,7 +274,7 @@ func (me *backend) _reporter_routine_(quit <-chan int, done chan<- int, events c
 		// report an error event when leaving
 		defer func() {
 			if err != nil {
-				events <- common.NewEventFromError(dingo.InstT.REPORTER, err)
+				events <- dingo.NewEventFromError(dingo.InstT.REPORTER, err)
 			}
 		}()
 
@@ -344,7 +343,7 @@ done:
 func (me *backend) _store_routine_(
 	quit <-chan int,
 	done chan<- int,
-	events chan<- *common.Event,
+	events chan<- *dingo.Event,
 	reports chan<- []byte,
 	ci *AmqpChannel,
 	dv <-chan amqp.Delivery,
@@ -402,7 +401,7 @@ done:
 	// cancel consuming
 	err = ci.Channel.Cancel(getConsumerTag(id), false)
 	if err != nil {
-		events <- common.NewEventFromError(dingo.InstT.STORE, err)
+		events <- dingo.NewEventFromError(dingo.InstT.STORE, err)
 		isChannelError = true
 		return
 	}
@@ -416,7 +415,7 @@ done:
 		nil,              // args
 	)
 	if err != nil {
-		events <- common.NewEventFromError(dingo.InstT.STORE, err)
+		events <- dingo.NewEventFromError(dingo.InstT.STORE, err)
 		isChannelError = true
 		return
 	}
@@ -429,7 +428,7 @@ done:
 		false, // noWait
 	)
 	if err != nil {
-		events <- common.NewEventFromError(dingo.InstT.STORE, err)
+		events <- dingo.NewEventFromError(dingo.InstT.STORE, err)
 		isChannelError = true
 		return
 	}

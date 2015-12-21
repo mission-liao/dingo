@@ -3,7 +3,6 @@ package dingo
 import (
 	"sync"
 
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
 
@@ -15,9 +14,9 @@ type localBackend struct {
 	cfg       *Config
 	fromUser  chan *ReportEnvelope
 	to        chan *ReportEnvelope // simulate the wire
-	reporters *common.HetroRoutines
+	reporters *HetroRoutines
 	reports   chan []byte
-	stores    *common.Routines
+	stores    *Routines
 	storeLock sync.Mutex
 	isStored  bool
 	toCheck   map[string]map[string]chan []byte // mapping (name, id) to report channel
@@ -28,8 +27,8 @@ type localBackend struct {
 func NewLocalBackend(cfg *Config, to chan *ReportEnvelope) (v *localBackend, err error) {
 	v = &localBackend{
 		cfg:       cfg,
-		stores:    common.NewRoutines(),
-		reporters: common.NewHetroRoutines(),
+		stores:    NewRoutines(),
+		reporters: NewHetroRoutines(),
 		fromUser:  to,
 		to:        to,
 		reports:   make(chan []byte, 10),
@@ -44,7 +43,7 @@ func NewLocalBackend(cfg *Config, to chan *ReportEnvelope) (v *localBackend, err
 	return
 }
 
-func (me *localBackend) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *common.Event, reports <-chan *ReportEnvelope) {
+func (me *localBackend) _reporter_routine_(quit <-chan int, done chan<- int, events chan<- *Event, reports <-chan *ReportEnvelope) {
 	defer func() {
 		done <- 1
 	}()
@@ -65,7 +64,7 @@ func (me *localBackend) _reporter_routine_(quit <-chan int, done chan<- int, eve
 clean:
 }
 
-func (me *localBackend) _store_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event) {
+func (me *localBackend) _store_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *Event) {
 	defer wait.Done()
 
 	out := func(enp *ReportEnvelope) {
@@ -111,11 +110,11 @@ clean:
 }
 
 //
-// common.Object interface
+// Object interface
 //
 
-func (me *localBackend) Events() ([]<-chan *common.Event, error) {
-	return []<-chan *common.Event{
+func (me *localBackend) Events() ([]<-chan *Event, error) {
+	return []<-chan *Event{
 		me.reporters.Events(),
 		me.stores.Events(),
 	}, nil

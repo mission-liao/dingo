@@ -3,7 +3,6 @@ package dingo
 import (
 	"testing"
 
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
@@ -37,8 +36,8 @@ func (me *remoteBridgeTestSuite) SetupTest() {
 }
 
 func (me *remoteBridgeTestSuite) TearDownTest() {
-	me.Nil(me.brk.(common.Object).Close())
-	me.Nil(me.bkd.(common.Object).Close())
+	me.Nil(me.brk.(Object).Close())
+	me.Nil(me.bkd.(Object).Close())
 
 	me.BridgeTestSuite.TearDownTest()
 }

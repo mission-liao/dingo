@@ -3,7 +3,6 @@ package dingo
 import (
 	"testing"
 
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
@@ -16,7 +15,7 @@ type mapperTestSuite struct {
 	_trans          *transport.Mgr
 	_hooks          exHooks
 	_countOfMappers int
-	_receiptsMux    *common.Mux
+	_receiptsMux    *Mux
 	_receipts       chan *TaskReceipt
 }
 
@@ -26,7 +25,7 @@ func TestMapperSuite(t *testing.T) {
 		_hooks:          newLocalBridge().(exHooks),
 		_tasks:          make(chan *transport.Task, 5),
 		_countOfMappers: 3,
-		_receiptsMux:    common.NewMux(),
+		_receiptsMux:    NewMux(),
 		_receipts:       make(chan *TaskReceipt, 1),
 	})
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
@@ -46,7 +45,7 @@ func (me *BackendTestSuite) SetupTest() {
 }
 
 func (me *BackendTestSuite) TearDownTest() {
-	me.Nil(me.Bkd.(common.Object).Close())
+	me.Nil(me.Bkd.(Object).Close())
 	me.Bkd, me.Rpt, me.Sto = nil, nil, nil
 
 	close(me.Reports)

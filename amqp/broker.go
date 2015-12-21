@@ -8,7 +8,6 @@ import (
 
 	// open source
 	"github.com/mission-liao/dingo"
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 	"github.com/streadway/amqp"
 )
@@ -20,13 +19,13 @@ import (
 type broker struct {
 	sender, receiver *AmqpConnection
 	consumerTags     chan int
-	consumers        *common.Routines
+	consumers        *dingo.Routines
 	cfg              AmqpConfig
 }
 
 func NewBroker(cfg *AmqpConfig) (v *broker, err error) {
 	v = &broker{
-		consumers: common.NewRoutines(),
+		consumers: dingo.NewRoutines(),
 		cfg:       *cfg,
 	}
 
@@ -79,11 +78,11 @@ func NewBroker(cfg *AmqpConfig) (v *broker, err error) {
 }
 
 //
-// common.Object interface
+// dingo.Object interface
 //
 
-func (me *broker) Events() ([]<-chan *common.Event, error) {
-	return []<-chan *common.Event{
+func (me *broker) Events() ([]<-chan *dingo.Event, error) {
+	return []<-chan *dingo.Event{
 		me.consumers.Events(),
 	}, nil
 }
@@ -266,7 +265,7 @@ func (me *broker) StopAllListeners() (err error) {
 func (me *broker) _consumer_routine_(
 	quit <-chan int,
 	wait *sync.WaitGroup,
-	events chan<- *common.Event,
+	events chan<- *dingo.Event,
 	tasks chan<- []byte,
 	receipts <-chan *dingo.TaskReceipt,
 	ci *AmqpChannel,
@@ -294,7 +293,7 @@ func (me *broker) _consumer_routine_(
 		nil,   // args
 	)
 	if err != nil {
-		events <- common.NewEventFromError(dingo.InstT.CONSUMER, err)
+		events <- dingo.NewEventFromError(dingo.InstT.CONSUMER, err)
 		return
 	}
 
@@ -313,7 +312,7 @@ func (me *broker) _consumer_routine_(
 				defer func() {
 					if err != nil || !ok {
 						d.Nack(false, false)
-						events <- common.NewEventFromError(dingo.InstT.CONSUMER, err)
+						events <- dingo.NewEventFromError(dingo.InstT.CONSUMER, err)
 					} else {
 						d.Ack(false)
 					}
@@ -350,7 +349,7 @@ func (me *broker) _consumer_routine_(
 clean:
 	err_ := ci.Channel.Cancel(tag, false)
 	if err_ != nil {
-		events <- common.NewEventFromError(dingo.InstT.CONSUMER, err_)
+		events <- dingo.NewEventFromError(dingo.InstT.CONSUMER, err_)
 		// should we return here?,
 		// we still need to clean the delivery channel...
 	}

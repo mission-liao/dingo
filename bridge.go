@@ -1,7 +1,6 @@
 package dingo
 
 import (
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
 
@@ -19,7 +18,7 @@ type bridge interface {
 	exHooks
 
 	Close() (err error)
-	Events() ([]<-chan *common.Event, error)
+	Events() ([]<-chan *Event, error)
 
 	//
 	// proxy for Producer

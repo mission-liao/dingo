@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
@@ -40,7 +39,7 @@ func (me *BrokerTestSuite) SetupTest() {
 }
 
 func (me *BrokerTestSuite) TearDownTest() {
-	me.Nil(me.Pdc.(common.Object).Close())
+	me.Nil(me.Pdc.(Object).Close())
 }
 
 func (me *BrokerTestSuite) AddListener(name string, receipts <-chan *TaskReceipt) (tasks <-chan []byte, err error) {
@@ -171,7 +170,7 @@ func (me *BrokerTestSuite) TestNamed() {
 		return
 	}
 
-	rs := common.NewRoutines()
+	rs := NewRoutines()
 	consumers := []NamedConsumer{}
 
 	var (
@@ -269,8 +268,8 @@ func (me *BrokerTestSuite) TestDuplicated() {
 		sentLock  sync.Mutex
 		sent      map[string]int = make(map[string]int)
 		sented    sync.WaitGroup
-		rs        *common.Routines = common.NewRoutines()
-		consumers []interface{}    = make([]interface{}, 0, countOfConsumers)
+		rs        *Routines     = NewRoutines()
+		consumers []interface{} = make([]interface{}, 0, countOfConsumers)
 	)
 
 	for i := 0; i < countOfConsumers; i++ {

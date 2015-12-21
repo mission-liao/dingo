@@ -1,4 +1,4 @@
-package common
+package dingo
 
 //
 // 'routines' helps to manage go-routines

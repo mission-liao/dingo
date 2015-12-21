@@ -1,4 +1,4 @@
-package common
+package dingo
 
 //
 // 'mux' is a n-to-1 multiplexer for a slice of 'receiving' channels.

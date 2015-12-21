@@ -1,10 +1,10 @@
-package common
+package dingo
 
 import (
 	"time"
 )
 
-var ErrLvl = struct {
+var EventLvl = struct {
 	DEBUG   int
 	INFO    int
 	WARNING int
@@ -24,7 +24,7 @@ type Event struct {
 	Payload interface{}
 }
 
-var ErrCode = struct {
+var EventCode = struct {
 	Generic             int
 	TaskDeliveryFailure int
 	DuplicatedPolling   int
@@ -46,8 +46,8 @@ func NewEventFromError(orig int, err error) *Event {
 	return &Event{
 		Origin:  orig,
 		Time:    time.Now(),
-		Level:   ErrLvl.ERROR,
-		Code:    ErrCode.Generic,
+		Level:   EventLvl.ERROR,
+		Code:    EventCode.Generic,
 		Payload: err,
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
@@ -15,12 +14,12 @@ type BridgeTestSuite struct {
 	name     string
 	bg       bridge
 	trans    *transport.Mgr
-	events   []*common.Event
-	eventMux *common.Mux
+	events   []*Event
+	eventMux *Mux
 }
 
 func (me *BridgeTestSuite) SetupSuite() {
-	me.eventMux = common.NewMux()
+	me.eventMux = NewMux()
 	me.trans = transport.NewMgr()
 }
 
@@ -40,9 +39,9 @@ func (me *BridgeTestSuite) SetupTest() {
 	}
 
 	// reset event array
-	me.events = make([]*common.Event, 0, 10)
+	me.events = make([]*Event, 0, 10)
 	me.eventMux.Handle(func(val interface{}, _ int) {
-		me.events = append(me.events, val.(*common.Event))
+		me.events = append(me.events, val.(*Event))
 	})
 }
 
@@ -50,7 +49,7 @@ func (me *BridgeTestSuite) TearDownTest() {
 	me.Nil(me.bg.Close())
 
 	for _, v := range me.events {
-		if v.Level == common.ErrLvl.ERROR {
+		if v.Level == EventLvl.ERROR {
 			me.Nil(v)
 		}
 	}

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
@@ -19,7 +18,7 @@ type DingoTestSuite struct {
 	Nbrk       NamedBroker
 	Bkd        Backend
 	eid        int
-	events     <-chan *common.Event
+	events     <-chan *Event
 }
 
 func (me *DingoTestSuite) SetupSuite() {
@@ -58,7 +57,7 @@ func (me *DingoTestSuite) SetupSuite() {
 	me.Equal(InstT.REPORTER|InstT.STORE, used)
 
 	// events
-	me.eid, me.events, err = me.App_.Listen(InstT.ALL, common.ErrLvl.DEBUG, 0)
+	me.eid, me.events, err = me.App_.Listen(InstT.ALL, EventLvl.DEBUG, 0)
 	me.Nil(err)
 }
 

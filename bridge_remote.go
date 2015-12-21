@@ -4,7 +4,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
 
@@ -23,29 +22,29 @@ type remoteBridge struct {
 	storeLock     sync.RWMutex
 	store         Store
 
-	listeners *common.Routines
-	reporters *common.Routines
-	storers   *common.Routines
+	listeners *Routines
+	reporters *Routines
+	storers   *Routines
 	doners    chan transport.Meta
-	events    chan *common.Event
-	eventMux  *common.Mux
+	events    chan *Event
+	eventMux  *Mux
 	trans     *transport.Mgr
 }
 
 func newRemoteBridge(trans *transport.Mgr) (b bridge) {
 	v := &remoteBridge{
-		listeners: common.NewRoutines(),
-		reporters: common.NewRoutines(),
-		storers:   common.NewRoutines(),
-		events:    make(chan *common.Event, 10),
-		eventMux:  common.NewMux(),
+		listeners: NewRoutines(),
+		reporters: NewRoutines(),
+		storers:   NewRoutines(),
+		events:    make(chan *Event, 10),
+		eventMux:  NewMux(),
 		doners:    make(chan transport.Meta, 10),
 		trans:     trans,
 	}
 	b = v
 
 	v.eventMux.Handle(func(val interface{}, _ int) {
-		v.events <- val.(*common.Event)
+		v.events <- val.(*Event)
 	})
 
 	return
@@ -58,13 +57,13 @@ func (me *remoteBridge) Close() (err error) {
 
 	me.eventMux.Close()
 	close(me.events)
-	me.events = make(chan *common.Event, 10)
+	me.events = make(chan *Event, 10)
 
 	return
 }
 
-func (me *remoteBridge) Events() ([]<-chan *common.Event, error) {
-	return []<-chan *common.Event{
+func (me *remoteBridge) Events() ([]<-chan *Event, error) {
+	return []<-chan *Event{
 		me.events,
 	}, nil
 }
@@ -159,14 +158,14 @@ func (me *remoteBridge) Report(reports <-chan *transport.Report) (err error) {
 		return
 	}
 
-	go func(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, input <-chan *transport.Report, output chan<- *ReportEnvelope) {
+	go func(quit <-chan int, wait *sync.WaitGroup, events chan<- *Event, input <-chan *transport.Report, output chan<- *ReportEnvelope) {
 		defer wait.Done()
 		// raise quit signal to receiver(s).
 		defer close(output)
 		out := func(r *transport.Report) {
 			b, err := me.trans.EncodeReport(r)
 			if err != nil {
-				events <- common.NewEventFromError(InstT.BRIDGE, err)
+				events <- NewEventFromError(InstT.BRIDGE, err)
 				return
 			}
 			output <- &ReportEnvelope{
@@ -222,7 +221,7 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 	go func(
 		quit <-chan int,
 		wait *sync.WaitGroup,
-		events chan<- *common.Event,
+		events chan<- *Event,
 		inputs <-chan []byte,
 		outputs chan<- *transport.Report,
 	) {
@@ -230,7 +229,7 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 		defer func() {
 			err = me.store.Done(t)
 			if err != nil {
-				events <- common.NewEventFromError(InstT.STORE, err)
+				events <- NewEventFromError(InstT.STORE, err)
 			}
 		}()
 
@@ -239,7 +238,7 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 			if !done {
 				r, err := t.ComposeReport(Status.Fail, nil, transport.NewErr(ErrCode.Shutdown, errors.New("dingo is shutdown")))
 				if err != nil {
-					events <- common.NewEventFromError(InstT.STORE, err)
+					events <- NewEventFromError(InstT.STORE, err)
 				} else {
 					outputs <- r
 				}
@@ -250,14 +249,14 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 		out := func(b []byte) bool {
 			r, err := me.trans.DecodeReport(b)
 			if err != nil {
-				events <- common.NewEventFromError(InstT.STORE, err)
+				events <- NewEventFromError(InstT.STORE, err)
 				return done
 			}
 			// fix returns
 			if len(r.Return()) > 0 {
 				err := me.trans.Return(r)
 				if err != nil {
-					events <- common.NewEventFromError(InstT.STORE, err)
+					events <- NewEventFromError(InstT.STORE, err)
 				}
 			}
 
@@ -446,7 +445,7 @@ func (me *remoteBridge) ProducerHook(eventID int, payload interface{}) (err erro
 func (me *remoteBridge) _listener_routines_(
 	quit <-chan int,
 	wait *sync.WaitGroup,
-	events chan<- *common.Event,
+	events chan<- *Event,
 	input <-chan []byte,
 	output chan<- *transport.Task,
 ) {
@@ -457,7 +456,7 @@ func (me *remoteBridge) _listener_routines_(
 	out := func(b []byte) {
 		t, err := me.trans.DecodeTask(b)
 		if err != nil {
-			events <- common.NewEventFromError(InstT.BRIDGE, err)
+			events <- NewEventFromError(InstT.BRIDGE, err)
 			return
 		}
 		output <- t

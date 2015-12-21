@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
 
@@ -17,7 +16,7 @@ type localBroker struct {
 	to       chan []byte
 
 	// listener routine
-	listeners *common.Routines
+	listeners *Routines
 }
 
 /*
@@ -31,7 +30,7 @@ func NewLocalBroker(cfg *Config, to chan []byte) (v *localBroker, err error) {
 		cfg:       cfg,
 		fromUser:  to,
 		to:        to,
-		listeners: common.NewRoutines(),
+		listeners: NewRoutines(),
 	}
 
 	if v.to == nil {
@@ -41,7 +40,7 @@ func NewLocalBroker(cfg *Config, to chan []byte) (v *localBroker, err error) {
 	return
 }
 
-func (me *localBroker) _consumer_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, input <-chan []byte, output chan<- []byte, receipts <-chan *TaskReceipt) {
+func (me *localBroker) _consumer_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *Event, input <-chan []byte, output chan<- []byte, receipts <-chan *TaskReceipt) {
 	defer wait.Done()
 
 	for {
@@ -55,7 +54,7 @@ func (me *localBroker) _consumer_routine_(quit <-chan int, wait *sync.WaitGroup,
 
 			h, err := transport.DecodeHeader(v)
 			if err != nil {
-				events <- common.NewEventFromError(InstT.CONSUMER, err)
+				events <- NewEventFromError(InstT.CONSUMER, err)
 				break
 			}
 
@@ -66,7 +65,7 @@ func (me *localBroker) _consumer_routine_(quit <-chan int, wait *sync.WaitGroup,
 			}
 
 			if reply.ID != h.ID() {
-				events <- common.NewEventFromError(
+				events <- NewEventFromError(
 					InstT.CONSUMER,
 					errors.New(fmt.Sprintf("expected: %v, received: %v", h, reply)),
 				)
@@ -78,11 +77,11 @@ clean:
 }
 
 //
-// common.Object interface
+// Object interface
 //
 
-func (me *localBroker) Events() ([]<-chan *common.Event, error) {
-	return []<-chan *common.Event{
+func (me *localBroker) Events() ([]<-chan *Event, error) {
+	return []<-chan *Event{
 		me.listeners.Events(),
 	}, nil
 }

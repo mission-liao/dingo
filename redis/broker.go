@@ -7,7 +7,6 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/mission-liao/dingo"
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
 
@@ -19,13 +18,13 @@ var _redisTaskQueue = "dingo.tasks"
 
 type broker struct {
 	pool      *redis.Pool
-	listeners *common.Routines
+	listeners *dingo.Routines
 	cfg       RedisConfig
 }
 
 func NewBroker(cfg *RedisConfig) (v *broker, err error) {
 	v = &broker{
-		listeners: common.NewRoutines(),
+		listeners: dingo.NewRoutines(),
 		cfg:       *cfg,
 	}
 
@@ -38,11 +37,11 @@ func NewBroker(cfg *RedisConfig) (v *broker, err error) {
 }
 
 //
-// common.Object interface
+// dingo.Object interface
 //
 
-func (me *broker) Events() ([]<-chan *common.Event, error) {
-	return []<-chan *common.Event{
+func (me *broker) Events() ([]<-chan *dingo.Event, error) {
+	return []<-chan *dingo.Event{
 		me.listeners.Events(),
 	}, nil
 }
@@ -98,7 +97,7 @@ func (me *broker) StopAllListeners() (err error) {
 func (me *broker) _consumer_routine_(
 	quit <-chan int,
 	wait *sync.WaitGroup,
-	events chan<- *common.Event,
+	events chan<- *dingo.Event,
 	tasks chan<- []byte,
 	receipts <-chan *dingo.TaskReceipt,
 	name string,
@@ -118,7 +117,7 @@ func (me *broker) _consumer_routine_(
 			// blocking call on redis server
 			reply, err := conn.Do("BRPOP", qn, me.cfg.GetListenTimeout())
 			if err != nil {
-				events <- common.NewEventFromError(dingo.InstT.CONSUMER, err)
+				events <- dingo.NewEventFromError(dingo.InstT.CONSUMER, err)
 				break
 			}
 
@@ -131,14 +130,14 @@ func (me *broker) _consumer_routine_(
 			// an slice with length 2
 			v, ok := reply.([]interface{})
 			if !ok {
-				events <- common.NewEventFromError(
+				events <- dingo.NewEventFromError(
 					dingo.InstT.CONSUMER,
 					errors.New(fmt.Sprintf("invalid reply: %v", reply)),
 				)
 				break
 			}
 			if len(v) != 2 {
-				events <- common.NewEventFromError(
+				events <- dingo.NewEventFromError(
 					dingo.InstT.CONSUMER,
 					errors.New(fmt.Sprintf("invalid reply: %v", reply)),
 				)
@@ -147,7 +146,7 @@ func (me *broker) _consumer_routine_(
 
 			b, ok := v[1].([]byte)
 			if !ok {
-				events <- common.NewEventFromError(
+				events <- dingo.NewEventFromError(
 					dingo.InstT.CONSUMER,
 					errors.New(fmt.Sprintf("invalid reply: %v", reply)),
 				)
@@ -156,7 +155,7 @@ func (me *broker) _consumer_routine_(
 
 			h, err := transport.DecodeHeader(b)
 			if err != nil {
-				events <- common.NewEventFromError(dingo.InstT.CONSUMER, err)
+				events <- dingo.NewEventFromError(dingo.InstT.CONSUMER, err)
 				break
 			}
 
@@ -167,7 +166,7 @@ func (me *broker) _consumer_routine_(
 			}
 
 			if rcpt.ID != h.ID() {
-				events <- common.NewEventFromError(
+				events <- dingo.NewEventFromError(
 					dingo.InstT.CONSUMER,
 					errors.New(fmt.Sprintf("expected: %v, received: %v", h, rcpt)),
 				)

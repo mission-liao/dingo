@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
 
@@ -19,33 +18,33 @@ type localBridge struct {
 	objLock   sync.RWMutex
 	needed    int
 	broker    chan *transport.Task
-	listeners *common.Routines
-	reporters *common.Routines
+	listeners *Routines
+	reporters *Routines
 	pollers   chan *localStorePoller
-	events    chan *common.Event
-	eventMux  *common.Mux
+	events    chan *Event
+	eventMux  *Mux
 }
 
 func newLocalBridge(args ...interface{}) (b bridge) {
 	v := &localBridge{
-		events:    make(chan *common.Event, 10),
-		eventMux:  common.NewMux(),
-		listeners: common.NewRoutines(),
-		reporters: common.NewRoutines(),
+		events:    make(chan *Event, 10),
+		eventMux:  NewMux(),
+		listeners: NewRoutines(),
+		reporters: NewRoutines(),
 		broker:    make(chan *transport.Task, 10),
 		pollers:   make(chan *localStorePoller, 10),
 	}
 	b = v
 
 	v.eventMux.Handle(func(val interface{}, _ int) {
-		v.events <- val.(*common.Event)
+		v.events <- val.(*Event)
 	})
 
 	return
 }
 
-func (me *localBridge) Events() ([]<-chan *common.Event, error) {
-	return []<-chan *common.Event{
+func (me *localBridge) Events() ([]<-chan *Event, error) {
+	return []<-chan *Event{
 		me.events,
 	}, nil
 }
@@ -100,7 +99,7 @@ func (me *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *tran
 	go func(
 		quit <-chan int,
 		wait *sync.WaitGroup,
-		events chan<- *common.Event,
+		events chan<- *Event,
 		input <-chan *transport.Task,
 		output chan<- *transport.Task,
 		receipts <-chan *TaskReceipt,
@@ -114,14 +113,14 @@ func (me *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *tran
 				return
 			}
 			if reply.ID != t.ID() {
-				events <- common.NewEventFromError(
+				events <- NewEventFromError(
 					InstT.CONSUMER,
 					errors.New(fmt.Sprintf("expect receipt from %v, but %v", t, reply)),
 				)
 				return
 			}
 			if reply.Status == ReceiptStatus.WORKER_NOT_FOUND {
-				events <- common.NewEventFromError(
+				events <- NewEventFromError(
 					InstT.CONSUMER,
 					errors.New(fmt.Sprintf("workers not found: %v", t)),
 				)
@@ -193,7 +192,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 	go func(
 		quit <-chan int,
 		wait *sync.WaitGroup,
-		events chan<- *common.Event,
+		events chan<- *Event,
 		inputs <-chan *transport.Report,
 		pollers chan *localStorePoller,
 	) {
@@ -238,7 +237,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 
 				if ids, ok := watched[name]; ok {
 					if _, ok := ids[id]; ok {
-						events <- common.NewEventFromError(
+						events <- NewEventFromError(
 							InstT.STORE,
 							errors.New(fmt.Sprintf("duplicated polling found: %v", id)),
 						)
@@ -303,7 +302,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 				}
 
 				if !outF(v) {
-					events <- common.NewEventFromError(
+					events <- NewEventFromError(
 						InstT.STORE,
 						errors.New(fmt.Sprintf("droping report: %v", v)),
 					)
@@ -319,7 +318,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 
 		for k, v := range watched {
 			for kk, vv := range v {
-				events <- common.NewEventFromError(
+				events <- NewEventFromError(
 					InstT.STORE,
 					errors.New(fmt.Sprintf("unclosed reports channel: %v:%v", k, kk)),
 				)
@@ -327,7 +326,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 				// send a 'Shutdown' report
 				r, err := vv.task.ComposeReport(Status.Fail, nil, transport.NewErr(ErrCode.Shutdown, errors.New("dingo is shutdown")))
 				if err != nil {
-					events <- common.NewEventFromError(InstT.STORE, err)
+					events <- NewEventFromError(InstT.STORE, err)
 				} else {
 					vv.reports <- r
 				}
@@ -339,7 +338,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 		for _, v := range unSent {
 			for _, vv := range v {
 				for _, r := range vv {
-					events <- common.NewEventFromError(
+					events <- NewEventFromError(
 						InstT.STORE,
 						errors.New(fmt.Sprintf("unsent report: %v", r)),
 					)

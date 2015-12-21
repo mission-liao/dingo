@@ -10,7 +10,6 @@ import (
 	"time"
 
 	// internal
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
 
@@ -43,7 +42,7 @@ var InstT = struct {
 
 type _eventListener struct {
 	targets, level int
-	events         chan *common.Event
+	events         chan *Event
 }
 
 type _object struct {
@@ -51,11 +50,13 @@ type _object struct {
 	obj  interface{}
 }
 
+/*
+ */
 type App struct {
 	cfg          Config
 	objsLock     sync.RWMutex
 	objs         map[int]*_object
-	eventMux     *common.Mux
+	eventMux     *Mux
 	eventOut     atomic.Value
 	eventOutLock sync.Mutex
 	b            bridge
@@ -72,7 +73,7 @@ type App struct {
 func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 	v := &App{
 		objs:     make(map[int]*_object),
-		eventMux: common.NewMux(),
+		eventMux: NewMux(),
 		trans:    transport.NewMgr(),
 		cfg:      *cfg,
 	}
@@ -81,7 +82,7 @@ func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 	// refer to 'ReadMostly' example in sync/atomic
 	v.eventOut.Store(make(map[int]*_eventListener))
 	v.eventMux.Handle(func(val interface{}, _ int) {
-		e := val.(*common.Event)
+		e := val.(*Event)
 		m := v.eventOut.Load().(map[int]*_eventListener)
 		// to the channel containing everythin errors
 		for _, eln := range m {
@@ -128,7 +129,7 @@ func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 	return
 }
 
-func (me *App) attachEvents(obj common.Object) (err error) {
+func (me *App) attachEvents(obj Object) (err error) {
 	if obj == nil {
 		return
 	}
@@ -190,7 +191,7 @@ func (me *App) Close() (err error) {
 
 	// stop reporter/store
 	for _, v := range me.objs {
-		s, ok := v.obj.(common.Object)
+		s, ok := v.obj.(Object)
 		if ok {
 			chk(s.Close())
 		}
@@ -570,10 +571,10 @@ func (me *App) Call(name string, opt *transport.Option, args ...interface{}) (re
   InstT.BRIDGE | InstT.WORKER | ...
 
  "level" are minimal severity level expected, include:
-  - common.ErrLvl.DEBUG
-  - common.ErrLvl.INFO
-  - common.ErrLvl.WARNING
-  - common.ErrLvl.Error
+  - ErrLvl.DEBUG
+  - ErrLvl.INFO
+  - ErrLvl.WARNING
+  - ErrLvl.Error
 
  "id" is the identity of this event channel, which could be used to stop
  monitoring by calling App.StopListen.
@@ -594,7 +595,7 @@ func (me *App) Call(name string, opt *transport.Option, args ...interface{}) (re
      }
    }
 */
-func (me *App) Listen(targets, level, expectedId int) (id int, events <-chan *common.Event, err error) {
+func (me *App) Listen(targets, level, expectedId int) (id int, events <-chan *Event, err error) {
 	// the implementation below
 	// refers to 'ReadMostly' example in sync/atomic
 
@@ -604,7 +605,7 @@ func (me *App) Listen(targets, level, expectedId int) (id int, events <-chan *co
 	listener := &_eventListener{
 		targets: targets,
 		level:   level,
-		events:  make(chan *common.Event, 10),
+		events:  make(chan *Event, 10),
 	}
 
 	m := me.eventOut.Load().(map[int]*_eventListener)

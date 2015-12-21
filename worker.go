@@ -6,7 +6,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
 
@@ -27,7 +26,7 @@ var (
 type worker struct {
 	receipts chan<- *TaskReceipt
 	tasks    <-chan *transport.Task
-	rs       *common.Routines
+	rs       *Routines
 	reports  []chan *transport.Report
 }
 
@@ -38,8 +37,8 @@ type worker struct {
 type _workers struct {
 	workersLock sync.Mutex
 	workers     atomic.Value
-	events      chan *common.Event
-	eventMux    *common.Mux
+	events      chan *Event
+	eventMux    *Mux
 	trans       *transport.Mgr
 	hooks       exHooks
 }
@@ -101,7 +100,7 @@ func (me *_workers) allocate(
 		w = &worker{
 			receipts: receipts,
 			tasks:    tasks,
-			rs:       common.NewRoutines(),
+			rs:       NewRoutines(),
 			reports:  make([]chan *transport.Report, 0, 10),
 		}
 
@@ -180,11 +179,11 @@ func (me *_workers) more(name string, count, share int) (remain int, reports []<
 }
 
 //
-// common.Object interface
+// Object interface
 //
 
-func (me *_workers) Events() ([]<-chan *common.Event, error) {
-	return []<-chan *common.Event{
+func (me *_workers) Events() ([]<-chan *Event, error) {
+	return []<-chan *Event{
 		me.events,
 	}, nil
 }
@@ -210,8 +209,8 @@ func (me *_workers) Close() (err error) {
 // factory function
 func newWorkers(trans *transport.Mgr, hooks exHooks) (w *_workers, err error) {
 	w = &_workers{
-		events:   make(chan *common.Event, 10),
-		eventMux: common.NewMux(),
+		events:   make(chan *Event, 10),
+		eventMux: NewMux(),
 		trans:    trans,
 		hooks:    hooks,
 	}
@@ -223,7 +222,7 @@ func newWorkers(trans *transport.Mgr, hooks exHooks) (w *_workers, err error) {
 		err = errors.New(fmt.Sprintf("Unable to allocate mux routine:%v"))
 	}
 	w.eventMux.Handle(func(val interface{}, _ int) {
-		w.events <- val.(*common.Event)
+		w.events <- val.(*Event)
 	})
 
 	return
@@ -236,7 +235,7 @@ func newWorkers(trans *transport.Mgr, hooks exHooks) (w *_workers, err error) {
 func (me *_workers) _worker_routine_(
 	quit <-chan int,
 	wait *sync.WaitGroup,
-	events chan<- *common.Event,
+	events chan<- *Event,
 	tasks <-chan *transport.Task,
 	receipts chan<- *TaskReceipt,
 	reports chan<- *transport.Report,
@@ -256,7 +255,7 @@ func (me *_workers) _worker_routine_(
 		if err_ != nil {
 			r, err_ = task.ComposeReport(Status.Fail, nil, transport.NewErr(0, err_))
 			if err_ != nil {
-				events <- common.NewEventFromError(InstT.WORKER, err_)
+				events <- NewEventFromError(InstT.WORKER, err_)
 				return
 			}
 		}
@@ -298,7 +297,7 @@ func (me *_workers) _worker_routine_(
 		// compose a report -- done / fail
 		if err != nil {
 			status = Status.Fail
-			events <- common.NewEventFromError(InstT.WORKER, err_)
+			events <- NewEventFromError(InstT.WORKER, err_)
 		} else {
 			status = Status.Success
 		}

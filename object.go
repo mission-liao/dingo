@@ -1,4 +1,4 @@
-package common
+package dingo
 
 type Object interface {
 	//
@@ -6,8 +6,4 @@ type Object interface {
 
 	//
 	Close() error
-}
-
-type EventProducer interface {
-	//
 }

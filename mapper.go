@@ -6,7 +6,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/mission-liao/dingo/common"
 	"github.com/mission-liao/dingo/transport"
 )
 
@@ -16,7 +15,7 @@ import (
 
 type _mappers struct {
 	workers *_workers
-	mappers *common.Routines
+	mappers *Routines
 	toLock  sync.Mutex
 	to      atomic.Value
 }
@@ -74,10 +73,10 @@ func (me *_mappers) allocateWorkers(name string, count, share int) ([]<-chan *tr
 }
 
 //
-// common.Object interface
+// Object interface
 //
 
-func (me *_mappers) Events() (ret []<-chan *common.Event, err error) {
+func (me *_mappers) Events() (ret []<-chan *Event, err error) {
 	ret, err = me.workers.Events()
 	if err != nil {
 		return
@@ -116,7 +115,7 @@ func newMappers(trans *transport.Mgr, hooks exHooks) (m *_mappers, err error) {
 
 	m = &_mappers{
 		workers: w,
-		mappers: common.NewRoutines(),
+		mappers: NewRoutines(),
 	}
 
 	m.to.Store(make(map[string]chan *transport.Task))
@@ -130,7 +129,7 @@ func newMappers(trans *transport.Mgr, hooks exHooks) (m *_mappers, err error) {
 func (m *_mappers) _mapper_routine_(
 	quit <-chan int,
 	wait *sync.WaitGroup,
-	events chan<- *common.Event,
+	events chan<- *Event,
 	tasks <-chan *transport.Task,
 	receipts chan<- *TaskReceipt,
 ) {
@@ -145,7 +144,7 @@ func (m *_mappers) _mapper_routine_(
 		var rpt TaskReceipt
 		if err != nil {
 			// send an error event
-			events <- common.NewEventFromError(InstT.MAPPER, err)
+			events <- NewEventFromError(InstT.MAPPER, err)
 
 			if err == errWorkerNotFound {
 				rpt = TaskReceipt{
