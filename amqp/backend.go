@@ -275,7 +275,7 @@ func (me *backend) _reporter_routine_(quit <-chan int, done chan<- int, events c
 		// report an error event when leaving
 		defer func() {
 			if err != nil {
-				events <- common.NewEventFromError(common.InstT.REPORTER, err)
+				events <- common.NewEventFromError(dingo.InstT.REPORTER, err)
 			}
 		}()
 
@@ -402,7 +402,7 @@ done:
 	// cancel consuming
 	err = ci.Channel.Cancel(getConsumerTag(id), false)
 	if err != nil {
-		events <- common.NewEventFromError(common.InstT.STORE, err)
+		events <- common.NewEventFromError(dingo.InstT.STORE, err)
 		isChannelError = true
 		return
 	}
@@ -416,7 +416,7 @@ done:
 		nil,              // args
 	)
 	if err != nil {
-		events <- common.NewEventFromError(common.InstT.STORE, err)
+		events <- common.NewEventFromError(dingo.InstT.STORE, err)
 		isChannelError = true
 		return
 	}
@@ -429,7 +429,7 @@ done:
 		false, // noWait
 	)
 	if err != nil {
-		events <- common.NewEventFromError(common.InstT.STORE, err)
+		events <- common.NewEventFromError(dingo.InstT.STORE, err)
 		isChannelError = true
 		return
 	}

@@ -39,25 +39,25 @@ func (me *DingoTestSuite) SetupSuite() {
 
 	// broker
 	if me.Brk != nil {
-		_, used, err := me.App_.Use(me.Brk, common.InstT.DEFAULT)
+		_, used, err := me.App_.Use(me.Brk, InstT.DEFAULT)
 		me.Nil(err)
-		me.Equal(common.InstT.PRODUCER|common.InstT.CONSUMER, used)
+		me.Equal(InstT.PRODUCER|InstT.CONSUMER, used)
 	} else {
 		me.NotNil(me.Nbrk)
-		_, used, err := me.App_.Use(me.Nbrk, common.InstT.DEFAULT)
+		_, used, err := me.App_.Use(me.Nbrk, InstT.DEFAULT)
 		me.Nil(err)
-		me.Equal(common.InstT.PRODUCER|common.InstT.CONSUMER, used)
+		me.Equal(InstT.PRODUCER|InstT.CONSUMER, used)
 	}
 
 	// backend
 	me.Bkd, err = me.GenBackend()
 	me.Nil(err)
-	_, used, err := me.App_.Use(me.Bkd, common.InstT.DEFAULT)
+	_, used, err := me.App_.Use(me.Bkd, InstT.DEFAULT)
 	me.Nil(err)
-	me.Equal(common.InstT.REPORTER|common.InstT.STORE, used)
+	me.Equal(InstT.REPORTER|InstT.STORE, used)
 
 	// events
-	me.eid, me.events, err = me.App_.Listen(common.InstT.ALL, common.ErrLvl.DEBUG, 0)
+	me.eid, me.events, err = me.App_.Listen(InstT.ALL, common.ErrLvl.DEBUG, 0)
 	me.Nil(err)
 }
 

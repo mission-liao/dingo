@@ -71,7 +71,7 @@ func (me *localBridge) SendTask(t *transport.Task) (err error) {
 	me.objLock.RLock()
 	defer me.objLock.RUnlock()
 
-	if me.needed&common.InstT.PRODUCER == 0 {
+	if me.needed&InstT.PRODUCER == 0 {
 		err = errors.New("producer is not attached")
 		return
 	}
@@ -92,7 +92,7 @@ func (me *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *tran
 	tasks2 := make(chan *transport.Task, 10)
 	tasks = tasks2
 
-	if me.needed&common.InstT.CONSUMER == 0 {
+	if me.needed&InstT.CONSUMER == 0 {
 		err = errors.New("consumer is not attached")
 		return
 	}
@@ -115,14 +115,14 @@ func (me *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *tran
 			}
 			if reply.ID != t.ID() {
 				events <- common.NewEventFromError(
-					common.InstT.CONSUMER,
+					InstT.CONSUMER,
 					errors.New(fmt.Sprintf("expect receipt from %v, but %v", t, reply)),
 				)
 				return
 			}
 			if reply.Status == ReceiptStatus.WORKER_NOT_FOUND {
 				events <- common.NewEventFromError(
-					common.InstT.CONSUMER,
+					InstT.CONSUMER,
 					errors.New(fmt.Sprintf("workers not found: %v", t)),
 				)
 				return
@@ -172,7 +172,7 @@ func (me *localBridge) StopAllListeners() (err error) {
 	me.objLock.Lock()
 	defer me.objLock.Unlock()
 
-	if me.needed&common.InstT.CONSUMER == 0 {
+	if me.needed&InstT.CONSUMER == 0 {
 		err = errors.New("consumer is not attached")
 		return
 	}
@@ -185,7 +185,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 	me.objLock.RLock()
 	defer me.objLock.RUnlock()
 
-	if me.needed&common.InstT.REPORTER == 0 {
+	if me.needed&InstT.REPORTER == 0 {
 		err = errors.New("reporter is not attached")
 		return
 	}
@@ -239,7 +239,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 				if ids, ok := watched[name]; ok {
 					if _, ok := ids[id]; ok {
 						events <- common.NewEventFromError(
-							common.InstT.STORE,
+							InstT.STORE,
 							errors.New(fmt.Sprintf("duplicated polling found: %v", id)),
 						)
 						break
@@ -304,7 +304,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 
 				if !outF(v) {
 					events <- common.NewEventFromError(
-						common.InstT.STORE,
+						InstT.STORE,
 						errors.New(fmt.Sprintf("droping report: %v", v)),
 					)
 				}
@@ -320,14 +320,14 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 		for k, v := range watched {
 			for kk, vv := range v {
 				events <- common.NewEventFromError(
-					common.InstT.STORE,
+					InstT.STORE,
 					errors.New(fmt.Sprintf("unclosed reports channel: %v:%v", k, kk)),
 				)
 
 				// send a 'Shutdown' report
 				r, err := vv.task.ComposeReport(transport.Status.Fail, nil, transport.NewErr(transport.ErrCode.Shutdown, errors.New("dingo is shutdown")))
 				if err != nil {
-					events <- common.NewEventFromError(common.InstT.STORE, err)
+					events <- common.NewEventFromError(InstT.STORE, err)
 				} else {
 					vv.reports <- r
 				}
@@ -340,7 +340,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 			for _, vv := range v {
 				for _, r := range vv {
 					events <- common.NewEventFromError(
-						common.InstT.STORE,
+						InstT.STORE,
 						errors.New(fmt.Sprintf("unsent report: %v", r)),
 					)
 				}
@@ -352,7 +352,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 }
 
 func (me *localBridge) Poll(t *transport.Task) (reports <-chan *transport.Report, err error) {
-	if me.needed&common.InstT.STORE == 0 {
+	if me.needed&InstT.STORE == 0 {
 		err = errors.New("store is not attached")
 		return
 	}
@@ -367,35 +367,35 @@ func (me *localBridge) Poll(t *transport.Task) (reports <-chan *transport.Report
 }
 
 func (me *localBridge) AttachReporter(r Reporter) (err error) {
-	me.needed |= common.InstT.REPORTER
+	me.needed |= InstT.REPORTER
 	return
 }
 
 func (me *localBridge) AttachStore(s Store) (err error) {
-	me.needed |= common.InstT.STORE
+	me.needed |= InstT.STORE
 	return
 }
 
 func (me *localBridge) AttachProducer(p Producer) (err error) {
-	me.needed |= common.InstT.PRODUCER
+	me.needed |= InstT.PRODUCER
 	return
 }
 
 func (me *localBridge) AttachConsumer(c Consumer, nc NamedConsumer) (err error) {
-	me.needed |= common.InstT.CONSUMER
+	me.needed |= InstT.CONSUMER
 	return
 }
 
 func (me *localBridge) Exists(it int) bool {
 	// make sure only one component is selected
 	switch it {
-	case common.InstT.PRODUCER:
+	case InstT.PRODUCER:
 		return me.needed&it == it
-	case common.InstT.CONSUMER:
+	case InstT.CONSUMER:
 		return me.needed&it == it
-	case common.InstT.REPORTER:
+	case InstT.REPORTER:
 		return me.needed&it == it
-	case common.InstT.STORE:
+	case InstT.STORE:
 		return me.needed&it == it
 	}
 

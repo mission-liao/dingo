@@ -14,6 +14,33 @@ import (
 	"github.com/mission-liao/dingo/transport"
 )
 
+/*
+ Types of instances
+*/
+var InstT = struct {
+	DEFAULT        int
+	REPORTER       int
+	STORE          int
+	PRODUCER       int
+	CONSUMER       int
+	MAPPER         int
+	WORKER         int
+	BRIDGE         int
+	NAMED_CONSUMER int
+	ALL            int
+}{
+	0,
+	(1 << 0),
+	(1 << 1),
+	(1 << 2),
+	(1 << 3),
+	(1 << 4),
+	(1 << 5),
+	(1 << 6),
+	(1 << 7),
+	int(^uint(0) >> 1), // Max int
+}
+
 type _eventListener struct {
 	targets, level int
 	events         chan *common.Event
@@ -278,7 +305,7 @@ func (me *App) Allocate(name string, count, share int) (remain int, err error) {
 		reports []<-chan *transport.Report
 	)
 
-	if me.b.Exists(common.InstT.NAMED_CONSUMER) {
+	if me.b.Exists(InstT.NAMED_CONSUMER) {
 		receipts := make(chan *TaskReceipt, 10)
 		tasks, err = me.b.AddNamedListener(name, receipts)
 		if err != nil {
@@ -288,7 +315,7 @@ func (me *App) Allocate(name string, count, share int) (remain int, err error) {
 		if err != nil {
 			return
 		}
-	} else if me.b.Exists(common.InstT.CONSUMER) {
+	} else if me.b.Exists(InstT.CONSUMER) {
 		reports, remain, err = me.mappers.allocateWorkers(name, count, share)
 		if err != nil {
 			return
@@ -328,12 +355,12 @@ func (me *App) SetOption(name string, opt *transport.Option) error {
   - err: errors
 
  For a producer, the right combination of "types" is
- common.InstT.PRODUCER|common.InstT.STORE, if reporting is not required,
- then only common.InstT.PRODUCER is used.
+ InstT.PRODUCER|InstT.STORE, if reporting is not required,
+ then only InstT.PRODUCER is used.
 
  For a consumer, the right combination of "types" is
- common.InstT.CONSUMER|common.InstT.REPORTER, if reporting is not reuqired(make sure there is no producer await),
- then only common.InstT.CONSUMER is used.
+ InstT.CONSUMER|InstT.REPORTER, if reporting is not reuqired(make sure there is no producer await),
+ then only InstT.CONSUMER is used.
 */
 func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 	me.objsLock.Lock()
@@ -362,21 +389,21 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 		}
 	}()
 
-	if types == common.InstT.DEFAULT {
+	if types == InstT.DEFAULT {
 		producer, _ = obj.(Producer)
 		consumer, _ = obj.(Consumer)
 		namedConsumer, _ = obj.(NamedConsumer)
 		store, _ = obj.(Store)
 		reporter, _ = obj.(Reporter)
 	} else {
-		if types&common.InstT.PRODUCER == common.InstT.PRODUCER {
+		if types&InstT.PRODUCER == InstT.PRODUCER {
 			producer, ok = obj.(Producer)
 			if !ok {
 				err = errors.New("producer is not found")
 				return
 			}
 		}
-		if types&common.InstT.CONSUMER == common.InstT.CONSUMER {
+		if types&InstT.CONSUMER == InstT.CONSUMER {
 			namedConsumer, ok = obj.(NamedConsumer)
 			if !ok {
 				consumer, ok = obj.(Consumer)
@@ -386,19 +413,19 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 				}
 			}
 		}
-		if types&common.InstT.NAMED_CONSUMER == common.InstT.NAMED_CONSUMER {
+		if types&InstT.NAMED_CONSUMER == InstT.NAMED_CONSUMER {
 			namedConsumer, ok = obj.(NamedConsumer)
 			if !ok {
 			}
 		}
-		if types&common.InstT.STORE == common.InstT.STORE {
+		if types&InstT.STORE == InstT.STORE {
 			store, ok = obj.(Store)
 			if !ok {
 				err = errors.New("store is not found")
 				return
 			}
 		}
-		if types&common.InstT.REPORTER == common.InstT.REPORTER {
+		if types&InstT.REPORTER == InstT.REPORTER {
 			reporter, ok = obj.(Reporter)
 			if !ok {
 				err = errors.New("reporter is not found")
@@ -409,17 +436,17 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 
 	if producer != nil {
 		err = me.b.AttachProducer(producer)
-		if err != nil && types != common.InstT.DEFAULT {
+		if err != nil && types != InstT.DEFAULT {
 			return
 		}
-		used |= common.InstT.PRODUCER
+		used |= InstT.PRODUCER
 	}
 	if consumer != nil || namedConsumer != nil {
 		err = me.b.AttachConsumer(consumer, namedConsumer)
-		if err != nil && types != common.InstT.DEFAULT {
+		if err != nil && types != InstT.DEFAULT {
 			return
 		}
-		if err == nil && me.b.Exists(common.InstT.CONSUMER) {
+		if err == nil && me.b.Exists(InstT.CONSUMER) {
 			var (
 				remain int
 				tasks  <-chan *transport.Task
@@ -434,21 +461,21 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 				me.mappers.more(tasks, receipts)
 			}
 		}
-		used |= common.InstT.CONSUMER
+		used |= InstT.CONSUMER
 	}
 	if reporter != nil {
 		err = me.b.AttachReporter(reporter)
-		if err != nil && types != common.InstT.DEFAULT {
+		if err != nil && types != InstT.DEFAULT {
 			return
 		}
-		used |= common.InstT.REPORTER
+		used |= InstT.REPORTER
 	}
 	if store != nil {
 		err = me.b.AttachStore(store)
-		if err != nil && types != common.InstT.DEFAULT {
+		if err != nil && types != InstT.DEFAULT {
 			return
 		}
-		used |= common.InstT.STORE
+		used |= InstT.STORE
 	}
 
 	return
@@ -531,16 +558,16 @@ func (me *App) Call(name string, opt *transport.Option, args ...interface{}) (re
  Get the channel to receive events from 'dingo'.
 
  "targets" are instances you want to monitor, they include:
-  - common.InstT.REPORTER: the Reporter instance attached to this App.
-  - common.InstT.STORE: the Store instance attached to this App.
-  - common.InstT.PRODUCER: the Producer instance attached to this App.
-  - common.InstT.CONSUMER: the Consumer/NamedConsumer instance attached to this App.
-  - common.InstT.MAPPER: the internal component, turn if on when debug.
-  - common.InstT.WORKER: the internal component, turn it on when debug.
-  - common.InstT.BRIDGE: the internal component, turn it on when debug.
-  - common.InstT.ALL: every instance.
+  - InstT.REPORTER: the Reporter instance attached to this App.
+  - InstT.STORE: the Store instance attached to this App.
+  - InstT.PRODUCER: the Producer instance attached to this App.
+  - InstT.CONSUMER: the Consumer/NamedConsumer instance attached to this App.
+  - InstT.MAPPER: the internal component, turn if on when debug.
+  - InstT.WORKER: the internal component, turn it on when debug.
+  - InstT.BRIDGE: the internal component, turn it on when debug.
+  - InstT.ALL: every instance.
  They are bit flags and can be combined as "targets", like:
-  common.InstT.BRIDGE | common.InstT.WORKER | ...
+  InstT.BRIDGE | InstT.WORKER | ...
 
  "level" are minimal severity level expected, include:
   - common.ErrLvl.DEBUG

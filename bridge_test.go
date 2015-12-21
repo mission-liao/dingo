@@ -302,14 +302,14 @@ func (me *BridgeTestSuite) TestPoll() {
 }
 
 func (me *BridgeTestSuite) TestExist() {
-	me.True(me.bg.Exists(common.InstT.REPORTER))
-	me.True(me.bg.Exists(common.InstT.CONSUMER))
-	me.True(me.bg.Exists(common.InstT.PRODUCER))
-	me.True(me.bg.Exists(common.InstT.STORE))
+	me.True(me.bg.Exists(InstT.REPORTER))
+	me.True(me.bg.Exists(InstT.CONSUMER))
+	me.True(me.bg.Exists(InstT.PRODUCER))
+	me.True(me.bg.Exists(InstT.STORE))
 
 	// checking should be ==, not &=
-	me.False(me.bg.Exists(common.InstT.STORE | common.InstT.REPORTER))
-	me.False(me.bg.Exists(common.InstT.ALL))
+	me.False(me.bg.Exists(InstT.STORE | InstT.REPORTER))
+	me.False(me.bg.Exists(InstT.ALL))
 }
 
 func (me *BridgeTestSuite) TestFinalReportWhenShutdown() {

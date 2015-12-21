@@ -86,7 +86,7 @@ func (me *localBroker) _consumer_routine_(quit <-chan int, wait *sync.WaitGroup,
 
 			h, err := transport.DecodeHeader(v)
 			if err != nil {
-				events <- common.NewEventFromError(common.InstT.CONSUMER, err)
+				events <- common.NewEventFromError(InstT.CONSUMER, err)
 				break
 			}
 
@@ -98,7 +98,7 @@ func (me *localBroker) _consumer_routine_(quit <-chan int, wait *sync.WaitGroup,
 
 			if reply.ID != h.ID() {
 				events <- common.NewEventFromError(
-					common.InstT.CONSUMER,
+					InstT.CONSUMER,
 					errors.New(fmt.Sprintf("expected: %v, received: %v", h, reply)),
 				)
 				break

@@ -166,7 +166,7 @@ func (me *remoteBridge) Report(reports <-chan *transport.Report) (err error) {
 		out := func(r *transport.Report) {
 			b, err := me.trans.EncodeReport(r)
 			if err != nil {
-				events <- common.NewEventFromError(common.InstT.BRIDGE, err)
+				events <- common.NewEventFromError(InstT.BRIDGE, err)
 				return
 			}
 			output <- &ReportEnvelope{
@@ -230,7 +230,7 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 		defer func() {
 			err = me.store.Done(t)
 			if err != nil {
-				events <- common.NewEventFromError(common.InstT.STORE, err)
+				events <- common.NewEventFromError(InstT.STORE, err)
 			}
 		}()
 
@@ -239,7 +239,7 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 			if !done {
 				r, err := t.ComposeReport(transport.Status.Fail, nil, transport.NewErr(transport.ErrCode.Shutdown, errors.New("dingo is shutdown")))
 				if err != nil {
-					events <- common.NewEventFromError(common.InstT.STORE, err)
+					events <- common.NewEventFromError(InstT.STORE, err)
 				} else {
 					outputs <- r
 				}
@@ -250,14 +250,14 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 		out := func(b []byte) bool {
 			r, err := me.trans.DecodeReport(b)
 			if err != nil {
-				events <- common.NewEventFromError(common.InstT.STORE, err)
+				events <- common.NewEventFromError(InstT.STORE, err)
 				return done
 			}
 			// fix returns
 			if len(r.Return()) > 0 {
 				err := me.trans.Return(r)
 				if err != nil {
-					events <- common.NewEventFromError(common.InstT.STORE, err)
+					events <- common.NewEventFromError(InstT.STORE, err)
 				}
 			}
 
@@ -374,35 +374,35 @@ func (me *remoteBridge) AttachConsumer(c Consumer, nc NamedConsumer) (err error)
 
 func (me *remoteBridge) Exists(it int) (ext bool) {
 	switch it {
-	case common.InstT.PRODUCER:
+	case InstT.PRODUCER:
 		func() {
 			me.producerLock.RLock()
 			defer me.producerLock.RUnlock()
 
 			ext = me.producer != nil
 		}()
-	case common.InstT.CONSUMER:
+	case InstT.CONSUMER:
 		func() {
 			me.consumerLock.RLock()
 			defer me.consumerLock.RUnlock()
 
 			ext = me.consumer != nil
 		}()
-	case common.InstT.REPORTER:
+	case InstT.REPORTER:
 		func() {
 			me.reporterLock.RLock()
 			defer me.reporterLock.RUnlock()
 
 			ext = me.reporter != nil
 		}()
-	case common.InstT.STORE:
+	case InstT.STORE:
 		func() {
 			me.storeLock.RLock()
 			defer me.storeLock.RUnlock()
 
 			ext = me.store != nil
 		}()
-	case common.InstT.NAMED_CONSUMER:
+	case InstT.NAMED_CONSUMER:
 		func() {
 			me.consumerLock.RLock()
 			defer me.consumerLock.RUnlock()
@@ -456,7 +456,7 @@ func (me *remoteBridge) _listener_routines_(
 	out := func(b []byte) {
 		t, err := me.trans.DecodeTask(b)
 		if err != nil {
-			events <- common.NewEventFromError(common.InstT.BRIDGE, err)
+			events <- common.NewEventFromError(InstT.BRIDGE, err)
 			return
 		}
 		output <- t

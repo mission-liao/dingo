@@ -145,7 +145,7 @@ func (m *_mappers) _mapper_routine_(
 		var rpt TaskReceipt
 		if err != nil {
 			// send an error event
-			events <- common.NewEventFromError(common.InstT.MAPPER, err)
+			events <- common.NewEventFromError(InstT.MAPPER, err)
 
 			if err == errWorkerNotFound {
 				rpt = TaskReceipt{

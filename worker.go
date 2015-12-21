@@ -256,7 +256,7 @@ func (me *_workers) _worker_routine_(
 		if err_ != nil {
 			r, err_ = task.ComposeReport(transport.Status.Fail, nil, transport.NewErr(0, err_))
 			if err_ != nil {
-				events <- common.NewEventFromError(common.InstT.WORKER, err_)
+				events <- common.NewEventFromError(InstT.WORKER, err_)
 				return
 			}
 		}
@@ -298,7 +298,7 @@ func (me *_workers) _worker_routine_(
 		// compose a report -- done / fail
 		if err != nil {
 			status = transport.Status.Fail
-			events <- common.NewEventFromError(common.InstT.WORKER, err_)
+			events <- common.NewEventFromError(InstT.WORKER, err_)
 		} else {
 			status = transport.Status.Success
 		}
