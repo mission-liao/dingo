@@ -1,16 +1,12 @@
 package dingo
 
 import (
-	// standard
 	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	// internal
-	"github.com/mission-liao/dingo/transport"
 )
 
 /*
@@ -60,7 +56,7 @@ type App struct {
 	eventOut     atomic.Value
 	eventOutLock sync.Mutex
 	b            bridge
-	trans        *transport.Mgr
+	trans        *Mgr
 	mappers      *_mappers
 	workers      *_workers
 }
@@ -74,7 +70,7 @@ func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 	v := &App{
 		objs:     make(map[int]*_object),
 		eventMux: NewMux(),
-		trans:    transport.NewMgr(),
+		trans:    NewMgr(),
 		cfg:      *cfg,
 	}
 	v.b = newBridge(nameOfBridge, v.trans)
@@ -218,22 +214,22 @@ func (me *App) Close() (err error) {
 
 /*
  Register a customized Marshaller, input should be an object implements both
- transport.Marshaller and transport.Invoker.
+ Marshaller and Invoker.
 
  You can pick any builtin Invoker(s)/Marshaller(s) combined with your customized one:
 
-   app.AddMarshaller(3, &struct{transport.JsonSafeMarshaller, __your_customized_invoker__})
+   app.AddMarshaller(3, &struct{JsonSafeMarshaller, __your_customized_invoker__})
 
  "expectedId" is the expected identifier of this Marshaller, which could be useful when you
  need to sync the Marshaller-ID between producers and consumers. 0~3 are occupied by builtin
  Marshaller(s). Suggested "expectedId" should begin from 100.
 */
-func (me *App) AddMarshaller(expectedId int, m transport.Marshaller) error {
+func (me *App) AddMarshaller(expectedId int, m Marshaller) error {
 	return me.trans.AddMarshaller(expectedId, m)
 }
 
 /*
- Register a customized IDMaker, input should be an object implements transport.IDMaker.
+ Register a customized IDMaker, input should be an object implements IDMaker.
 
  You can register different id-makers to different tasks, internally, dingo would take both
  (name, id) as identity of a task.
@@ -244,7 +240,7 @@ func (me *App) AddMarshaller(expectedId int, m transport.Marshaller) error {
 
  The default IDMaker used by dingo is implemented by uuid4.
 */
-func (me *App) AddIdMaker(expectedId int, m transport.IDMaker) error {
+func (me *App) AddIdMaker(expectedId int, m IDMaker) error {
 	return me.trans.AddIdMaker(expectedId, m)
 }
 
@@ -254,8 +250,8 @@ func (me *App) AddIdMaker(expectedId int, m transport.IDMaker) error {
  parameters:
   - name: name of tasks
   - fn: the function that actually perform the task.
-  - taskMash, reportMash: id of transport.Marshaller for 'transport.Task' and 'transport.Report'
-  - idmaker: id of transport.IDMaker you would like to use when generating tasks.
+  - taskMash, reportMash: id of Marshaller for 'Task' and 'Report'
+  - idmaker: id of IDMaker you would like to use when generating tasks.
 
  returns:
   - err: any error produced
@@ -302,8 +298,8 @@ func (me *App) Allocate(name string, count, share int) (remain int, err error) {
 	defer me.objsLock.RUnlock()
 
 	var (
-		tasks   <-chan *transport.Task
-		reports []<-chan *transport.Report
+		tasks   <-chan *Task
+		reports []<-chan *Report
 	)
 
 	if me.b.Exists(InstT.NAMED_CONSUMER) {
@@ -340,7 +336,7 @@ func (me *App) Allocate(name string, count, share int) (remain int, err error) {
 /*
  Set default option used for a worker function.
 */
-func (me *App) SetOption(name string, opt *transport.Option) error {
+func (me *App) SetOption(name string, opt *Option) error {
 	return me.trans.SetOption(name, opt)
 }
 
@@ -450,7 +446,7 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 		if err == nil && me.b.Exists(InstT.CONSUMER) {
 			var (
 				remain int
-				tasks  <-chan *transport.Task
+				tasks  <-chan *Task
 			)
 			for remain = me.cfg.Mappers_; remain > 0; remain-- {
 				receipts := make(chan *TaskReceipt, 10)
@@ -519,7 +515,7 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
  Noted: the 'Fail' here doesn't mean your worker function is failed,
  it means "dingo" doesn't execute your worker function properly.
 */
-func (me *App) Call(name string, opt *transport.Option, args ...interface{}) (reports <-chan *transport.Report, err error) {
+func (me *App) Call(name string, opt *Option, args ...interface{}) (reports <-chan *Report, err error) {
 	me.objsLock.RLock()
 	defer me.objsLock.RUnlock()
 

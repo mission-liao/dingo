@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-
-	"github.com/mission-liao/dingo/transport"
 )
 
 //
@@ -23,20 +21,20 @@ type _mappers struct {
 // allocating more mappers
 //
 // parameters:
-// - tasks: input channel for transport.Task
+// - tasks: input channel for Task
 // - receipts: output channel for TaskReceipt
-func (me *_mappers) more(tasks <-chan *transport.Task, receipts chan<- *TaskReceipt) {
+func (me *_mappers) more(tasks <-chan *Task, receipts chan<- *TaskReceipt) {
 	go me._mapper_routine_(me.mappers.New(), me.mappers.Wait(), me.mappers.Events(), tasks, receipts)
 }
 
-// dispatching a 'transport.Task'
+// dispatching a 'Task'
 //
 // parameters:
 // - t: the task
 // returns:
 // - err: any error
-func (me *_mappers) dispatch(t *transport.Task) (err error) {
-	all := me.to.Load().(map[string]chan *transport.Task)
+func (me *_mappers) dispatch(t *Task) (err error) {
+	all := me.to.Load().(map[string]chan *Task)
 	if out, ok := all[t.Name()]; ok {
 		out <- t
 	} else {
@@ -49,21 +47,21 @@ func (me *_mappers) dispatch(t *transport.Task) (err error) {
 // proxy of _workers
 //
 
-func (me *_mappers) allocateWorkers(name string, count, share int) ([]<-chan *transport.Report, int, error) {
+func (me *_mappers) allocateWorkers(name string, count, share int) ([]<-chan *Report, int, error) {
 	me.toLock.Lock()
 	defer me.toLock.Unlock()
 
-	all := me.to.Load().(map[string]chan *transport.Task)
+	all := me.to.Load().(map[string]chan *Task)
 	if _, ok := all[name]; ok {
 		return nil, count, errors.New(fmt.Sprintf("already registered: %v", name))
 	}
-	t := make(chan *transport.Task, 10)
+	t := make(chan *Task, 10)
 	r, n, err := me.workers.allocate(name, t, nil, count, share)
 	if err != nil {
 		return r, n, err
 	}
 
-	alln := make(map[string]chan *transport.Task)
+	alln := make(map[string]chan *Task)
 	for k := range all {
 		alln[k] = all[k]
 	}
@@ -93,11 +91,11 @@ func (m *_mappers) Close() (err error) {
 	m.toLock.Lock()
 	defer m.toLock.Unlock()
 
-	all := m.to.Load().(map[string]chan *transport.Task)
+	all := m.to.Load().(map[string]chan *Task)
 	for _, v := range all {
 		close(v)
 	}
-	m.to.Store(make(map[string]chan *transport.Task))
+	m.to.Store(make(map[string]chan *Task))
 
 	return
 }
@@ -107,7 +105,7 @@ func (m *_mappers) Close() (err error) {
 // - tasks: input channel
 // returns:
 // ...
-func newMappers(trans *transport.Mgr, hooks exHooks) (m *_mappers, err error) {
+func newMappers(trans *Mgr, hooks exHooks) (m *_mappers, err error) {
 	w, err := newWorkers(trans, hooks)
 	if err != nil {
 		return
@@ -118,7 +116,7 @@ func newMappers(trans *transport.Mgr, hooks exHooks) (m *_mappers, err error) {
 		mappers: NewRoutines(),
 	}
 
-	m.to.Store(make(map[string]chan *transport.Task))
+	m.to.Store(make(map[string]chan *Task))
 	return
 }
 
@@ -130,13 +128,13 @@ func (m *_mappers) _mapper_routine_(
 	quit <-chan int,
 	wait *sync.WaitGroup,
 	events chan<- *Event,
-	tasks <-chan *transport.Task,
+	tasks <-chan *Task,
 	receipts chan<- *TaskReceipt,
 ) {
 	defer wait.Done()
 	defer close(receipts)
 
-	receive := func(t *transport.Task) {
+	receive := func(t *Task) {
 		// find registered worker
 		err := m.dispatch(t)
 

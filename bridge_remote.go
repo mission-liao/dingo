@@ -3,8 +3,6 @@ package dingo
 import (
 	"errors"
 	"sync"
-
-	"github.com/mission-liao/dingo/transport"
 )
 
 //
@@ -25,20 +23,20 @@ type remoteBridge struct {
 	listeners *Routines
 	reporters *Routines
 	storers   *Routines
-	doners    chan transport.Meta
+	doners    chan Meta
 	events    chan *Event
 	eventMux  *Mux
-	trans     *transport.Mgr
+	trans     *Mgr
 }
 
-func newRemoteBridge(trans *transport.Mgr) (b bridge) {
+func newRemoteBridge(trans *Mgr) (b bridge) {
 	v := &remoteBridge{
 		listeners: NewRoutines(),
 		reporters: NewRoutines(),
 		storers:   NewRoutines(),
 		events:    make(chan *Event, 10),
 		eventMux:  NewMux(),
-		doners:    make(chan transport.Meta, 10),
+		doners:    make(chan Meta, 10),
 		trans:     trans,
 	}
 	b = v
@@ -68,7 +66,7 @@ func (me *remoteBridge) Events() ([]<-chan *Event, error) {
 	}, nil
 }
 
-func (me *remoteBridge) SendTask(t *transport.Task) (err error) {
+func (me *remoteBridge) SendTask(t *Task) (err error) {
 	me.producerLock.RLock()
 	defer me.producerLock.RUnlock()
 
@@ -86,7 +84,7 @@ func (me *remoteBridge) SendTask(t *transport.Task) (err error) {
 	return
 }
 
-func (me *remoteBridge) AddNamedListener(name string, receipts <-chan *TaskReceipt) (tasks <-chan *transport.Task, err error) {
+func (me *remoteBridge) AddNamedListener(name string, receipts <-chan *TaskReceipt) (tasks <-chan *Task, err error) {
 	me.consumerLock.RLock()
 	defer me.consumerLock.RUnlock()
 
@@ -100,13 +98,13 @@ func (me *remoteBridge) AddNamedListener(name string, receipts <-chan *TaskRecei
 		return
 	}
 
-	tasks2 := make(chan *transport.Task, 10)
+	tasks2 := make(chan *Task, 10)
 	tasks = tasks2
 	go me._listener_routines_(me.listeners.New(), me.listeners.Wait(), me.events, ts, tasks2)
 	return
 }
 
-func (me *remoteBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *transport.Task, err error) {
+func (me *remoteBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *Task, err error) {
 	me.consumerLock.RLock()
 	defer me.consumerLock.RUnlock()
 
@@ -120,7 +118,7 @@ func (me *remoteBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *tra
 		return
 	}
 
-	tasks2 := make(chan *transport.Task, 10)
+	tasks2 := make(chan *Task, 10)
 	tasks = tasks2
 	go me._listener_routines_(me.listeners.New(), me.listeners.Wait(), me.events, ts, tasks2)
 	return
@@ -143,7 +141,7 @@ func (me *remoteBridge) StopAllListeners() (err error) {
 	return
 }
 
-func (me *remoteBridge) Report(reports <-chan *transport.Report) (err error) {
+func (me *remoteBridge) Report(reports <-chan *Report) (err error) {
 	me.reporterLock.RLock()
 	defer me.reporterLock.RUnlock()
 
@@ -158,11 +156,11 @@ func (me *remoteBridge) Report(reports <-chan *transport.Report) (err error) {
 		return
 	}
 
-	go func(quit <-chan int, wait *sync.WaitGroup, events chan<- *Event, input <-chan *transport.Report, output chan<- *ReportEnvelope) {
+	go func(quit <-chan int, wait *sync.WaitGroup, events chan<- *Event, input <-chan *Report, output chan<- *ReportEnvelope) {
 		defer wait.Done()
 		// raise quit signal to receiver(s).
 		defer close(output)
-		out := func(r *transport.Report) {
+		out := func(r *Report) {
 			b, err := me.trans.EncodeReport(r)
 			if err != nil {
 				events <- NewEventFromError(InstT.BRIDGE, err)
@@ -202,7 +200,7 @@ func (me *remoteBridge) Report(reports <-chan *transport.Report) (err error) {
 	return
 }
 
-func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Report, err error) {
+func (me *remoteBridge) Poll(t *Task) (reports <-chan *Report, err error) {
 	me.storeLock.RLock()
 	defer me.storeLock.RUnlock()
 
@@ -216,14 +214,14 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 		return
 	}
 
-	reports2 := make(chan *transport.Report, Status.Count)
+	reports2 := make(chan *Report, Status.Count)
 	reports = reports2
 	go func(
 		quit <-chan int,
 		wait *sync.WaitGroup,
 		events chan<- *Event,
 		inputs <-chan []byte,
-		outputs chan<- *transport.Report,
+		outputs chan<- *Report,
 	) {
 		defer wait.Done()
 		defer func() {
@@ -236,7 +234,7 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 		var done bool
 		defer func() {
 			if !done {
-				r, err := t.ComposeReport(Status.Fail, nil, transport.NewErr(ErrCode.Shutdown, errors.New("dingo is shutdown")))
+				r, err := t.ComposeReport(Status.Fail, nil, NewErr(ErrCode.Shutdown, errors.New("dingo is shutdown")))
 				if err != nil {
 					events <- NewEventFromError(InstT.STORE, err)
 				} else {
@@ -447,7 +445,7 @@ func (me *remoteBridge) _listener_routines_(
 	wait *sync.WaitGroup,
 	events chan<- *Event,
 	input <-chan []byte,
-	output chan<- *transport.Task,
+	output chan<- *Task,
 ) {
 	defer func() {
 		close(output)

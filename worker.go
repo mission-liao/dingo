@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-
-	"github.com/mission-liao/dingo/transport"
 )
 
 //
@@ -25,9 +23,9 @@ var (
 
 type worker struct {
 	receipts chan<- *TaskReceipt
-	tasks    <-chan *transport.Task
+	tasks    <-chan *Task
 	rs       *Routines
-	reports  []chan *transport.Report
+	reports  []chan *Report
 }
 
 //
@@ -39,7 +37,7 @@ type _workers struct {
 	workers     atomic.Value
 	events      chan *Event
 	eventMux    *Mux
-	trans       *transport.Mgr
+	trans       *Mgr
 	hooks       exHooks
 }
 
@@ -54,14 +52,14 @@ type _workers struct {
 // - share: the count of workers sharing one report channel
 // returns:
 // - remain: count of workers remain not initiated
-// - reports: array of channels of 'transport.Report'
+// - reports: array of channels of 'Report'
 // - err: any error
 func (me *_workers) allocate(
 	name string,
-	tasks <-chan *transport.Task,
+	tasks <-chan *Task,
 	receipts chan<- *TaskReceipt,
 	count, share int,
-) (reports []<-chan *transport.Report, remain int, err error) {
+) (reports []<-chan *Report, remain int, err error) {
 	var (
 		w   *worker
 		eid int
@@ -101,7 +99,7 @@ func (me *_workers) allocate(
 			receipts: receipts,
 			tasks:    tasks,
 			rs:       NewRoutines(),
-			reports:  make([]chan *transport.Report, 0, 10),
+			reports:  make([]chan *Report, 0, 10),
 		}
 
 		eid, err = me.eventMux.Register(w.rs.Events(), 0)
@@ -132,14 +130,14 @@ func (me *_workers) allocate(
 // returns:
 // - remain: count of workers remain not initiated
 // - err: any error
-func (me *_workers) more(name string, count, share int) (remain int, reports []<-chan *transport.Report, err error) {
+func (me *_workers) more(name string, count, share int) (remain int, reports []<-chan *Report, err error) {
 	remain = count
 	if count <= 0 || share < 0 {
 		err = errors.New(fmt.Sprintf("invalid count/share is provided %v", count, share))
 		return
 	}
 
-	reports = make([]<-chan *transport.Report, 0, remain)
+	reports = make([]<-chan *Report, 0, remain)
 
 	// locking
 	ws := me.workers.Load().(map[string]*worker)
@@ -151,8 +149,8 @@ func (me *_workers) more(name string, count, share int) (remain int, reports []<
 		return
 	}
 
-	add := func() (r chan *transport.Report) {
-		r = make(chan *transport.Report, 10)
+	add := func() (r chan *Report) {
+		r = make(chan *Report, 10)
 		reports = append(reports, r)
 		w.reports = append(w.reports, r)
 		return
@@ -207,7 +205,7 @@ func (me *_workers) Close() (err error) {
 }
 
 // factory function
-func newWorkers(trans *transport.Mgr, hooks exHooks) (w *_workers, err error) {
+func newWorkers(trans *Mgr, hooks exHooks) (w *_workers, err error) {
 	w = &_workers{
 		events:   make(chan *Event, 10),
 		eventMux: NewMux(),
@@ -236,24 +234,24 @@ func (me *_workers) _worker_routine_(
 	quit <-chan int,
 	wait *sync.WaitGroup,
 	events chan<- *Event,
-	tasks <-chan *transport.Task,
+	tasks <-chan *Task,
 	receipts chan<- *TaskReceipt,
-	reports chan<- *transport.Report,
+	reports chan<- *Report,
 ) {
 	defer wait.Done()
-	rep := func(task *transport.Task, status int16, payload []interface{}, err error, alreadySent bool) (sent bool) {
+	rep := func(task *Task, status int16, payload []interface{}, err error, alreadySent bool) (sent bool) {
 		sent = alreadySent
 		if task.Option().IgnoreReport() {
 			return
 		}
 
 		var (
-			r    *transport.Report
+			r    *Report
 			err_ error
 		)
 		r, err_ = task.ComposeReport(status, payload, err)
 		if err_ != nil {
-			r, err_ = task.ComposeReport(Status.Fail, nil, transport.NewErr(0, err_))
+			r, err_ = task.ComposeReport(Status.Fail, nil, NewErr(0, err_))
 			if err_ != nil {
 				events <- NewEventFromError(InstT.WORKER, err_)
 				return
@@ -271,11 +269,11 @@ func (me *_workers) _worker_routine_(
 
 		return
 	}
-	call := func(t *transport.Task) {
+	call := func(t *Task) {
 		reported := false
 		defer func() {
 			if r := recover(); r != nil {
-				reported = rep(t, Status.Fail, nil, transport.NewErr(ErrCode.Panic, errors.New(fmt.Sprintf("%v", r))), reported)
+				reported = rep(t, Status.Fail, nil, NewErr(ErrCode.Panic, errors.New(fmt.Sprintf("%v", r))), reported)
 			}
 		}()
 

@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -13,13 +12,13 @@ type workerTestSuite struct {
 	suite.Suite
 
 	_ws    *_workers
-	_trans *transport.Mgr
+	_trans *Mgr
 	_hooks exHooks
 }
 
 func TestWorkerSuite(t *testing.T) {
 	suite.Run(t, &workerTestSuite{
-		_trans: transport.NewMgr(),
+		_trans: NewMgr(),
 		_hooks: newLocalBridge().(exHooks),
 	})
 }
@@ -44,7 +43,7 @@ func (me *workerTestSuite) TestParellelRun() {
 
 	stepIn := make(chan int, 3)
 	stepOut := make(chan int)
-	tasks := make(chan *transport.Task)
+	tasks := make(chan *Task)
 	fn := func(i int) {
 		stepIn <- i
 		// workers would be blocked here
@@ -83,7 +82,7 @@ func (me *workerTestSuite) TestParellelRun() {
 
 func (me *workerTestSuite) TestPanic() {
 	// allocate workers
-	tasks := make(chan *transport.Task)
+	tasks := make(chan *Task)
 	me.Nil(me._trans.Register("TestPanic", func() { panic("QQ") }, Encode.Default, Encode.Default, ID.Default))
 	reports, remain, err := me._ws.allocate("TestPanic", tasks, nil, 1, 0)
 	me.Nil(err)
@@ -107,7 +106,7 @@ func (me *workerTestSuite) TestPanic() {
 
 func (me *workerTestSuite) TestIgnoreReport() {
 	// allocate workers
-	tasks := make(chan *transport.Task)
+	tasks := make(chan *Task)
 	me.Nil(me._trans.Register("TestIgnoreReport", func() {}, Encode.Default, Encode.Default, ID.Default))
 	reports, remain, err := me._ws.allocate("TestIgnoreReport", tasks, nil, 1, 0)
 	me.Nil(err)
@@ -133,7 +132,7 @@ func (me *workerTestSuite) TestIgnoreReport() {
 
 func (me *workerTestSuite) TestMonitorProgress() {
 	// allocate workers
-	tasks := make(chan *transport.Task)
+	tasks := make(chan *Task)
 	me.Nil(me._trans.Register("TestOnlyResult", func() {}, Encode.Default, Encode.Default, ID.Default))
 	reports, remain, err := me._ws.allocate("TestOnlyResult", tasks, nil, 1, 0)
 	me.Nil(err)

@@ -1,9 +1,5 @@
 package dingo
 
-import (
-	"github.com/mission-liao/dingo/transport"
-)
-
 // exporting hooks of external objects(backend, broker
 // to internal object(workers, mappers).
 //
@@ -23,24 +19,24 @@ type bridge interface {
 	//
 	// proxy for Producer
 	//
-	SendTask(t *transport.Task) (err error)
+	SendTask(t *Task) (err error)
 
 	//
 	// proxy for Consumer
 	//
-	AddNamedListener(name string, receipts <-chan *TaskReceipt) (tasks <-chan *transport.Task, err error)
-	AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *transport.Task, err error)
+	AddNamedListener(name string, receipts <-chan *TaskReceipt) (tasks <-chan *Task, err error)
+	AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *Task, err error)
 	StopAllListeners() (err error)
 
 	//
 	// proxy for Reporter
 	//
-	Report(reports <-chan *transport.Report) (err error)
+	Report(reports <-chan *Report) (err error)
 
 	//
 	// proxy for Store
 	//
-	Poll(t *transport.Task) (reports <-chan *transport.Report, err error)
+	Poll(t *Task) (reports <-chan *Report, err error)
 
 	//
 	// setter
@@ -56,7 +52,7 @@ type bridge interface {
 	Exists(it int) bool
 }
 
-func newBridge(which string, trans *transport.Mgr, args ...interface{}) bridge {
+func newBridge(which string, trans *Mgr, args ...interface{}) bridge {
 	switch which {
 	case "local":
 		return newLocalBridge(args...)

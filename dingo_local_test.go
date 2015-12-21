@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -79,30 +78,30 @@ func (me *localTestSuite) TestIgnoreReport() {
 type testMyMarshaller struct{}
 
 func (me *testMyMarshaller) Prepare(string, interface{}) (err error) { return }
-func (me *testMyMarshaller) EncodeTask(fn interface{}, task *transport.Task) ([]byte, error) {
+func (me *testMyMarshaller) EncodeTask(fn interface{}, task *Task) ([]byte, error) {
 	// encode args
 	bN, _ := json.Marshal(task.Args()[0])
 	bName, _ := json.Marshal(task.Args()[1])
 	// encode option
 	bOpt, _ := json.Marshal(task.P.O)
-	return transport.ComposeBytes(task.H, [][]byte{bN, bName, bOpt})
+	return ComposeBytes(task.H, [][]byte{bN, bName, bOpt})
 }
 
-func (me *testMyMarshaller) DecodeTask(h *transport.Header, fn interface{}, b []byte) (task *transport.Task, err error) {
+func (me *testMyMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *Task, err error) {
 	var (
 		n    int
 		name string
-		o    *transport.Option
+		o    *Option
 	)
 
-	bs, _ := transport.DecomposeBytes(h, b)
+	bs, _ := DecomposeBytes(h, b)
 	json.Unmarshal(bs[0], &n)
 	json.Unmarshal(bs[1], &name)
 	json.Unmarshal(bs[2], &o)
 
-	task = &transport.Task{
+	task = &Task{
 		H: h,
-		P: &transport.TaskPayload{
+		P: &TaskPayload{
 			O: o,
 			A: []interface{}{n, name},
 		},
@@ -110,7 +109,7 @@ func (me *testMyMarshaller) DecodeTask(h *transport.Header, fn interface{}, b []
 	return
 }
 
-func (me *testMyMarshaller) EncodeReport(fn interface{}, report *transport.Report) (b []byte, err error) {
+func (me *testMyMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte, err error) {
 	bs := [][]byte{}
 
 	// encode returns
@@ -128,18 +127,18 @@ func (me *testMyMarshaller) EncodeReport(fn interface{}, report *transport.Repor
 	bOpt, _ := json.Marshal(report.Option())
 	bs = append(bs, bStatus, bError, bOpt)
 
-	return transport.ComposeBytes(report.H, bs)
+	return ComposeBytes(report.H, bs)
 }
 
-func (me *testMyMarshaller) DecodeReport(h *transport.Header, fn interface{}, b []byte) (report *transport.Report, err error) {
+func (me *testMyMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (report *Report, err error) {
 	var (
 		msg   string
 		count int
 		s     int16
-		e     *transport.Error
-		o     *transport.Option
+		e     *Error
+		o     *Option
 	)
-	bs, _ := transport.DecomposeBytes(h, b)
+	bs, _ := DecomposeBytes(h, b)
 	if len(bs) > 3 {
 		// the report might, or might not containing
 		// returns.
@@ -150,9 +149,9 @@ func (me *testMyMarshaller) DecodeReport(h *transport.Header, fn interface{}, b 
 	json.Unmarshal(bs[0], &s)
 	json.Unmarshal(bs[1], &e)
 	json.Unmarshal(bs[2], &o)
-	report = &transport.Report{
+	report = &Report{
 		H: h,
-		P: &transport.ReportPayload{
+		P: &ReportPayload{
 			S: s,
 			E: e,
 			O: o,
@@ -251,10 +250,10 @@ func (me *localTestSuite) TestCustomMarshaller() {
 	mid := int(102)
 	err := me.App_.AddMarshaller(mid, &struct {
 		testMyInvoker
-		transport.CustomMarshaller
+		CustomMarshaller
 	}{
 		testMyInvoker{},
-		transport.CustomMarshaller{Codec: &testMyCodec{}},
+		CustomMarshaller{Codec: &testMyCodec{}},
 	})
 	me.Nil(err)
 
@@ -325,10 +324,10 @@ func (me *localTestSuite) TestCustomMarshallerWithMinimalFunc() {
 	mid := int(103)
 	err := me.App_.AddMarshaller(mid, &struct {
 		testMyInvoker2
-		transport.CustomMarshaller
+		CustomMarshaller
 	}{
 		testMyInvoker2{},
-		transport.CustomMarshaller{Codec: &testMyMinimalCodec{}},
+		CustomMarshaller{Codec: &testMyMinimalCodec{}},
 	})
 	me.Nil(err)
 

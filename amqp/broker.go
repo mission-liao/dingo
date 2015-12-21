@@ -8,7 +8,6 @@ import (
 
 	// open source
 	"github.com/mission-liao/dingo"
-	"github.com/mission-liao/dingo/transport"
 	"github.com/streadway/amqp"
 )
 
@@ -159,7 +158,7 @@ func (me *broker) ProducerHook(eventID int, payload interface{}) (err error) {
 	return
 }
 
-func (me *broker) Send(id transport.Meta, body []byte) (err error) {
+func (me *broker) Send(id dingo.Meta, body []byte) (err error) {
 	// acquire a channel
 	ci, err := me.sender.Channel()
 	if err != nil {
@@ -317,7 +316,7 @@ func (me *broker) _consumer_routine_(
 						d.Ack(false)
 					}
 				}()
-				h, err := transport.DecodeHeader(d.Body)
+				h, err := dingo.DecodeHeader(d.Body)
 				if err != nil {
 					return
 				}

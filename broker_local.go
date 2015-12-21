@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-
-	"github.com/mission-liao/dingo/transport"
 )
 
 type localBroker struct {
@@ -52,7 +50,7 @@ func (me *localBroker) _consumer_routine_(quit <-chan int, wait *sync.WaitGroup,
 				goto clean
 			}
 
-			h, err := transport.DecodeHeader(v)
+			h, err := DecodeHeader(v)
 			if err != nil {
 				events <- NewEventFromError(InstT.CONSUMER, err)
 				break
@@ -107,7 +105,7 @@ func (me *localBroker) ProducerHook(eventID int, payload interface{}) (err error
 	return
 }
 
-func (me *localBroker) Send(id transport.Meta, body []byte) (err error) {
+func (me *localBroker) Send(id Meta, body []byte) (err error) {
 	me.to <- body
 	return
 }

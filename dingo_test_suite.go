@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -301,9 +300,9 @@ func (me *DingoTestSuite) TestOrder() {
 	}
 
 	// sending tasks
-	reports := [][]<-chan *transport.Report{}
+	reports := [][]<-chan *Report{}
 	for k, v := range callers {
-		rs := []<-chan *transport.Report{}
+		rs := []<-chan *Report{}
 		for i := 0; i < countOfTasks; i++ {
 			rep, err := v.Call("TestOrder", nil, k, fmt.Sprintf("%d.%d", k, i))
 			me.Nil(err)

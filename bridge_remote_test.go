@@ -3,7 +3,6 @@ package dingo
 import (
 	"testing"
 
-	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -71,7 +70,7 @@ func (me *remoteBridgeTestSuite) TestReturnFix() {
 	me.Nil(err)
 
 	// attach a reporting channel
-	reports := make(chan *transport.Report, 10)
+	reports := make(chan *Report, 10)
 	me.Nil(me.bg.Report(reports))
 
 	// poll the task

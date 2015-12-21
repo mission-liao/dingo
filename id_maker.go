@@ -1,4 +1,4 @@
-package transport
+package dingo
 
 import (
 	"github.com/satori/go.uuid"

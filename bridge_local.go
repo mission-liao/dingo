@@ -5,19 +5,17 @@ import (
 	"fmt"
 	"sync"
 	"time"
-
-	"github.com/mission-liao/dingo/transport"
 )
 
 type localStorePoller struct {
-	task    *transport.Task
-	reports chan<- *transport.Report
+	task    *Task
+	reports chan<- *Report
 }
 
 type localBridge struct {
 	objLock   sync.RWMutex
 	needed    int
-	broker    chan *transport.Task
+	broker    chan *Task
 	listeners *Routines
 	reporters *Routines
 	pollers   chan *localStorePoller
@@ -31,7 +29,7 @@ func newLocalBridge(args ...interface{}) (b bridge) {
 		eventMux:  NewMux(),
 		listeners: NewRoutines(),
 		reporters: NewRoutines(),
-		broker:    make(chan *transport.Task, 10),
+		broker:    make(chan *Task, 10),
 		pollers:   make(chan *localStorePoller, 10),
 	}
 	b = v
@@ -58,7 +56,7 @@ func (me *localBridge) Close() (err error) {
 	me.eventMux.Close()
 
 	close(me.broker)
-	me.broker = make(chan *transport.Task, 10)
+	me.broker = make(chan *Task, 10)
 	return
 }
 
@@ -66,7 +64,7 @@ func (me *localBridge) Register(name string, fn interface{}) (err error) {
 	return
 }
 
-func (me *localBridge) SendTask(t *transport.Task) (err error) {
+func (me *localBridge) SendTask(t *Task) (err error) {
 	me.objLock.RLock()
 	defer me.objLock.RUnlock()
 
@@ -79,16 +77,16 @@ func (me *localBridge) SendTask(t *transport.Task) (err error) {
 	return
 }
 
-func (me *localBridge) AddNamedListener(name string, rcpt <-chan *TaskReceipt) (tasks <-chan *transport.Task, err error) {
+func (me *localBridge) AddNamedListener(name string, rcpt <-chan *TaskReceipt) (tasks <-chan *Task, err error) {
 	err = errors.New("named consumer is not supported by local-bridge")
 	return
 }
 
-func (me *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *transport.Task, err error) {
+func (me *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *Task, err error) {
 	me.objLock.RLock()
 	defer me.objLock.RUnlock()
 
-	tasks2 := make(chan *transport.Task, 10)
+	tasks2 := make(chan *Task, 10)
 	tasks = tasks2
 
 	if me.needed&InstT.CONSUMER == 0 {
@@ -100,12 +98,12 @@ func (me *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *tran
 		quit <-chan int,
 		wait *sync.WaitGroup,
 		events chan<- *Event,
-		input <-chan *transport.Task,
-		output chan<- *transport.Task,
+		input <-chan *Task,
+		output chan<- *Task,
 		receipts <-chan *TaskReceipt,
 	) {
 		defer wait.Done()
-		out := func(t *transport.Task) (done bool) {
+		out := func(t *Task) (done bool) {
 			output <- t
 			reply, ok := <-receipts
 			if !ok {
@@ -180,7 +178,7 @@ func (me *localBridge) StopAllListeners() (err error) {
 	return
 }
 
-func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
+func (me *localBridge) Report(reports <-chan *Report) (err error) {
 	me.objLock.RLock()
 	defer me.objLock.RUnlock()
 
@@ -193,7 +191,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 		quit <-chan int,
 		wait *sync.WaitGroup,
 		events chan<- *Event,
-		inputs <-chan *transport.Report,
+		inputs <-chan *Report,
 		pollers chan *localStorePoller,
 	) {
 		// each time Report is called, a dedicated 'watch', 'unSent' is allocated,
@@ -203,14 +201,14 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 			watched map[string]map[string]*localStorePoller = make(map[string]map[string]*localStorePoller)
 
 			// map (name, id) to slice of unsent reports.
-			unSent map[string]map[string][]*transport.Report = make(map[string]map[string][]*transport.Report)
+			unSent map[string]map[string][]*Report = make(map[string]map[string][]*Report)
 
 			id, name string
 			poller   *localStorePoller
 		)
 
 		defer wait.Done()
-		outF := func(r *transport.Report) (found bool) {
+		outF := func(r *Report) (found bool) {
 			id, name = r.ID(), r.Name()
 			if ids, ok := watched[name]; ok {
 				if poller, found = ids[id]; found {
@@ -284,10 +282,10 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 					if unSentReports, ok := rs[id]; ok {
 						rs[id] = append(unSentReports, v)
 					} else {
-						rs[id] = []*transport.Report{v}
+						rs[id] = []*Report{v}
 					}
 				} else {
-					unSent[name] = map[string][]*transport.Report{id: []*transport.Report{v}}
+					unSent[name] = map[string][]*Report{id: []*Report{v}}
 				}
 			}
 		}
@@ -324,7 +322,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 				)
 
 				// send a 'Shutdown' report
-				r, err := vv.task.ComposeReport(Status.Fail, nil, transport.NewErr(ErrCode.Shutdown, errors.New("dingo is shutdown")))
+				r, err := vv.task.ComposeReport(Status.Fail, nil, NewErr(ErrCode.Shutdown, errors.New("dingo is shutdown")))
 				if err != nil {
 					events <- NewEventFromError(InstT.STORE, err)
 				} else {
@@ -350,12 +348,12 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 	return
 }
 
-func (me *localBridge) Poll(t *transport.Task) (reports <-chan *transport.Report, err error) {
+func (me *localBridge) Poll(t *Task) (reports <-chan *Report, err error) {
 	if me.needed&InstT.STORE == 0 {
 		err = errors.New("store is not attached")
 		return
 	}
-	reports2 := make(chan *transport.Report, Status.Count)
+	reports2 := make(chan *Report, Status.Count)
 	me.pollers <- &localStorePoller{
 		task:    t,
 		reports: reports2,

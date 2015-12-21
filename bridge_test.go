@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -13,14 +12,14 @@ type BridgeTestSuite struct {
 
 	name     string
 	bg       bridge
-	trans    *transport.Mgr
+	trans    *Mgr
 	events   []*Event
 	eventMux *Mux
 }
 
 func (me *BridgeTestSuite) SetupSuite() {
 	me.eventMux = NewMux()
-	me.trans = transport.NewMgr()
+	me.trans = NewMgr()
 }
 
 func (me *BridgeTestSuite) TearDownSuite() {
@@ -57,20 +56,20 @@ func (me *BridgeTestSuite) TearDownTest() {
 	me.eventMux.Close()
 }
 
-func (me *BridgeTestSuite) send(reports chan<- *transport.Report, task *transport.Task, s int16) {
+func (me *BridgeTestSuite) send(reports chan<- *Report, task *Task, s int16) {
 	r, err := task.ComposeReport(s, nil, nil)
 	me.Nil(err)
 
 	reports <- r
 }
 
-func (me *BridgeTestSuite) chk(expected *transport.Task, got *transport.Report, s int16) {
+func (me *BridgeTestSuite) chk(expected *Task, got *Report, s int16) {
 	me.Equal(expected.ID(), got.ID())
 	me.Equal(expected.Name(), got.Name())
 	me.Equal(s, got.Status())
 }
 
-func (me *BridgeTestSuite) gen(reports chan<- *transport.Report, task *transport.Task, wait *sync.WaitGroup) {
+func (me *BridgeTestSuite) gen(reports chan<- *Report, task *Task, wait *sync.WaitGroup) {
 	defer wait.Done()
 
 	me.Nil(me.bg.(exHooks).ReporterHook(ReporterEvent.BeforeReport, task))
@@ -80,7 +79,7 @@ func (me *BridgeTestSuite) gen(reports chan<- *transport.Report, task *transport
 	me.send(reports, task, Status.Success)
 }
 
-func (me *BridgeTestSuite) chks(task *transport.Task, wait *sync.WaitGroup) {
+func (me *BridgeTestSuite) chks(task *Task, wait *sync.WaitGroup) {
 	defer wait.Done()
 
 	r, err := me.bg.Poll(task)
@@ -153,7 +152,7 @@ func (me *BridgeTestSuite) TestAddListener() {
 	// get that task from one channel
 	pass := false
 	var (
-		tReceived *transport.Task
+		tReceived *Task
 		receipt   *TaskReceipt = &TaskReceipt{
 			ID:     t.ID(),
 			Status: ReceiptStatus.OK,
@@ -198,7 +197,7 @@ func (me *BridgeTestSuite) TestReport() {
 	))
 
 	// attach reporter channel
-	reports := make(chan *transport.Report, 10)
+	reports := make(chan *Report, 10)
 	me.Nil(me.bg.Report(reports))
 
 	// a sample task
@@ -240,9 +239,9 @@ func (me *BridgeTestSuite) TestPoll() {
 	count := 1
 
 	// multiple reports channel
-	rs := []chan *transport.Report{}
+	rs := []chan *Report{}
 	for i := 0; i < count; i++ {
-		rs = append(rs, make(chan *transport.Report, 10))
+		rs = append(rs, make(chan *Report, 10))
 		me.Nil(me.bg.Report(rs[len(rs)-1]))
 	}
 
@@ -250,7 +249,7 @@ func (me *BridgeTestSuite) TestPoll() {
 	// - t1, t2 -> r1
 	// - t3, t4 -> r2
 	// - t5 -> r3
-	ts := []*transport.Task{}
+	ts := []*Task{}
 	for i := 0; i < count; i++ {
 		t, err := me.trans.ComposeTask("Poll", nil, []interface{}{fmt.Sprintf("t%d", 2*i)})
 		me.Nil(err)
@@ -323,7 +322,7 @@ func (me *BridgeTestSuite) TestFinalReportWhenShutdown() {
 	))
 
 	// a report channel
-	reports := make(chan *transport.Report, 1)
+	reports := make(chan *Report, 1)
 	me.Nil(me.bg.Report(reports))
 
 	// a sample task
@@ -352,11 +351,11 @@ func (me *BridgeTestSuite) TestDifferentReportsWithSameID() {
 	var (
 		countOfTypes int = 10
 		countOfTasks int = 10
-		tasks        []*transport.Task
+		tasks        []*Task
 		wait         sync.WaitGroup
 	)
 
-	reports := make(chan *transport.Report, 10)
+	reports := make(chan *Report, 10)
 	me.Nil(me.bg.Report(reports))
 
 	// register idMaker, task

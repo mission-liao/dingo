@@ -7,7 +7,6 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/mission-liao/dingo"
-	"github.com/mission-liao/dingo/transport"
 )
 
 var _redisTaskQueue = "dingo.tasks"
@@ -61,7 +60,7 @@ func (me *broker) ProducerHook(eventID int, payload interface{}) (err error) {
 	return
 }
 
-func (me *broker) Send(id transport.Meta, body []byte) (err error) {
+func (me *broker) Send(id dingo.Meta, body []byte) (err error) {
 	conn := me.pool.Get()
 	defer conn.Close()
 
@@ -153,7 +152,7 @@ func (me *broker) _consumer_routine_(
 				break
 			}
 
-			h, err := transport.DecodeHeader(b)
+			h, err := dingo.DecodeHeader(b)
 			if err != nil {
 				events <- dingo.NewEventFromError(dingo.InstT.CONSUMER, err)
 				break

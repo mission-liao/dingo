@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
 
 type BrokerTestSuite struct {
 	suite.Suite
 
-	Trans         *transport.Mgr
+	Trans         *Mgr
 	Gen           func() (interface{}, error)
 	Pdc           Producer
 	Csm           Consumer
@@ -35,7 +34,7 @@ func (me *BrokerTestSuite) SetupTest() {
 	}
 
 	me.ConsumerNames = []string{}
-	me.Trans = transport.NewMgr()
+	me.Trans = NewMgr()
 }
 
 func (me *BrokerTestSuite) TearDownTest() {
@@ -89,7 +88,7 @@ func (me *BrokerTestSuite) TestBasic() {
 	}
 
 	// generate a header byte stream
-	hb, err := transport.NewHeader(t.ID(), t.Name()).Flush(0)
+	hb, err := NewHeader(t.ID(), t.Name()).Flush(0)
 	me.Nil(err)
 	if err != nil {
 		return
@@ -122,7 +121,7 @@ func (me *BrokerTestSuite) _simplified_mapper_(
 	tasks <-chan []byte,
 	rcs chan<- *TaskReceipt,
 	name string,
-	fn func(h *transport.Header),
+	fn func(h *Header),
 ) {
 	defer wait.Done()
 	defer close(rcs)
@@ -135,7 +134,7 @@ done:
 			if !ok {
 				break done
 			}
-			h, err := transport.DecodeHeader(t)
+			h, err := DecodeHeader(t)
 			me.Nil(err)
 			if len(name) > 0 {
 				me.Equal(name, h.Name())
@@ -195,7 +194,7 @@ func (me *BrokerTestSuite) TestNamed() {
 
 		// a simplified mapper routine
 		go me._simplified_mapper_(rs.New(), rs.Wait(), tasks, rc, name,
-			func(h *transport.Header) {
+			func(h *Header) {
 				sentLock.Lock()
 				defer sentLock.Unlock()
 
@@ -225,7 +224,7 @@ func (me *BrokerTestSuite) TestNamed() {
 	for i := 0; i < countOfTasks; i++ {
 		// 0 ~ 1024 -> 0x0 ~ 0x400
 		id, name := fmt.Sprintf("00000000-0000-0000-0000-000000000%03x", i), fmt.Sprintf("named.%d", i%countOfConsumers)
-		h := transport.NewHeader(id, name)
+		h := NewHeader(id, name)
 		b, err := h.Flush(0)
 		me.Nil(err)
 		func() {
@@ -295,7 +294,7 @@ func (me *BrokerTestSuite) TestDuplicated() {
 		me.Nil(err)
 
 		go me._simplified_mapper_(rs.New(), rs.Wait(), tasks, rc, name,
-			func(h *transport.Header) {
+			func(h *Header) {
 				sentLock.Lock()
 				defer sentLock.Unlock()
 
@@ -321,7 +320,7 @@ func (me *BrokerTestSuite) TestDuplicated() {
 	for i := 0; i < countOfTasks; i++ {
 		// 0 ~ 1024 -> 0x0 ~ 0x400
 		id, name := fmt.Sprintf("00000000-0000-0000-0000-000000000%03x", i), fmt.Sprintf("duplicated.%d", i%countOfConsumers)
-		h := transport.NewHeader(id, name)
+		h := NewHeader(id, name)
 		b, err := h.Flush(0)
 		me.Nil(err)
 		func() {

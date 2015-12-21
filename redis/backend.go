@@ -7,7 +7,6 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/mission-liao/dingo"
-	"github.com/mission-liao/dingo/transport"
 )
 
 var _redisResultQueue = "dingo.result"
@@ -77,7 +76,7 @@ func (me *backend) Report(reports <-chan *dingo.ReportEnvelope) (id int, err err
 // Store interface
 //
 
-func (me *backend) Poll(meta transport.Meta) (reports <-chan []byte, err error) {
+func (me *backend) Poll(meta dingo.Meta) (reports <-chan []byte, err error) {
 	quit, done, idx := me.stores.New(0)
 
 	me.ridsLock.Lock()
@@ -95,7 +94,7 @@ func (me *backend) Poll(meta transport.Meta) (reports <-chan []byte, err error) 
 	return
 }
 
-func (me *backend) Done(meta transport.Meta) (err error) {
+func (me *backend) Done(meta dingo.Meta) (err error) {
 	var v int
 	err = func() (err error) {
 		var (
@@ -156,7 +155,7 @@ func (me *backend) _reporter_routine_(quit <-chan int, done chan<- int, events c
 clean:
 }
 
-func (me *backend) _store_routine_(quit <-chan int, done chan<- int, events chan<- *dingo.Event, reports chan<- []byte, id transport.Meta) {
+func (me *backend) _store_routine_(quit <-chan int, done chan<- int, events chan<- *dingo.Event, reports chan<- []byte, id dingo.Meta) {
 	conn := me.pool.Get()
 	defer func() {
 		done <- 1
@@ -224,6 +223,6 @@ finished:
 // private function
 //
 
-func getKey(meta transport.Meta) string {
+func getKey(meta dingo.Meta) string {
 	return fmt.Sprintf("%v.%s.%s", _redisResultQueue, meta.Name(), meta.ID())
 }

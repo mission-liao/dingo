@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -12,16 +11,16 @@ type BackendTestSuite struct {
 	suite.Suite
 
 	Gen     func() (Backend, error)
-	Trans   *transport.Mgr
+	Trans   *Mgr
 	Bkd     Backend
 	Rpt     Reporter
 	Sto     Store
 	Reports chan *ReportEnvelope
-	Tasks   []*transport.Task
+	Tasks   []*Task
 }
 
 func (me *BackendTestSuite) SetupSuite() {
-	me.Trans = transport.NewMgr()
+	me.Trans = NewMgr()
 	me.NotNil(me.Gen)
 }
 
@@ -41,7 +40,7 @@ func (me *BackendTestSuite) SetupTest() {
 	_, err = me.Rpt.Report(me.Reports)
 	me.Nil(err)
 
-	me.Tasks = []*transport.Task{}
+	me.Tasks = []*Task{}
 }
 
 func (me *BackendTestSuite) TearDownTest() {
@@ -102,7 +101,7 @@ func (me *BackendTestSuite) TestBasic() {
 	me.Tasks = append(me.Tasks, task)
 }
 
-func (me *BackendTestSuite) send(task *transport.Task, s int16) {
+func (me *BackendTestSuite) send(task *Task, s int16) {
 	r, err := task.ComposeReport(s, nil, nil)
 	me.Nil(err)
 
@@ -112,7 +111,7 @@ func (me *BackendTestSuite) send(task *transport.Task, s int16) {
 	me.Reports <- &ReportEnvelope{task, b}
 }
 
-func (me *BackendTestSuite) chk(task *transport.Task, b []byte, s int16) {
+func (me *BackendTestSuite) chk(task *Task, b []byte, s int16) {
 	r, err := me.Trans.DecodeReport(b)
 	me.Nil(err)
 
@@ -123,7 +122,7 @@ func (me *BackendTestSuite) chk(task *transport.Task, b []byte, s int16) {
 	}
 }
 
-func (me *BackendTestSuite) gen(task *transport.Task, wait *sync.WaitGroup) {
+func (me *BackendTestSuite) gen(task *Task, wait *sync.WaitGroup) {
 	defer wait.Done()
 
 	me.Nil(me.Rpt.ReporterHook(ReporterEvent.BeforeReport, task))
@@ -133,7 +132,7 @@ func (me *BackendTestSuite) gen(task *transport.Task, wait *sync.WaitGroup) {
 	me.send(task, Status.Success)
 }
 
-func (me *BackendTestSuite) chks(task *transport.Task, wait *sync.WaitGroup) {
+func (me *BackendTestSuite) chks(task *Task, wait *sync.WaitGroup) {
 	defer wait.Done()
 
 	r, err := me.Sto.Poll(task)
@@ -151,7 +150,7 @@ func (me *BackendTestSuite) TestOrder() {
 	me.Nil(me.Trans.Register("order", func() {}, Encode.Default, Encode.Default, ID.Default))
 
 	var (
-		tasks []*transport.Task
+		tasks []*Task
 		wait  sync.WaitGroup
 	)
 
@@ -195,7 +194,7 @@ func (me *BackendTestSuite) TestSameID() {
 	var (
 		countOfTypes int = 10
 		countOfTasks int = 10
-		tasks        []*transport.Task
+		tasks        []*Task
 		wait         sync.WaitGroup
 	)
 

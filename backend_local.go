@@ -2,8 +2,6 @@ package dingo
 
 import (
 	"sync"
-
-	"github.com/mission-liao/dingo/transport"
 )
 
 //
@@ -156,7 +154,7 @@ func (me *localBackend) Report(reports <-chan *ReportEnvelope) (id int, err erro
 // Store
 //
 
-func (me *localBackend) Poll(meta transport.Meta) (reports <-chan []byte, err error) {
+func (me *localBackend) Poll(meta Meta) (reports <-chan []byte, err error) {
 	me.storeLock.Lock()
 	defer me.storeLock.Unlock()
 
@@ -211,7 +209,7 @@ func (me *localBackend) Poll(meta transport.Meta) (reports <-chan []byte, err er
 	return
 }
 
-func (me *localBackend) Done(meta transport.Meta) (err error) {
+func (me *localBackend) Done(meta Meta) (err error) {
 	var (
 		id   string = meta.ID()
 		name string = meta.Name()

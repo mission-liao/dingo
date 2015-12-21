@@ -3,8 +3,6 @@ package dingo
 import (
 	"errors"
 	"time"
-
-	"github.com/mission-liao/dingo/transport"
 )
 
 var ResultError = struct {
@@ -27,7 +25,7 @@ var ResultError = struct {
 }
 
 /*
- Result is a wrapper of chan *transport.Report, taking care of the logic to handle
+ Result is a wrapper of chan *Report, taking care of the logic to handle
  asynchronous result from 'dingo'.
 
  Example usage:
@@ -36,7 +34,7 @@ var ResultError = struct {
   // blocking until done
   err := r.Wait(0)
   if err == nil {
-    r.Last // the last transport.Report
+    r.Last // the last Report
   }
 
   // polling for every 1 second
@@ -53,7 +51,7 @@ var ResultError = struct {
   func (count int, composed string) {...}
 
  When anything goes wrong, you could register a handler function via 'OnNOK', whose fingerprint is
-  func (*transport.Error, error)
+  func (*Error, error)
  Both failure reports or errors generated in 'Result' object would be passed to this handler,
  at least one of them would not be nil.
 
@@ -61,19 +59,19 @@ var ResultError = struct {
  doesn't matter. Those handlers would be called exactly once.
 */
 type Result struct {
-	Last    *transport.Report
-	reports <-chan *transport.Report
+	Last    *Report
+	reports <-chan *Report
 	err     error
 	fn      interface{}
-	efn     func(*transport.Error, error)
-	ivok    transport.Invoker
+	efn     func(*Error, error)
+	ivok    Invoker
 }
 
 /*
  Simply wrap this factory function with the calling to dingo.Call.
   NewResult(app.Call("test", ...))
 */
-func NewResult(reports <-chan *transport.Report, err error) (r *Result) {
+func NewResult(reports <-chan *Report, err error) (r *Result) {
 	r = &Result{
 		reports: reports,
 		err:     err,
@@ -116,7 +114,7 @@ func (me *Result) Wait(timeout time.Duration) (err error) {
 		return
 	}
 
-	out := func(r *transport.Report, ok bool) bool {
+	out := func(r *Report, ok bool) bool {
 		if !ok {
 			err = ResultError.ChannelClosed
 			me.err = err
@@ -175,9 +173,9 @@ func (me *Result) Then() (err error) {
 }
 
 /*
- Assign transport.Invoker for Result.OnOK
+ Assign Invoker for Result.OnOK
 */
-func (me *Result) SetInvoker(ivok transport.Invoker) {
+func (me *Result) SetInvoker(ivok Invoker) {
 	me.ivok = ivok
 }
 
@@ -191,7 +189,7 @@ func (me *Result) OnOK(fn interface{}) {
 
 	if me.Last != nil && me.Last.OK() {
 		if me.ivok == nil {
-			me.ivok = &transport.LazyInvoker{}
+			me.ivok = &LazyInvoker{}
 		}
 		_, err := me.ivok.Call(fn, me.Last.Return())
 		// reset cached handler
@@ -210,7 +208,7 @@ func (me *Result) OnOK(fn interface{}) {
 /*
  Set the handler for the failure case.
 */
-func (me *Result) OnNOK(efn func(*transport.Error, error)) {
+func (me *Result) OnNOK(efn func(*Error, error)) {
 	if efn == nil {
 		panic("nil error handler in dingo.result.OnNOK")
 	}

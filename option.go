@@ -1,4 +1,4 @@
-package transport
+package dingo
 
 type Option struct {
 	// IgnoreReport: stop reporting when executing tasks.

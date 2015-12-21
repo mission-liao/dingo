@@ -6,18 +6,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mission-liao/dingo/transport"
 	"github.com/stretchr/testify/suite"
 )
 
 type resultTestSuite struct {
 	suite.Suite
-	trans *transport.Mgr
+	trans *Mgr
 }
 
 func TestResultSuite(t *testing.T) {
 	suite.Run(t, &resultTestSuite{
-		trans: transport.NewMgr(),
+		trans: NewMgr(),
 	})
 }
 
@@ -48,14 +47,14 @@ func (me *resultTestSuite) TestNew() {
 
 	// ok
 	{
-		r := NewResult(make(chan *transport.Report, 1), nil)
+		r := NewResult(make(chan *Report, 1), nil)
 		me.NotNil(r)
 		me.Equal(ResultError.Timeout, r.Wait(100*time.Millisecond))
 	}
 
 	// channel and error, original error is returned
 	{
-		r := NewResult(make(chan *transport.Report, 1), errors.New("test error"))
+		r := NewResult(make(chan *Report, 1), errors.New("test error"))
 		me.NotNil(r)
 		me.Equal("test error", r.Wait(0).Error())
 		me.Equal("test error", r.Wait(0).Error())
@@ -77,7 +76,7 @@ func (me *resultTestSuite) TestWait() {
 	}
 
 	chk := func(s int16, v []interface{}, e error, t time.Duration) {
-		reports := make(chan *transport.Report, 10)
+		reports := make(chan *Report, 10)
 		r := NewResult(reports, nil)
 		me.NotNil(r)
 		if r == nil {
@@ -116,7 +115,7 @@ func (me *resultTestSuite) TestWait() {
 }
 
 func (me *resultTestSuite) TestChannelClose() {
-	reports := make(chan *transport.Report, 10)
+	reports := make(chan *Report, 10)
 	r := NewResult(reports, nil)
 	close(reports)
 	me.Equal(ResultError.ChannelClosed, r.Wait(0))
@@ -137,7 +136,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 
 	// success -> OnOK -> Wait
 	{
-		reports := make(chan *transport.Report, 10)
+		reports := make(chan *Report, 10)
 		res := NewResult(reports, nil)
 
 		rep, err := task.ComposeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
@@ -162,7 +161,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 
 	// success -> Wait -> OnOK
 	{
-		reports := make(chan *transport.Report, 10)
+		reports := make(chan *Report, 10)
 		res := NewResult(reports, nil)
 
 		rep, err := task.ComposeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
@@ -188,7 +187,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 
 	// fail -> OnNOK -> Wait
 	{
-		reports := make(chan *transport.Report, 10)
+		reports := make(chan *Report, 10)
 		res := NewResult(reports, nil)
 
 		rep, err := task.ComposeReport(Status.Fail, nil, errors.New("test string"))
@@ -200,7 +199,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		reports <- rep
 		// OnNOK
 		called := false
-		res.OnNOK(func(te *transport.Error, e error) {
+		res.OnNOK(func(te *Error, e error) {
 			me.Nil(e)
 			me.Equal("test string", te.Msg())
 			called = true
@@ -213,7 +212,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 
 	// fail -> Wait -> OnNOK
 	{
-		reports := make(chan *transport.Report, 10)
+		reports := make(chan *Report, 10)
 		res := NewResult(reports, nil)
 
 		rep, err := task.ComposeReport(Status.Fail, nil, errors.New("test string"))
@@ -228,7 +227,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 
 		// OnNOK
 		called := false
-		res.OnNOK(func(te *transport.Error, e error) {
+		res.OnNOK(func(te *Error, e error) {
 			me.Nil(e)
 			me.Equal("test string", te.Msg())
 			called = true
@@ -239,13 +238,13 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 
 	// err -> OnNOK -> Wait
 	{
-		reports := make(chan *transport.Report, 10)
+		reports := make(chan *Report, 10)
 		res := NewResult(reports, nil)
 		close(reports)
 
 		// OnNOK
 		called := false
-		res.OnNOK(func(te *transport.Error, e error) {
+		res.OnNOK(func(te *Error, e error) {
 			me.Nil(te)
 			me.Equal(ResultError.ChannelClosed, e)
 			called = true
@@ -258,7 +257,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 
 	// err -> Wait -> OnNOK
 	{
-		reports := make(chan *transport.Report, 10)
+		reports := make(chan *Report, 10)
 		res := NewResult(reports, nil)
 		close(reports)
 
@@ -267,7 +266,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 
 		// OnNOK
 		called := false
-		res.OnNOK(func(te *transport.Error, e error) {
+		res.OnNOK(func(te *Error, e error) {
 			me.Nil(te)
 			me.Equal(ResultError.ChannelClosed, e)
 			called = true
@@ -294,7 +293,7 @@ func (me *resultTestSuite) TestThen() {
 
 	// success
 	{
-		reports := make(chan *transport.Report, 10)
+		reports := make(chan *Report, 10)
 		res := NewResult(reports, nil)
 
 		// no handlers
@@ -322,7 +321,7 @@ func (me *resultTestSuite) TestThen() {
 
 	// fail
 	{
-		reports := make(chan *transport.Report, 10)
+		reports := make(chan *Report, 10)
 		res := NewResult(reports, nil)
 
 		// fail
@@ -334,7 +333,7 @@ func (me *resultTestSuite) TestThen() {
 
 		reports <- rep
 		// OnNOK
-		res.OnNOK(func(te *transport.Error, e error) {
+		res.OnNOK(func(te *Error, e error) {
 			me.Nil(e)
 			me.Equal("test string", te.Msg())
 			wait.Done()
@@ -347,12 +346,12 @@ func (me *resultTestSuite) TestThen() {
 
 	// error
 	{
-		reports := make(chan *transport.Report, 10)
+		reports := make(chan *Report, 10)
 		res := NewResult(reports, nil)
 		close(reports)
 
 		// OnNOK
-		res.OnNOK(func(te *transport.Error, e error) {
+		res.OnNOK(func(te *Error, e error) {
 			me.Equal(ResultError.ChannelClosed, e)
 			wait.Done()
 		})
@@ -389,7 +388,7 @@ func (me *resultTestSuite) TestOnOK() {
 		return
 	}
 
-	reports := make(chan *transport.Report, 10)
+	reports := make(chan *Report, 10)
 	res := NewResult(reports, nil)
 	reports <- rep
 	res.Wait(0)

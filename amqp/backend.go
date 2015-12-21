@@ -11,7 +11,6 @@ import (
 
 	// internal
 	"github.com/mission-liao/dingo"
-	"github.com/mission-liao/dingo/transport"
 )
 
 type backend struct {
@@ -119,7 +118,7 @@ func (me *backend) ReporterHook(eventID int, payload interface{}) (err error) {
 				}
 			}()
 
-			id := payload.(transport.Meta)
+			id := payload.(dingo.Meta)
 			qName, rKey := getQueueName(id), getRoutingKey(id)
 
 			// declare a queue for this task
@@ -162,7 +161,7 @@ func (me *backend) Report(reports <-chan *dingo.ReportEnvelope) (id int, err err
 // Store interface
 //
 
-func (me *backend) Poll(meta transport.Meta) (reports <-chan []byte, err error) {
+func (me *backend) Poll(meta dingo.Meta) (reports <-chan []byte, err error) {
 	// bind to the queue for this task
 	tag, qName, rKey := getConsumerTag(meta), getQueueName(meta), getRoutingKey(meta)
 	quit, done, idx := me.stores.New(0)
@@ -234,7 +233,7 @@ func (me *backend) Poll(meta transport.Meta) (reports <-chan []byte, err error) 
 	return
 }
 
-func (me *backend) Done(meta transport.Meta) (err error) {
+func (me *backend) Done(meta dingo.Meta) (err error) {
 	var v int
 	err = func() (err error) {
 		var (
@@ -347,7 +346,7 @@ func (me *backend) _store_routine_(
 	reports chan<- []byte,
 	ci *AmqpChannel,
 	dv <-chan amqp.Delivery,
-	id transport.Meta) {
+	id dingo.Meta) {
 
 	var (
 		err            error
@@ -439,16 +438,16 @@ done:
 //
 
 //
-func getQueueName(meta transport.Meta) string {
+func getQueueName(meta dingo.Meta) string {
 	return fmt.Sprintf("dingo.q.%s.%s", meta.Name(), meta.ID())
 }
 
 //
-func getRoutingKey(meta transport.Meta) string {
+func getRoutingKey(meta dingo.Meta) string {
 	return fmt.Sprintf("dingo.rkey.%s.%s", meta.Name(), meta.ID())
 }
 
 //
-func getConsumerTag(meta transport.Meta) string {
+func getConsumerTag(meta dingo.Meta) string {
 	return fmt.Sprintf("dingo.consumer.%s.%s", meta.Name(), meta.ID())
 }

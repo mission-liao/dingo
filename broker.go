@@ -1,9 +1,5 @@
 package dingo
 
-import (
-	"github.com/mission-liao/dingo/transport"
-)
-
 type Broker interface {
 	Producer
 	Consumer
@@ -37,7 +33,7 @@ type Producer interface {
 	// parameters:
 	// - meta: the meta info of this task to be sent.
 	// - b: the byte stream of this task.
-	Send(meta transport.Meta, b []byte) error
+	Send(meta Meta, b []byte) error
 }
 
 /*
