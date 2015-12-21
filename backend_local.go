@@ -13,28 +13,34 @@ import (
 
 type localBackend struct {
 	cfg       *Config
+	fromUser  chan *ReportEnvelope
 	to        chan *ReportEnvelope // simulate the wire
 	reporters *common.HetroRoutines
 	reports   chan []byte
 	stores    *common.Routines
 	storeLock sync.Mutex
+	isStored  bool
 	toCheck   map[string]map[string]chan []byte // mapping (name, id) to report channel
 	unSent    []*ReportEnvelope
 }
 
 // factory
-func NewLocalBackend(cfg *Config) (v *localBackend, err error) {
+func NewLocalBackend(cfg *Config, to chan *ReportEnvelope) (v *localBackend, err error) {
 	v = &localBackend{
 		cfg:       cfg,
 		stores:    common.NewRoutines(),
 		reporters: common.NewHetroRoutines(),
-		to:        make(chan *ReportEnvelope, 10),
+		fromUser:  to,
+		to:        to,
 		reports:   make(chan []byte, 10),
 		toCheck:   make(map[string]map[string]chan []byte),
 		unSent:    make([]*ReportEnvelope, 0, 10),
 	}
 
-	go v._store_routine_(v.stores.New(), v.stores.Wait(), v.stores.Events())
+	if v.to == nil {
+		v.to = make(chan *ReportEnvelope, 10)
+	}
+
 	return
 }
 
@@ -120,7 +126,14 @@ func (me *localBackend) Close() (err error) {
 	me.reporters.Close()
 
 	close(me.reports)
-	close(me.to)
+
+	if me.fromUser == nil {
+		close(me.to)
+	}
+	me.to = me.fromUser
+	if me.to == nil {
+		me.to = make(chan *ReportEnvelope, 10)
+	}
 
 	return
 }
@@ -147,6 +160,15 @@ func (me *localBackend) Report(reports <-chan *ReportEnvelope) (id int, err erro
 func (me *localBackend) Poll(meta transport.Meta) (reports <-chan []byte, err error) {
 	me.storeLock.Lock()
 	defer me.storeLock.Unlock()
+
+	if !me.isStored {
+		me.isStored = true
+		go me._store_routine_(me.stores.New(), me.stores.Wait(), me.stores.Events())
+	}
+
+	if meta == nil {
+		return
+	}
 
 	var (
 		r    chan []byte

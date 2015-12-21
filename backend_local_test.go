@@ -15,7 +15,7 @@ func TestLocalReporter(t *testing.T) {
 	ass := assert.New(t)
 
 	var reporter Reporter
-	reporter, err := NewLocalBackend(DefaultConfig())
+	reporter, err := NewLocalBackend(DefaultConfig(), nil)
 
 	// test case for Report/Unbind
 	reports := make(chan *ReportEnvelope, 10)
@@ -38,7 +38,10 @@ func TestLocalBackendSuite(t *testing.T) {
 	suite.Run(t, &localBackendTestSuite{
 		BackendTestSuite{
 			Gen: func() (b Backend, err error) {
-				b, err = NewLocalBackend(DefaultConfig())
+				b, err = NewLocalBackend(DefaultConfig(), nil)
+
+				// TODO: find a better way to trigger _store_routine_
+				b.Poll(nil)
 				return
 			},
 		},
