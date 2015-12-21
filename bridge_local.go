@@ -325,7 +325,7 @@ func (me *localBridge) Report(reports <-chan *transport.Report) (err error) {
 				)
 
 				// send a 'Shutdown' report
-				r, err := vv.task.ComposeReport(transport.Status.Fail, nil, transport.NewErr(transport.ErrCode.Shutdown, errors.New("dingo is shutdown")))
+				r, err := vv.task.ComposeReport(Status.Fail, nil, transport.NewErr(ErrCode.Shutdown, errors.New("dingo is shutdown")))
 				if err != nil {
 					events <- common.NewEventFromError(InstT.STORE, err)
 				} else {
@@ -356,7 +356,7 @@ func (me *localBridge) Poll(t *transport.Task) (reports <-chan *transport.Report
 		err = errors.New("store is not attached")
 		return
 	}
-	reports2 := make(chan *transport.Report, transport.Status.Count)
+	reports2 := make(chan *transport.Report, Status.Count)
 	me.pollers <- &localStorePoller{
 		task:    t,
 		reports: reports2,

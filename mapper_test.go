@@ -80,7 +80,7 @@ func (me *mapperTestSuite) TestParellelMapping() {
 	}
 	me.Nil(me._trans.Register(
 		"ParellelMapping", fn,
-		transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
+		Encode.Default, Encode.Default, ID.Default,
 	))
 
 	reports, remain, err := me._mps.allocateWorkers("ParellelMapping", 1, 0)
@@ -93,7 +93,7 @@ func (me *mapperTestSuite) TestParellelMapping() {
 		// compose corresponding task
 		t, err := me._trans.ComposeTask(
 			"ParellelMapping",
-			transport.NewOption().SetMonitorProgress(true),
+			NewOption().SetMonitorProgress(true),
 			[]interface{}{i},
 		)
 		me.Nil(err)

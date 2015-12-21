@@ -61,7 +61,7 @@ func (me *BackendTestSuite) TearDownTest() {
 
 func (me *BackendTestSuite) TestBasic() {
 	// register an encoding for this method
-	me.Nil(me.Trans.Register("basic", func() {}, transport.Encode.Default, transport.Encode.Default, transport.ID.Default))
+	me.Nil(me.Trans.Register("basic", func() {}, Encode.Default, Encode.Default, ID.Default))
 
 	// compose a dummy task
 	task, err := me.Trans.ComposeTask("basic", nil, []interface{}{})
@@ -71,7 +71,7 @@ func (me *BackendTestSuite) TestBasic() {
 	me.Nil(me.Rpt.ReporterHook(ReporterEvent.BeforeReport, task))
 
 	// send a report
-	report, err := task.ComposeReport(transport.Status.Sent, make([]interface{}, 0), nil)
+	report, err := task.ComposeReport(Status.Sent, make([]interface{}, 0), nil)
 	me.Nil(err)
 	{
 		b, err := me.Trans.EncodeReport(report)
@@ -129,9 +129,9 @@ func (me *BackendTestSuite) gen(task *transport.Task, wait *sync.WaitGroup) {
 
 	me.Nil(me.Rpt.ReporterHook(ReporterEvent.BeforeReport, task))
 
-	me.send(task, transport.Status.Sent)
-	me.send(task, transport.Status.Progress)
-	me.send(task, transport.Status.Success)
+	me.send(task, Status.Sent)
+	me.send(task, Status.Progress)
+	me.send(task, Status.Success)
 }
 
 func (me *BackendTestSuite) chks(task *transport.Task, wait *sync.WaitGroup) {
@@ -140,16 +140,16 @@ func (me *BackendTestSuite) chks(task *transport.Task, wait *sync.WaitGroup) {
 	r, err := me.Sto.Poll(task)
 	me.Nil(err)
 
-	me.chk(task, <-r, transport.Status.Sent)
-	me.chk(task, <-r, transport.Status.Progress)
-	me.chk(task, <-r, transport.Status.Success)
+	me.chk(task, <-r, Status.Sent)
+	me.chk(task, <-r, Status.Progress)
+	me.chk(task, <-r, Status.Success)
 
 	me.Nil(me.Sto.Done(task))
 }
 
 func (me *BackendTestSuite) TestOrder() {
 	// send reports of tasks, make sure their order correct
-	me.Nil(me.Trans.Register("order", func() {}, transport.Encode.Default, transport.Encode.Default, transport.ID.Default))
+	me.Nil(me.Trans.Register("order", func() {}, Encode.Default, Encode.Default, ID.Default))
 
 	var (
 		tasks []*transport.Task
@@ -204,7 +204,7 @@ func (me *BackendTestSuite) TestSameID() {
 	for i := 0; i < countOfTypes; i++ {
 		name := fmt.Sprintf("SameID.%d", i)
 		me.Nil(me.Trans.AddIdMaker(100+i, &testSeqID{}))
-		me.Nil(me.Trans.Register(name, func() {}, transport.Encode.Default, transport.Encode.Default, 100+i))
+		me.Nil(me.Trans.Register(name, func() {}, Encode.Default, Encode.Default, 100+i))
 
 		for j := 0; j < countOfTasks; j++ {
 			t, err := me.Trans.ComposeTask(name, nil, nil)

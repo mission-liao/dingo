@@ -71,7 +71,7 @@ func (me *BrokerTestSuite) TestBasic() {
 	var (
 		tasks <-chan []byte
 	)
-	me.Nil(me.Trans.Register("", func() {}, transport.Encode.Default, transport.Encode.Default, transport.ID.Default))
+	me.Nil(me.Trans.Register("", func() {}, Encode.Default, Encode.Default, ID.Default))
 	// init one listener
 	receipts := make(chan *TaskReceipt, 10)
 	tasks, err := me.AddListener("", receipts)

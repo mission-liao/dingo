@@ -66,7 +66,7 @@ func (me *resultTestSuite) TestNew() {
 func (me *resultTestSuite) TestWait() {
 	me.Nil(me.trans.Register(
 		"TestWait", func() {},
-		transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
+		Encode.Default, Encode.Default, ID.Default,
 	))
 
 	// compose a task
@@ -110,9 +110,9 @@ func (me *resultTestSuite) TestWait() {
 		}
 	}
 
-	chk(transport.Status.Sent, nil, nil, 100*time.Millisecond)
-	chk(transport.Status.Fail, nil, errors.New("test fail"), 0)
-	chk(transport.Status.Success, []interface{}{1, "value"}, nil, 0)
+	chk(Status.Sent, nil, nil, 100*time.Millisecond)
+	chk(Status.Fail, nil, errors.New("test fail"), 0)
+	chk(Status.Success, []interface{}{1, "value"}, nil, 0)
 }
 
 func (me *resultTestSuite) TestChannelClose() {
@@ -125,7 +125,7 @@ func (me *resultTestSuite) TestChannelClose() {
 func (me *resultTestSuite) TestHandlerWithWait() {
 	me.Nil(me.trans.Register(
 		"TestHandlerWithWait", func() {},
-		transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
+		Encode.Default, Encode.Default, ID.Default,
 	))
 
 	// compose a task
@@ -140,7 +140,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		reports := make(chan *transport.Report, 10)
 		res := NewResult(reports, nil)
 
-		rep, err := task.ComposeReport(transport.Status.Success, []interface{}{int(1), "test string"}, nil)
+		rep, err := task.ComposeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
 		me.Nil(err)
 		if err != nil {
 			return
@@ -165,7 +165,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		reports := make(chan *transport.Report, 10)
 		res := NewResult(reports, nil)
 
-		rep, err := task.ComposeReport(transport.Status.Success, []interface{}{int(1), "test string"}, nil)
+		rep, err := task.ComposeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
 		me.Nil(err)
 		if err != nil {
 			return
@@ -191,7 +191,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		reports := make(chan *transport.Report, 10)
 		res := NewResult(reports, nil)
 
-		rep, err := task.ComposeReport(transport.Status.Fail, nil, errors.New("test string"))
+		rep, err := task.ComposeReport(Status.Fail, nil, errors.New("test string"))
 		me.Nil(err)
 		if err != nil {
 			return
@@ -216,7 +216,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		reports := make(chan *transport.Report, 10)
 		res := NewResult(reports, nil)
 
-		rep, err := task.ComposeReport(transport.Status.Fail, nil, errors.New("test string"))
+		rep, err := task.ComposeReport(Status.Fail, nil, errors.New("test string"))
 		me.Nil(err)
 		if err != nil {
 			return
@@ -280,7 +280,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 func (me *resultTestSuite) TestThen() {
 	me.Nil(me.trans.Register(
 		"TestThen", func() {},
-		transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
+		Encode.Default, Encode.Default, ID.Default,
 	))
 
 	// compose a task
@@ -301,7 +301,7 @@ func (me *resultTestSuite) TestThen() {
 		me.Equal(ResultError.NoHandler, res.Then())
 
 		// success
-		rep, err := task.ComposeReport(transport.Status.Success, []interface{}{int(1), "test string"}, nil)
+		rep, err := task.ComposeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
 		me.Nil(err)
 		if err != nil {
 			return
@@ -326,7 +326,7 @@ func (me *resultTestSuite) TestThen() {
 		res := NewResult(reports, nil)
 
 		// fail
-		rep, err := task.ComposeReport(transport.Status.Fail, nil, errors.New("test string"))
+		rep, err := task.ComposeReport(Status.Fail, nil, errors.New("test string"))
 		me.Nil(err)
 		if err != nil {
 			return
@@ -372,7 +372,7 @@ func (me *resultTestSuite) TestOnOK() {
 	// should be panic when invoking is failed.
 	me.Nil(me.trans.Register(
 		"TestOnOK", func() {},
-		transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
+		Encode.Default, Encode.Default, ID.Default,
 	))
 
 	// compose a task
@@ -383,7 +383,7 @@ func (me *resultTestSuite) TestOnOK() {
 	}
 
 	// compose a success report
-	rep, err := task.ComposeReport(transport.Status.Success, []interface{}{int(1), "test string"}, nil)
+	rep, err := task.ComposeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
 	me.Nil(err)
 	if err != nil {
 		return

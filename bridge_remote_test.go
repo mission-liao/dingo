@@ -27,10 +27,13 @@ func (me *remoteBridgeTestSuite) SetupTest() {
 	me.Nil(me.bg.AttachConsumer(me.brk.(Consumer), nil))
 
 	// backend
-	me.bkd, err = NewLocalBackend(DefaultConfig())
+	me.bkd, err = NewLocalBackend(DefaultConfig(), nil)
 	me.Nil(err)
 	me.Nil(me.bg.AttachReporter(me.bkd.(Reporter)))
 	me.Nil(me.bg.AttachStore(me.bkd.(Store)))
+
+	// TODO: find a better way to trigger _store_routine_
+	me.bkd.Poll(nil)
 }
 
 func (me *remoteBridgeTestSuite) TearDownTest() {
@@ -57,7 +60,7 @@ func (me *remoteBridgeTestSuite) TestReturnFix() {
 	me.Nil(me.trans.Register(
 		"ReturnFix",
 		func() float64 { return 0 },
-		transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
+		Encode.Default, Encode.Default, ID.Default,
 	))
 
 	// compose a task
@@ -65,7 +68,7 @@ func (me *remoteBridgeTestSuite) TestReturnFix() {
 	me.Nil(err)
 
 	// compose a corresponding report
-	r, err := t.ComposeReport(transport.Status.Success, []interface{}{int(6)}, nil)
+	r, err := t.ComposeReport(Status.Success, []interface{}{int(6)}, nil)
 	me.Nil(err)
 
 	// attach a reporting channel

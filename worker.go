@@ -254,7 +254,7 @@ func (me *_workers) _worker_routine_(
 		)
 		r, err_ = task.ComposeReport(status, payload, err)
 		if err_ != nil {
-			r, err_ = task.ComposeReport(transport.Status.Fail, nil, transport.NewErr(0, err_))
+			r, err_ = task.ComposeReport(Status.Fail, nil, transport.NewErr(0, err_))
 			if err_ != nil {
 				events <- common.NewEventFromError(InstT.WORKER, err_)
 				return
@@ -276,7 +276,7 @@ func (me *_workers) _worker_routine_(
 		reported := false
 		defer func() {
 			if r := recover(); r != nil {
-				reported = rep(t, transport.Status.Fail, nil, transport.NewErr(transport.ErrCode.Panic, errors.New(fmt.Sprintf("%v", r))), reported)
+				reported = rep(t, Status.Fail, nil, transport.NewErr(ErrCode.Panic, errors.New(fmt.Sprintf("%v", r))), reported)
 			}
 		}()
 
@@ -287,20 +287,20 @@ func (me *_workers) _worker_routine_(
 		)
 
 		// compose a report -- sent
-		reported = rep(t, transport.Status.Sent, nil, nil, reported)
+		reported = rep(t, Status.Sent, nil, nil, reported)
 
 		// compose a report -- progress
-		reported = rep(t, transport.Status.Progress, nil, nil, reported)
+		reported = rep(t, Status.Progress, nil, nil, reported)
 
 		// call the actuall function, where is the magic
 		ret, err = me.trans.Call(t)
 
 		// compose a report -- done / fail
 		if err != nil {
-			status = transport.Status.Fail
+			status = Status.Fail
 			events <- common.NewEventFromError(InstT.WORKER, err_)
 		} else {
-			status = transport.Status.Success
+			status = Status.Success
 		}
 		reported = rep(t, status, ret, err, reported)
 	}

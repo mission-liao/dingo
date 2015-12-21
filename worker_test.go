@@ -52,7 +52,7 @@ func (me *workerTestSuite) TestParellelRun() {
 	}
 	me.Nil(me._trans.Register(
 		"TestParellelRun", fn,
-		transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
+		Encode.Default, Encode.Default, ID.Default,
 	))
 	reports, remain, err := me._ws.allocate("TestParellelRun", tasks, nil, 3, 0)
 	me.Nil(err)
@@ -84,14 +84,14 @@ func (me *workerTestSuite) TestParellelRun() {
 func (me *workerTestSuite) TestPanic() {
 	// allocate workers
 	tasks := make(chan *transport.Task)
-	me.Nil(me._trans.Register("TestPanic", func() { panic("QQ") }, transport.Encode.Default, transport.Encode.Default, transport.ID.Default))
+	me.Nil(me._trans.Register("TestPanic", func() { panic("QQ") }, Encode.Default, Encode.Default, ID.Default))
 	reports, remain, err := me._ws.allocate("TestPanic", tasks, nil, 1, 0)
 	me.Nil(err)
 	me.Equal(0, remain)
 	me.Len(reports, 1)
 
 	// an option with MonitorProgress == false
-	task, err := me._trans.ComposeTask("TestPanic", transport.NewOption(), nil)
+	task, err := me._trans.ComposeTask("TestPanic", NewOption(), nil)
 	me.NotNil(task)
 	me.Nil(err)
 	if task != nil {
@@ -101,21 +101,21 @@ func (me *workerTestSuite) TestPanic() {
 		r := <-reports[0]
 		// should be a failed one
 		me.True(r.Fail())
-		me.Equal(transport.ErrCode.Panic, r.Error().Code())
+		me.Equal(ErrCode.Panic, r.Error().Code())
 	}
 }
 
 func (me *workerTestSuite) TestIgnoreReport() {
 	// allocate workers
 	tasks := make(chan *transport.Task)
-	me.Nil(me._trans.Register("TestIgnoreReport", func() {}, transport.Encode.Default, transport.Encode.Default, transport.ID.Default))
+	me.Nil(me._trans.Register("TestIgnoreReport", func() {}, Encode.Default, Encode.Default, ID.Default))
 	reports, remain, err := me._ws.allocate("TestIgnoreReport", tasks, nil, 1, 0)
 	me.Nil(err)
 	me.Equal(0, remain)
 	me.Len(reports, 1)
 
 	// an option with IgnoreReport == true
-	task, err := me._trans.ComposeTask("TestIgnoreReport", transport.NewOption().SetIgnoreReport(true), nil)
+	task, err := me._trans.ComposeTask("TestIgnoreReport", NewOption().SetIgnoreReport(true), nil)
 	me.NotNil(task)
 	me.Nil(err)
 
@@ -134,14 +134,14 @@ func (me *workerTestSuite) TestIgnoreReport() {
 func (me *workerTestSuite) TestMonitorProgress() {
 	// allocate workers
 	tasks := make(chan *transport.Task)
-	me.Nil(me._trans.Register("TestOnlyResult", func() {}, transport.Encode.Default, transport.Encode.Default, transport.ID.Default))
+	me.Nil(me._trans.Register("TestOnlyResult", func() {}, Encode.Default, Encode.Default, ID.Default))
 	reports, remain, err := me._ws.allocate("TestOnlyResult", tasks, nil, 1, 0)
 	me.Nil(err)
 	me.Equal(0, remain)
 	me.Len(reports, 1)
 
 	// an option with MonitorProgress == false
-	task, err := me._trans.ComposeTask("TestOnlyResult", transport.NewOption(), nil)
+	task, err := me._trans.ComposeTask("TestOnlyResult", NewOption(), nil)
 	me.NotNil(task)
 	me.Nil(err)
 

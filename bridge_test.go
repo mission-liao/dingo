@@ -76,9 +76,9 @@ func (me *BridgeTestSuite) gen(reports chan<- *transport.Report, task *transport
 
 	me.Nil(me.bg.(exHooks).ReporterHook(ReporterEvent.BeforeReport, task))
 
-	me.send(reports, task, transport.Status.Sent)
-	me.send(reports, task, transport.Status.Progress)
-	me.send(reports, task, transport.Status.Success)
+	me.send(reports, task, Status.Sent)
+	me.send(reports, task, Status.Progress)
+	me.send(reports, task, Status.Success)
 }
 
 func (me *BridgeTestSuite) chks(task *transport.Task, wait *sync.WaitGroup) {
@@ -87,9 +87,9 @@ func (me *BridgeTestSuite) chks(task *transport.Task, wait *sync.WaitGroup) {
 	r, err := me.bg.Poll(task)
 	me.Nil(err)
 
-	me.chk(task, <-r, transport.Status.Sent)
-	me.chk(task, <-r, transport.Status.Progress)
-	me.chk(task, <-r, transport.Status.Success)
+	me.chk(task, <-r, Status.Sent)
+	me.chk(task, <-r, Status.Progress)
+	me.chk(task, <-r, Status.Success)
 }
 
 //
@@ -100,7 +100,7 @@ func (me *BridgeTestSuite) TestSendTask() {
 	me.trans.Register(
 		"SendTask",
 		func() {},
-		transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
+		Encode.Default, Encode.Default, ID.Default,
 	)
 
 	// add listener
@@ -131,7 +131,7 @@ func (me *BridgeTestSuite) TestAddListener() {
 	me.trans.Register(
 		"AddListener",
 		func() {},
-		transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
+		Encode.Default, Encode.Default, ID.Default,
 	)
 
 	// prepare listeners
@@ -195,7 +195,7 @@ func (me *BridgeTestSuite) TestReport() {
 	me.Nil(me.trans.Register(
 		"Report",
 		func() {},
-		transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
+		Encode.Default, Encode.Default, ID.Default,
 	))
 
 	// attach reporter channel
@@ -210,7 +210,7 @@ func (me *BridgeTestSuite) TestReport() {
 
 	// normal report
 	{
-		input, err := t.ComposeReport(transport.Status.Sent, nil, nil)
+		input, err := t.ComposeReport(Status.Sent, nil, nil)
 		me.Nil(err)
 		reports <- input
 		r, ok := <-outputs
@@ -221,7 +221,7 @@ func (me *BridgeTestSuite) TestReport() {
 	// a report with 'Done' == true
 	// the output channel should be closed
 	{
-		input, err := t.ComposeReport(transport.Status.Success, nil, nil)
+		input, err := t.ComposeReport(Status.Success, nil, nil)
 		me.Nil(err)
 		reports <- input
 		r, ok := <-outputs
@@ -236,7 +236,7 @@ func (me *BridgeTestSuite) TestPoll() {
 	me.Nil(me.trans.Register(
 		"Poll",
 		func() {},
-		transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
+		Encode.Default, Encode.Default, ID.Default,
 	))
 	count := 1
 
@@ -265,15 +265,15 @@ func (me *BridgeTestSuite) TestPoll() {
 	// reports belongs to one task should be sent
 	// to the same reporter
 	for k, t := range ts {
-		r, err := t.ComposeReport(transport.Status.Sent, nil, nil)
+		r, err := t.ComposeReport(Status.Sent, nil, nil)
 		me.Nil(err)
 		rs[k/2] <- r
 
-		r, err = t.ComposeReport(transport.Status.Progress, nil, nil)
+		r, err = t.ComposeReport(Status.Progress, nil, nil)
 		me.Nil(err)
 		rs[k/2] <- r
 
-		r, err = t.ComposeReport(transport.Status.Success, nil, nil)
+		r, err = t.ComposeReport(Status.Success, nil, nil)
 		me.Nil(err)
 		rs[k/2] <- r
 	}
@@ -289,13 +289,13 @@ func (me *BridgeTestSuite) TestPoll() {
 
 		r, ok := <-out
 		me.True(ok)
-		me.Equal(transport.Status.Sent, r.Status())
+		me.Equal(Status.Sent, r.Status())
 		r, ok = <-out
 		me.True(ok)
-		me.Equal(transport.Status.Progress, r.Status())
+		me.Equal(Status.Progress, r.Status())
 		r, ok = <-out
 		me.True(ok)
-		me.Equal(transport.Status.Success, r.Status())
+		me.Equal(Status.Success, r.Status())
 		r, ok = <-out
 		me.False(ok)
 	}
@@ -320,7 +320,7 @@ func (me *BridgeTestSuite) TestFinalReportWhenShutdown() {
 	me.Nil(me.trans.Register(
 		"FinalReportWhenShutdown",
 		func() {},
-		transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
+		Encode.Default, Encode.Default, ID.Default,
 	))
 
 	// a report channel
@@ -335,7 +335,7 @@ func (me *BridgeTestSuite) TestFinalReportWhenShutdown() {
 	me.Nil(err)
 
 	// send reports: Sent, but not the final one
-	r, err := task.ComposeReport(transport.Status.Sent, nil, nil)
+	r, err := task.ComposeReport(Status.Sent, nil, nil)
 	me.Nil(err)
 	reports <- r
 	o := <-out
@@ -344,8 +344,8 @@ func (me *BridgeTestSuite) TestFinalReportWhenShutdown() {
 	// close bridge, a 'Shutdown' report should be received.
 	me.Nil(me.bg.Close())
 	o = <-out
-	me.Equal(transport.Status.Fail, o.Status())
-	me.Equal(transport.ErrCode.Shutdown, o.Error().Code())
+	me.Equal(Status.Fail, o.Status())
+	me.Equal(ErrCode.Shutdown, o.Error().Code())
 }
 
 func (me *BridgeTestSuite) TestDifferentReportsWithSameID() {
@@ -364,7 +364,7 @@ func (me *BridgeTestSuite) TestDifferentReportsWithSameID() {
 	for i := 0; i < countOfTypes; i++ {
 		name := fmt.Sprintf("DifferentReportsWithSameID.%d", i)
 		me.Nil(me.trans.AddIdMaker(100+i, &testSeqID{}))
-		me.Nil(me.trans.Register(name, func() {}, transport.Encode.Default, transport.Encode.Default, 100+i))
+		me.Nil(me.trans.Register(name, func() {}, Encode.Default, Encode.Default, 100+i))
 
 		for j := 0; j < countOfTasks; j++ {
 			t, err := me.trans.ComposeTask(name, nil, nil)

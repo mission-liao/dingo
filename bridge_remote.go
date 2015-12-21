@@ -217,7 +217,7 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 		return
 	}
 
-	reports2 := make(chan *transport.Report, transport.Status.Count)
+	reports2 := make(chan *transport.Report, Status.Count)
 	reports = reports2
 	go func(
 		quit <-chan int,
@@ -237,7 +237,7 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 		var done bool
 		defer func() {
 			if !done {
-				r, err := t.ComposeReport(transport.Status.Fail, nil, transport.NewErr(transport.ErrCode.Shutdown, errors.New("dingo is shutdown")))
+				r, err := t.ComposeReport(Status.Fail, nil, transport.NewErr(ErrCode.Shutdown, errors.New("dingo is shutdown")))
 				if err != nil {
 					events <- common.NewEventFromError(InstT.STORE, err)
 				} else {
@@ -272,6 +272,7 @@ func (me *remoteBridge) Poll(t *transport.Task) (reports <-chan *transport.Repor
 			case _, _ = <-quit:
 				break finished
 			case v, ok := <-inputs:
+				_ = "breakpoint"
 				if !ok {
 					break finished
 				}
