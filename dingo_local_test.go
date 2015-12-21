@@ -14,21 +14,35 @@ import (
 
 type localTestSuite struct {
 	DingoTestSuite
+	wireBroker  chan []byte
+	wireBackend chan *ReportEnvelope
+}
+
+func (me *localTestSuite) SetupSuite() {
+	me.reset()
+	me.DingoTestSuite.SetupSuite()
+}
+
+func (me *localTestSuite) SetupTest() {
+	me.reset()
+}
+
+func (me *localTestSuite) reset() {
+	// reset the 'virtual wire' for every test
+	me.wireBroker, me.wireBackend = make(chan []byte, 10), make(chan *ReportEnvelope, 10)
+
+	me.DingoTestSuite.GenBroker = func() (v interface{}, err error) {
+		v, err = NewLocalBroker(DefaultConfig(), me.wireBroker)
+		return
+	}
+	me.DingoTestSuite.GenBackend = func() (b Backend, err error) {
+		b, err = NewLocalBackend(DefaultConfig(), me.wireBackend)
+		return
+	}
 }
 
 func TestDingoLocalSuite(t *testing.T) {
-	suite.Run(t, &localTestSuite{
-		DingoTestSuite{
-			GenBroker: func() (v interface{}, err error) {
-				v, err = NewLocalBroker(DefaultConfig(), nil)
-				return
-			},
-			GenBackend: func() (b Backend, err error) {
-				b, err = NewLocalBackend(DefaultConfig())
-				return
-			},
-		},
-	})
+	suite.Run(t, &localTestSuite{})
 }
 
 //
@@ -42,7 +56,7 @@ func (me *localTestSuite) TestIgnoreReport() {
 	// initiate workers
 	me.Nil(me.App_.Register(
 		"TestIgnoreReport", func() {},
-		transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
+		Encode.Default, Encode.Default, ID.Default,
 	))
 	remain, err := me.App_.Allocate("TestIgnoreReport", 1, 1)
 	me.Equal(0, remain)
@@ -51,7 +65,7 @@ func (me *localTestSuite) TestIgnoreReport() {
 	// initiate a task with an option(IgnoreReport == true)
 	reports, err := me.App_.Call(
 		"TestIgnoreReport",
-		transport.NewOption().SetIgnoreReport(true).SetMonitorProgress(true),
+		NewOption().SetIgnoreReport(true).SetMonitorProgress(true),
 	)
 	me.Nil(err)
 	me.Nil(reports)
@@ -178,14 +192,14 @@ func (me *localTestSuite) TestMyMarshaller() {
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.App_.Register("TestMyMarshaller", fn, mid, mid, transport.ID.Default))
+	me.Nil(me.App_.Register("TestMyMarshaller", fn, mid, mid, ID.Default))
 	remain, err := me.App_.Allocate("TestMyMarshaller", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
 	reports, err := me.App_.Call(
 		"TestMyMarshaller",
-		transport.NewOption(),
+		NewOption(),
 		12345, "mission",
 	)
 	me.Nil(err)
@@ -245,14 +259,14 @@ func (me *localTestSuite) TestCustomMarshaller() {
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.App_.Register("TestCustomMarshaller", fn, mid, mid, transport.ID.Default))
+	me.Nil(me.App_.Register("TestCustomMarshaller", fn, mid, mid, ID.Default))
 	remain, err := me.App_.Allocate("TestCustomMarshaller", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
 	// initiate a task with an option(IgnoreReport == true)
 	reports, err := me.App_.Call(
-		"TestCustomMarshaller", transport.NewOption().SetMonitorProgress(true), 12345, "mission",
+		"TestCustomMarshaller", NewOption().SetMonitorProgress(true), 12345, "mission",
 	)
 	me.Nil(err)
 
@@ -319,14 +333,14 @@ func (me *localTestSuite) TestCustomMarshallerWithMinimalFunc() {
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.App_.Register("TestCustomMarshallerWithMinimalFunc", fn, mid, mid, transport.ID.Default))
+	me.Nil(me.App_.Register("TestCustomMarshallerWithMinimalFunc", fn, mid, mid, ID.Default))
 	remain, err := me.App_.Allocate("TestCustomMarshallerWithMinimalFunc", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
 	// initiate a task with an option(IgnoreReport == true)
 	reports, err := me.App_.Call(
-		"TestCustomMarshallerWithMinimalFunc", transport.NewOption().SetMonitorProgress(true),
+		"TestCustomMarshallerWithMinimalFunc", NewOption().SetMonitorProgress(true),
 	)
 	me.Nil(err)
 

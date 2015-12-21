@@ -1,6 +1,7 @@
 package dingo
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/mission-liao/dingo/common"
@@ -89,6 +90,74 @@ func (me *DingoTestSuite) TearDownSuite() {
 	me.Nil(me.App_.Close())
 }
 
+func (me *DingoTestSuite) newCaller() (app *App, err error) {
+	app, err = NewApp("remote", DefaultConfig())
+	me.Nil(err)
+	if err != nil {
+		return
+	}
+
+	v, err := me.GenBroker()
+	me.Nil(err)
+	if err != nil {
+		return
+	}
+
+	_, _, err = app.Use(v, InstT.PRODUCER)
+	me.Nil(err)
+	if err != nil {
+		return
+	}
+
+	b, err := me.GenBackend()
+	me.Nil(err)
+	if err != nil {
+		return
+	}
+
+	_, _, err = app.Use(b, InstT.STORE)
+	me.Nil(err)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (me *DingoTestSuite) newWorker() (app *App, err error) {
+	app, err = NewApp("remote", DefaultConfig())
+	me.Nil(err)
+	if err != nil {
+		return
+	}
+
+	v, err := me.GenBroker()
+	me.Nil(err)
+	if err != nil {
+		return
+	}
+
+	_, _, err = app.Use(v, InstT.CONSUMER)
+	me.Nil(err)
+	if err != nil {
+		return
+	}
+
+	b, err := me.GenBackend()
+	me.Nil(err)
+	if err != nil {
+		return
+	}
+
+	_, _, err = app.Use(b, InstT.REPORTER)
+	me.Nil(err)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 //
 // test cases
 //
@@ -100,7 +169,7 @@ func (me *DingoTestSuite) TestBasic() {
 		func(n int) int {
 			called = n
 			return n + 1
-		}, transport.Encode.Default, transport.Encode.Default, transport.ID.Default,
+		}, Encode.Default, Encode.Default, ID.Default,
 	)
 	me.Nil(err)
 	remain, err := me.App_.Allocate("TestBasic", 1, 1)
@@ -108,15 +177,15 @@ func (me *DingoTestSuite) TestBasic() {
 	me.Equal(0, remain)
 
 	// call that function
-	reports, err := me.App_.Call("TestBasic", transport.NewOption().SetMonitorProgress(true), 5)
+	reports, err := me.App_.Call("TestBasic", NewOption().SetMonitorProgress(true), 5)
 	me.Nil(err)
 	me.NotNil(reports)
 
 	// await for reports
 	status := []int16{
-		transport.Status.Sent,
-		transport.Status.Progress,
-		transport.Status.Success,
+		Status.Sent,
+		Status.Progress,
+		Status.Success,
 	}
 	for {
 		done := false
@@ -148,6 +217,135 @@ func (me *DingoTestSuite) TestBasic() {
 
 		if done {
 			break
+		}
+	}
+}
+
+func (me *DingoTestSuite) TestOrder() {
+	countOfCallers := 3
+	countOfWorkers := 5
+	countOfTasks := 5
+
+	{
+		_, ok := me.Brk.(*localBroker)
+		if ok {
+			// localBroker is only valid for 1 caller.
+			countOfCallers = 1
+		}
+	}
+
+	work := func(n int, name string) (int, string) {
+		return n + 1, name + "b"
+	}
+
+	// init callers
+	callers := []*App{}
+	defer func() {
+		for _, v := range callers {
+			me.Nil(v.Close())
+		}
+	}()
+	for i := 0; i < countOfCallers; i++ {
+		app, err := me.newCaller()
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+
+		// register worker function
+		err = app.Register("TestOrder", work, Encode.Default, Encode.Default, ID.Default)
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+
+		// set option, make sure 'MonitorProgress' is turned on
+		err = app.SetOption("TestOrder", NewOption().SetMonitorProgress(true))
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+
+		callers = append(callers, app)
+	}
+
+	// init workers
+	workers := []*App{}
+	defer func() {
+		for _, v := range workers {
+			me.Nil(v.Close())
+		}
+	}()
+	for i := 0; i < countOfWorkers; i++ {
+		app, err := me.newWorker()
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+
+		// register worker function
+		err = app.Register("TestOrder", work, Encode.Default, Encode.Default, ID.Default)
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+
+		// allocate workers
+		remain, err := app.Allocate("TestOrder", 1, 1)
+		me.Equal(0, remain)
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+
+		workers = append(workers, app)
+	}
+
+	// sending tasks
+	reports := [][]<-chan *transport.Report{}
+	for k, v := range callers {
+		rs := []<-chan *transport.Report{}
+		for i := 0; i < countOfTasks; i++ {
+			rep, err := v.Call("TestOrder", nil, k, fmt.Sprintf("%d.%d", k, i))
+			me.Nil(err)
+			if err != nil {
+				return
+			}
+
+			rs = append(rs, rep)
+		}
+		reports = append(reports, rs)
+	}
+
+	// check results one by one
+	for k, rs := range reports {
+		for i, v := range rs {
+			// sent
+			rep := <-v
+			me.Equal(Status.Sent, rep.Status())
+			name, id := rep.Name(), rep.ID()
+
+			// progress
+			rep = <-v
+			me.Equal(Status.Progress, rep.Status())
+			me.Equal(name, rep.Name())
+			me.Equal(id, rep.ID())
+
+			// success
+			rep = <-v
+			me.Equal(Status.Success, rep.Status())
+			me.Equal(name, rep.Name())
+			me.Equal(id, rep.ID())
+
+			// check result
+			ret := rep.Return()
+			me.Len(ret, 2)
+			if len(ret) == 2 {
+				// plus 1
+				me.Equal(k+1, ret[0].(int))
+				// plus 'b'
+				me.Equal(fmt.Sprintf("%d.%db", k, i), ret[1].(string))
+			}
 		}
 	}
 }

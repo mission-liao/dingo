@@ -12,9 +12,6 @@ import (
 type localBroker struct {
 	cfg *Config
 
-	// broker routine
-	brk *common.Routines
-
 	// channels
 	fromUser chan []byte
 	to       chan []byte
@@ -32,44 +29,16 @@ type localBroker struct {
 func NewLocalBroker(cfg *Config, to chan []byte) (v *localBroker, err error) {
 	v = &localBroker{
 		cfg:       cfg,
-		brk:       common.NewRoutines(),
 		fromUser:  to,
 		to:        to,
 		listeners: common.NewRoutines(),
 	}
 
-	if v.fromUser == nil {
+	if v.to == nil {
 		v.to = make(chan []byte, 10)
 	}
 
-	v.init()
 	return
-}
-
-func (me *localBroker) init() (err error) {
-	// broker routine
-	quit := me.brk.New()
-	go me._broker_routine_(quit, me.brk.Wait(), me.brk.Events())
-
-	return
-}
-
-func (me *localBroker) _broker_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event) {
-	defer wait.Done()
-
-	for {
-		select {
-		case _, _ = <-quit:
-			goto clean
-		case v, ok := <-me.to:
-			if !ok {
-				goto clean
-			}
-
-			me.to <- v
-		}
-	}
-clean:
 }
 
 func (me *localBroker) _consumer_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *common.Event, input <-chan []byte, output chan<- []byte, receipts <-chan *TaskReceipt) {
@@ -114,13 +83,11 @@ clean:
 
 func (me *localBroker) Events() ([]<-chan *common.Event, error) {
 	return []<-chan *common.Event{
-		me.brk.Events(),
 		me.listeners.Events(),
 	}, nil
 }
 
 func (me *localBroker) Close() (err error) {
-	me.brk.Close()
 	me.listeners.Close()
 	if me.fromUser == nil {
 		// close it only when it's not provided by callers.
