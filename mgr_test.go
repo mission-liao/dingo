@@ -10,7 +10,7 @@ import (
 
 func TestMgrMarshallers(t *testing.T) {
 	ass := assert.New(t)
-	trans := NewMgr()
+	trans := newMgr()
 	ass.Nil(trans.Register("TestMgrMarshallers", func() {}, Encode.JSON, Encode.GOB, ID.Default))
 	task, err := trans.ComposeTask("TestMgrMarshallers", nil, []interface{}{float64(1)})
 	task.H.I = "a2a2da60-9cba-11e5-b690-0002a5d5c51b" // fix ID for testing
@@ -63,7 +63,7 @@ func TestMgrInvokers(t *testing.T) {
 	}
 
 	ass := assert.New(t)
-	trans := NewMgr()
+	trans := newMgr()
 	ass.Nil(trans.Register("TestMgrInvokers", fn, Encode.JSON, Encode.JSON, ID.Default))
 
 	// compose a task, with wrong type of input
@@ -89,7 +89,7 @@ func TestMgrInvokers(t *testing.T) {
 
 func TestMgrOption(t *testing.T) {
 	ass := assert.New(t)
-	trans := NewMgr()
+	trans := newMgr()
 
 	// name doesn't register
 	ass.NotNil(trans.SetOption("TestMgrOption", NewOption()))
@@ -116,7 +116,7 @@ func TestMgrOption(t *testing.T) {
 
 func TestMgrRegister(t *testing.T) {
 	ass := assert.New(t)
-	trans := NewMgr()
+	trans := newMgr()
 
 	// register a function, with not-existed marshaller id.
 	ass.NotNil(trans.Register("TestMgrResgister", func() {}, 100, 100, 100))

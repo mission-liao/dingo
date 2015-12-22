@@ -12,14 +12,14 @@ type BridgeTestSuite struct {
 
 	name     string
 	bg       bridge
-	trans    *Mgr
+	trans    *mgr
 	events   []*Event
-	eventMux *Mux
+	eventMux *mux
 }
 
 func (me *BridgeTestSuite) SetupSuite() {
-	me.eventMux = NewMux()
-	me.trans = NewMgr()
+	me.eventMux = newMux()
+	me.trans = newMgr()
 }
 
 func (me *BridgeTestSuite) TearDownSuite() {

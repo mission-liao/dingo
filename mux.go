@@ -7,11 +7,11 @@ package dingo
 // the original use case in 'dingo' is muxing from chan<-task.TaskInfo from
 // brokers and chan<-task.Report from backends.
 //
-// 'Mux' won't close those registered channels, but it would take care of
+// 'mux' won't close those registered channels, but it would take care of
 // its output channel, callers should check channel validity when receiving
-// from 'Mux''s output channel:
+// from 'mux''s output channel:
 //
-//     m := &Mux{}
+//     m := &mux{}
 //     m.Init()
 //       ...
 //     m.Handle(func(v interface{}, idx int) {
@@ -36,7 +36,7 @@ type _newChannel struct {
 	v  interface{}
 }
 
-type Mux struct {
+type mux struct {
 	rs      *Routines
 	changed []chan time.Time
 	rsLock  sync.Mutex
@@ -48,8 +48,8 @@ type Mux struct {
 	handlers     atomic.Value
 }
 
-func NewMux() (m *Mux) {
-	m = &Mux{
+func newMux() (m *mux) {
+	m = &mux{
 		rs:      NewRoutines(),
 		changed: make([]chan time.Time, 0, 10),
 	}
@@ -60,7 +60,7 @@ func NewMux() (m *Mux) {
 }
 
 //
-func (me *Mux) More(count int) (remain int, err error) {
+func (me *mux) More(count int) (remain int, err error) {
 	remain = count
 	for ; remain > 0; remain-- {
 		c := make(chan time.Time, 10)
@@ -71,7 +71,7 @@ func (me *Mux) More(count int) (remain int, err error) {
 }
 
 //
-func (me *Mux) Close() {
+func (me *mux) Close() {
 	func() {
 		me.rsLock.Lock()
 		defer me.rsLock.Unlock()
@@ -93,7 +93,7 @@ func (me *Mux) Close() {
 }
 
 //
-func (me *Mux) Register(ch interface{}, expectedId int) (id int, err error) {
+func (me *mux) Register(ch interface{}, expectedId int) (id int, err error) {
 	func() {
 		me.casesLock.Lock()
 		defer me.casesLock.Unlock()
@@ -127,7 +127,7 @@ func (me *Mux) Register(ch interface{}, expectedId int) (id int, err error) {
 }
 
 //
-func (me *Mux) Unregister(id int) (ch interface{}, err error) {
+func (me *mux) Unregister(id int) (ch interface{}, err error) {
 	func() {
 		me.casesLock.Lock()
 		defer me.casesLock.Unlock()
@@ -157,7 +157,7 @@ func (me *Mux) Unregister(id int) (ch interface{}, err error) {
 	return
 }
 
-func (me *Mux) Handle(handler func(interface{}, int)) {
+func (me *mux) Handle(handler func(interface{}, int)) {
 	func() {
 		me.handlersLock.Lock()
 		defer me.handlersLock.Unlock()
@@ -178,7 +178,7 @@ func (me *Mux) Handle(handler func(interface{}, int)) {
 	}
 }
 
-func (me *Mux) _mux_routine_(quit <-chan int, wait *sync.WaitGroup, changed <-chan time.Time) {
+func (me *mux) _mux_routine_(quit <-chan int, wait *sync.WaitGroup, changed <-chan time.Time) {
 	defer wait.Done()
 	var (
 		cond       []reflect.SelectCase

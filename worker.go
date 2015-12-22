@@ -36,8 +36,8 @@ type _workers struct {
 	workersLock sync.Mutex
 	workers     atomic.Value
 	events      chan *Event
-	eventMux    *Mux
-	trans       *Mgr
+	eventMux    *mux
+	trans       *mgr
 	hooks       exHooks
 }
 
@@ -205,10 +205,10 @@ func (me *_workers) Close() (err error) {
 }
 
 // factory function
-func newWorkers(trans *Mgr, hooks exHooks) (w *_workers, err error) {
+func newWorkers(trans *mgr, hooks exHooks) (w *_workers, err error) {
 	w = &_workers{
 		events:   make(chan *Event, 10),
-		eventMux: NewMux(),
+		eventMux: newMux(),
 		trans:    trans,
 		hooks:    hooks,
 	}

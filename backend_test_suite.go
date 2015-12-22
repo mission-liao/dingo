@@ -11,7 +11,7 @@ type BackendTestSuite struct {
 	suite.Suite
 
 	Gen     func() (Backend, error)
-	Trans   *Mgr
+	Trans   *mgr
 	Bkd     Backend
 	Rpt     Reporter
 	Sto     Store
@@ -20,7 +20,7 @@ type BackendTestSuite struct {
 }
 
 func (me *BackendTestSuite) SetupSuite() {
-	me.Trans = NewMgr()
+	me.Trans = newMgr()
 	me.NotNil(me.Gen)
 }
 

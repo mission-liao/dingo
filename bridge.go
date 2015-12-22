@@ -52,7 +52,7 @@ type bridge interface {
 	Exists(it int) bool
 }
 
-func newBridge(which string, trans *Mgr, args ...interface{}) bridge {
+func newBridge(which string, trans *mgr, args ...interface{}) bridge {
 	switch which {
 	case "local":
 		return newLocalBridge(args...)

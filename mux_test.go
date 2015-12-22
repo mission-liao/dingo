@@ -14,7 +14,7 @@ import (
 func TestMuxDifferentType(t *testing.T) {
 	ass := assert.New(t)
 
-	m := NewMux()
+	m := newMux()
 	remain, err := m.More(3)
 	ass.Equal(0, remain)
 	ass.Nil(err)
@@ -75,7 +75,7 @@ func TestMuxDifferentType(t *testing.T) {
 func TestMuxChannelClose(t *testing.T) {
 	ass := assert.New(t)
 
-	m := NewMux()
+	m := newMux()
 	remain, err := m.More(1)
 	ass.Equal(0, remain)
 	ass.Nil(err)
@@ -108,7 +108,7 @@ func TestMuxChannelClose(t *testing.T) {
 func TestMuxOutputClose(t *testing.T) {
 	ass := assert.New(t)
 
-	m := NewMux()
+	m := newMux()
 	remain, err := m.More(3)
 	ass.Equal(0, remain)
 	ass.Nil(err)
@@ -140,7 +140,7 @@ func TestMuxOutputClose(t *testing.T) {
 
 func TestMuxIdGeneration(t *testing.T) {
 	ass := assert.New(t)
-	m := NewMux()
+	m := newMux()
 	remain, err := m.More(3)
 	ass.Equal(0, remain)
 	ass.Nil(err)

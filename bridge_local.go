@@ -20,13 +20,13 @@ type localBridge struct {
 	reporters *Routines
 	pollers   chan *localStorePoller
 	events    chan *Event
-	eventMux  *Mux
+	eventMux  *mux
 }
 
 func newLocalBridge(args ...interface{}) (b bridge) {
 	v := &localBridge{
 		events:    make(chan *Event, 10),
-		eventMux:  NewMux(),
+		eventMux:  newMux(),
 		listeners: NewRoutines(),
 		reporters: NewRoutines(),
 		broker:    make(chan *Task, 10),

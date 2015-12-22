@@ -52,11 +52,11 @@ type App struct {
 	cfg          Config
 	objsLock     sync.RWMutex
 	objs         map[int]*_object
-	eventMux     *Mux
+	eventMux     *mux
 	eventOut     atomic.Value
 	eventOutLock sync.Mutex
 	b            bridge
-	trans        *Mgr
+	trans        *mgr
 	mappers      *_mappers
 	workers      *_workers
 }
@@ -69,8 +69,8 @@ type App struct {
 func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 	v := &App{
 		objs:     make(map[int]*_object),
-		eventMux: NewMux(),
-		trans:    NewMgr(),
+		eventMux: newMux(),
+		trans:    newMgr(),
 		cfg:      *cfg,
 	}
 	v.b = newBridge(nameOfBridge, v.trans)

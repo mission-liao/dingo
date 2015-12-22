@@ -25,17 +25,17 @@ type remoteBridge struct {
 	storers   *Routines
 	doners    chan Meta
 	events    chan *Event
-	eventMux  *Mux
-	trans     *Mgr
+	eventMux  *mux
+	trans     *mgr
 }
 
-func newRemoteBridge(trans *Mgr) (b bridge) {
+func newRemoteBridge(trans *mgr) (b bridge) {
 	v := &remoteBridge{
 		listeners: NewRoutines(),
 		reporters: NewRoutines(),
 		storers:   NewRoutines(),
 		events:    make(chan *Event, 10),
-		eventMux:  NewMux(),
+		eventMux:  newMux(),
 		doners:    make(chan Meta, 10),
 		trans:     trans,
 	}

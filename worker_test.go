@@ -12,13 +12,13 @@ type workerTestSuite struct {
 	suite.Suite
 
 	_ws    *_workers
-	_trans *Mgr
+	_trans *mgr
 	_hooks exHooks
 }
 
 func TestWorkerSuite(t *testing.T) {
 	suite.Run(t, &workerTestSuite{
-		_trans: NewMgr(),
+		_trans: newMgr(),
 		_hooks: newLocalBridge().(exHooks),
 	})
 }

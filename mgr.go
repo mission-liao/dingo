@@ -16,7 +16,7 @@ type fnOpt struct {
 	opt     *Option
 }
 
-type Mgr struct {
+type mgr struct {
 	msLock     sync.Mutex
 	ms         atomic.Value
 	imsLock    sync.Mutex
@@ -25,8 +25,8 @@ type Mgr struct {
 	fn2opt     atomic.Value
 }
 
-func NewMgr() (c *Mgr) {
-	c = &Mgr{}
+func newMgr() (c *mgr) {
+	c = &mgr{}
 
 	// init for marshaller's'
 	ms := make(map[int]Marshaller)
@@ -74,7 +74,7 @@ func NewMgr() (c *Mgr) {
 	return
 }
 
-func (me *Mgr) AddIdMaker(id int, m IDMaker) (err error) {
+func (me *mgr) AddIdMaker(id int, m IDMaker) (err error) {
 	me.imsLock.Lock()
 	defer me.imsLock.Unlock()
 
@@ -93,7 +93,7 @@ func (me *Mgr) AddIdMaker(id int, m IDMaker) (err error) {
 	return
 }
 
-func (me *Mgr) AddMarshaller(id int, m Marshaller) (err error) {
+func (me *mgr) AddMarshaller(id int, m Marshaller) (err error) {
 	// a Marshaller should depend on an Invoker
 	_, ok := m.(Invoker)
 	if !ok {
@@ -119,7 +119,7 @@ func (me *Mgr) AddMarshaller(id int, m Marshaller) (err error) {
 	return
 }
 
-func (me *Mgr) Register(name string, fn interface{}, msTask, msReport int, idMaker int) (err error) {
+func (me *mgr) Register(name string, fn interface{}, msTask, msReport int, idMaker int) (err error) {
 	if uint(len(name)) >= ^uint(0) {
 		err = errors.New(fmt.Sprintf("length of name exceeds maximum: %v", len(name)))
 		return
@@ -180,7 +180,7 @@ func (me *Mgr) Register(name string, fn interface{}, msTask, msReport int, idMak
 	return
 }
 
-func (me *Mgr) SetOption(name string, opt *Option) (err error) {
+func (me *mgr) SetOption(name string, opt *Option) (err error) {
 	if opt == nil {
 		err = errors.New("nil Option is not acceptable")
 		return
@@ -204,7 +204,7 @@ func (me *Mgr) SetOption(name string, opt *Option) (err error) {
 	return
 }
 
-func (me *Mgr) GetOption(name string) (opt *Option, err error) {
+func (me *mgr) GetOption(name string) (opt *Option, err error) {
 	fns := me.fn2opt.Load().(map[string]*fnOpt)
 	if fn, ok := fns[name]; ok {
 		opt = fn.opt
@@ -215,7 +215,7 @@ func (me *Mgr) GetOption(name string) (opt *Option, err error) {
 	return
 }
 
-func (me *Mgr) ComposeTask(name string, o *Option, args []interface{}) (t *Task, err error) {
+func (me *mgr) ComposeTask(name string, o *Option, args []interface{}) (t *Task, err error) {
 	fn := me.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[name]
 	if !ok {
@@ -244,7 +244,7 @@ func (me *Mgr) ComposeTask(name string, o *Option, args []interface{}) (t *Task,
 	return
 }
 
-func (me *Mgr) EncodeTask(task *Task) (b []byte, err error) {
+func (me *mgr) EncodeTask(task *Task) (b []byte, err error) {
 	fn := me.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[task.Name()]
 	if !ok {
@@ -263,7 +263,7 @@ func (me *Mgr) EncodeTask(task *Task) (b []byte, err error) {
 	return
 }
 
-func (me *Mgr) DecodeTask(b []byte) (task *Task, err error) {
+func (me *mgr) DecodeTask(b []byte) (task *Task, err error) {
 	h, err := DecodeHeader(b)
 	if err != nil {
 		return
@@ -289,7 +289,7 @@ func (me *Mgr) DecodeTask(b []byte) (task *Task, err error) {
 	return
 }
 
-func (me *Mgr) EncodeReport(report *Report) (b []byte, err error) {
+func (me *mgr) EncodeReport(report *Report) (b []byte, err error) {
 	// looking for marshaller-option
 	fn := me.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[report.Name()]
@@ -310,7 +310,7 @@ func (me *Mgr) EncodeReport(report *Report) (b []byte, err error) {
 	return
 }
 
-func (me *Mgr) DecodeReport(b []byte) (report *Report, err error) {
+func (me *mgr) DecodeReport(b []byte) (report *Report, err error) {
 	h, err := DecodeHeader(b)
 	if err != nil {
 		return
@@ -336,7 +336,7 @@ func (me *Mgr) DecodeReport(b []byte) (report *Report, err error) {
 	return
 }
 
-func (me *Mgr) Call(t *Task) (ret []interface{}, err error) {
+func (me *mgr) Call(t *Task) (ret []interface{}, err error) {
 	// looking for marshaller-option
 	fn := me.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[t.Name()]
@@ -357,7 +357,7 @@ func (me *Mgr) Call(t *Task) (ret []interface{}, err error) {
 	return
 }
 
-func (me *Mgr) Return(r *Report) (err error) {
+func (me *mgr) Return(r *Report) (err error) {
 	// looking for marshaller-option
 	fn := me.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[r.Name()]
