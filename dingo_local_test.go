@@ -1,9 +1,10 @@
-package dingo
+package dingo_test
 
 import (
 	"encoding/json"
 	"testing"
 
+	"github.com/mission-liao/dingo"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -12,9 +13,9 @@ import (
 //
 
 type localTestSuite struct {
-	DingoTestSuite
+	dingo.DingoTestSuite
 	wireBroker  chan []byte
-	wireBackend chan *ReportEnvelope
+	wireBackend chan *dingo.ReportEnvelope
 }
 
 func (me *localTestSuite) SetupSuite() {
@@ -28,14 +29,14 @@ func (me *localTestSuite) SetupTest() {
 
 func (me *localTestSuite) reset() {
 	// reset the 'virtual wire' for every test
-	me.wireBroker, me.wireBackend = make(chan []byte, 10), make(chan *ReportEnvelope, 10)
+	me.wireBroker, me.wireBackend = make(chan []byte, 10), make(chan *dingo.ReportEnvelope, 10)
 
 	me.DingoTestSuite.GenBroker = func() (v interface{}, err error) {
-		v, err = NewLocalBroker(DefaultConfig(), me.wireBroker)
+		v, err = dingo.NewLocalBroker(dingo.DefaultConfig(), me.wireBroker)
 		return
 	}
-	me.DingoTestSuite.GenBackend = func() (b Backend, err error) {
-		b, err = NewLocalBackend(DefaultConfig(), me.wireBackend)
+	me.DingoTestSuite.GenBackend = func() (b dingo.Backend, err error) {
+		b, err = dingo.NewLocalBackend(dingo.DefaultConfig(), me.wireBackend)
 		return
 	}
 }
@@ -55,7 +56,7 @@ func (me *localTestSuite) TestIgnoreReport() {
 	// initiate workers
 	me.Nil(me.App_.Register(
 		"TestIgnoreReport", func() {},
-		Encode.Default, Encode.Default, ID.Default,
+		dingo.Encode.Default, dingo.Encode.Default, dingo.ID.Default,
 	))
 	remain, err := me.App_.Allocate("TestIgnoreReport", 1, 1)
 	me.Equal(0, remain)
@@ -64,7 +65,7 @@ func (me *localTestSuite) TestIgnoreReport() {
 	// initiate a task with an option(IgnoreReport == true)
 	reports, err := me.App_.Call(
 		"TestIgnoreReport",
-		NewOption().SetIgnoreReport(true).SetMonitorProgress(true),
+		dingo.NewOption().SetIgnoreReport(true).SetMonitorProgress(true),
 	)
 	me.Nil(err)
 	me.Nil(reports)
@@ -78,30 +79,30 @@ func (me *localTestSuite) TestIgnoreReport() {
 type testMyMarshaller struct{}
 
 func (me *testMyMarshaller) Prepare(string, interface{}) (err error) { return }
-func (me *testMyMarshaller) EncodeTask(fn interface{}, task *Task) ([]byte, error) {
+func (me *testMyMarshaller) EncodeTask(fn interface{}, task *dingo.Task) ([]byte, error) {
 	// encode args
 	bN, _ := json.Marshal(task.Args()[0])
 	bName, _ := json.Marshal(task.Args()[1])
 	// encode option
 	bOpt, _ := json.Marshal(task.P.O)
-	return ComposeBytes(task.H, [][]byte{bN, bName, bOpt})
+	return dingo.ComposeBytes(task.H, [][]byte{bN, bName, bOpt})
 }
 
-func (me *testMyMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *Task, err error) {
+func (me *testMyMarshaller) DecodeTask(h *dingo.Header, fn interface{}, b []byte) (task *dingo.Task, err error) {
 	var (
 		n    int
 		name string
-		o    *Option
+		o    *dingo.Option
 	)
 
-	bs, _ := DecomposeBytes(h, b)
+	bs, _ := dingo.DecomposeBytes(h, b)
 	json.Unmarshal(bs[0], &n)
 	json.Unmarshal(bs[1], &name)
 	json.Unmarshal(bs[2], &o)
 
-	task = &Task{
+	task = &dingo.Task{
 		H: h,
-		P: &TaskPayload{
+		P: &dingo.TaskPayload{
 			O: o,
 			A: []interface{}{n, name},
 		},
@@ -109,7 +110,7 @@ func (me *testMyMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (tas
 	return
 }
 
-func (me *testMyMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte, err error) {
+func (me *testMyMarshaller) EncodeReport(fn interface{}, report *dingo.Report) (b []byte, err error) {
 	bs := [][]byte{}
 
 	// encode returns
@@ -127,18 +128,18 @@ func (me *testMyMarshaller) EncodeReport(fn interface{}, report *Report) (b []by
 	bOpt, _ := json.Marshal(report.Option())
 	bs = append(bs, bStatus, bError, bOpt)
 
-	return ComposeBytes(report.H, bs)
+	return dingo.ComposeBytes(report.H, bs)
 }
 
-func (me *testMyMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (report *Report, err error) {
+func (me *testMyMarshaller) DecodeReport(h *dingo.Header, fn interface{}, b []byte) (report *dingo.Report, err error) {
 	var (
 		msg   string
 		count int
 		s     int16
-		e     *Error
-		o     *Option
+		e     *dingo.Error
+		o     *dingo.Option
 	)
-	bs, _ := DecomposeBytes(h, b)
+	bs, _ := dingo.DecomposeBytes(h, b)
 	if len(bs) > 3 {
 		// the report might, or might not containing
 		// returns.
@@ -149,9 +150,9 @@ func (me *testMyMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (r
 	json.Unmarshal(bs[0], &s)
 	json.Unmarshal(bs[1], &e)
 	json.Unmarshal(bs[2], &o)
-	report = &Report{
+	report = &dingo.Report{
 		H: h,
-		P: &ReportPayload{
+		P: &dingo.ReportPayload{
 			S: s,
 			E: e,
 			O: o,
@@ -191,14 +192,14 @@ func (me *localTestSuite) TestMyMarshaller() {
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.App_.Register("TestMyMarshaller", fn, mid, mid, ID.Default))
+	me.Nil(me.App_.Register("TestMyMarshaller", fn, mid, mid, dingo.ID.Default))
 	remain, err := me.App_.Allocate("TestMyMarshaller", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
 	reports, err := me.App_.Call(
 		"TestMyMarshaller",
-		NewOption(),
+		dingo.NewOption(),
 		12345, "mission",
 	)
 	me.Nil(err)
@@ -250,22 +251,22 @@ func (me *localTestSuite) TestCustomMarshaller() {
 	mid := int(102)
 	err := me.App_.AddMarshaller(mid, &struct {
 		testMyInvoker
-		CustomMarshaller
+		dingo.CustomMarshaller
 	}{
 		testMyInvoker{},
-		CustomMarshaller{Codec: &testMyCodec{}},
+		dingo.CustomMarshaller{Codec: &testMyCodec{}},
 	})
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.App_.Register("TestCustomMarshaller", fn, mid, mid, ID.Default))
+	me.Nil(me.App_.Register("TestCustomMarshaller", fn, mid, mid, dingo.ID.Default))
 	remain, err := me.App_.Allocate("TestCustomMarshaller", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
 	// initiate a task with an option(IgnoreReport == true)
 	reports, err := me.App_.Call(
-		"TestCustomMarshaller", NewOption().SetMonitorProgress(true), 12345, "mission",
+		"TestCustomMarshaller", dingo.NewOption().SetMonitorProgress(true), 12345, "mission",
 	)
 	me.Nil(err)
 
@@ -324,22 +325,22 @@ func (me *localTestSuite) TestCustomMarshallerWithMinimalFunc() {
 	mid := int(103)
 	err := me.App_.AddMarshaller(mid, &struct {
 		testMyInvoker2
-		CustomMarshaller
+		dingo.CustomMarshaller
 	}{
 		testMyInvoker2{},
-		CustomMarshaller{Codec: &testMyMinimalCodec{}},
+		dingo.CustomMarshaller{Codec: &testMyMinimalCodec{}},
 	})
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.App_.Register("TestCustomMarshallerWithMinimalFunc", fn, mid, mid, ID.Default))
+	me.Nil(me.App_.Register("TestCustomMarshallerWithMinimalFunc", fn, mid, mid, dingo.ID.Default))
 	remain, err := me.App_.Allocate("TestCustomMarshallerWithMinimalFunc", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
 	// initiate a task with an option(IgnoreReport == true)
 	reports, err := me.App_.Call(
-		"TestCustomMarshallerWithMinimalFunc", NewOption().SetMonitorProgress(true),
+		"TestCustomMarshallerWithMinimalFunc", dingo.NewOption().SetMonitorProgress(true),
 	)
 	me.Nil(err)
 

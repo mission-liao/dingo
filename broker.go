@@ -88,6 +88,8 @@ type NamedConsumer interface {
 var ReceiptStatus = struct {
 	// this task is received successfully.
 	OK int
+	// something goes wrong
+	NOK int
 	// dingo can't find workers for this tasks
 	WORKER_NOT_FOUND int
 }{

@@ -1,19 +1,20 @@
-package dingo
+package dingo_test
 
 import (
 	"encoding/json"
 	"testing"
 
+	"github.com/mission-liao/dingo"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestErrMarshal(t *testing.T) {
 	ass := assert.New(t)
 
-	body, err := json.Marshal(&Error{0, "test string"})
+	body, err := json.Marshal(&dingo.Error{0, "test string"})
 	ass.Nil(err)
 
-	var e Error
+	var e dingo.Error
 	err = json.Unmarshal(body, &e)
 	ass.Nil(err)
 
@@ -22,7 +23,7 @@ func TestErrMarshal(t *testing.T) {
 }
 
 func TestErrNil(t *testing.T) {
-	var e *Error
+	var e *dingo.Error
 	// should not panic
-	NewErr(0, e)
+	dingo.NewErr(0, e)
 }

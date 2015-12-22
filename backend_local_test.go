@@ -1,8 +1,9 @@
-package dingo
+package dingo_test
 
 import (
 	"testing"
 
+	"github.com/mission-liao/dingo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -14,16 +15,16 @@ import (
 func TestLocalReporter(t *testing.T) {
 	ass := assert.New(t)
 
-	var reporter Reporter
-	reporter, err := NewLocalBackend(DefaultConfig(), nil)
+	var reporter dingo.Reporter
+	reporter, err := dingo.NewLocalBackend(dingo.DefaultConfig(), nil)
 
 	// test case for Report/Unbind
-	reports := make(chan *ReportEnvelope, 10)
+	reports := make(chan *dingo.ReportEnvelope, 10)
 	_, err = reporter.Report(reports)
 	ass.Nil(err)
 
 	// teardown
-	reporter.(*localBackend).Close()
+	reporter.(dingo.Object).Close()
 }
 
 //
@@ -31,14 +32,14 @@ func TestLocalReporter(t *testing.T) {
 //
 
 type localBackendTestSuite struct {
-	BackendTestSuite
+	dingo.BackendTestSuite
 }
 
 func TestLocalBackendSuite(t *testing.T) {
 	suite.Run(t, &localBackendTestSuite{
-		BackendTestSuite{
-			Gen: func() (b Backend, err error) {
-				b, err = NewLocalBackend(DefaultConfig(), nil)
+		dingo.BackendTestSuite{
+			Gen: func() (b dingo.Backend, err error) {
+				b, err = dingo.NewLocalBackend(dingo.DefaultConfig(), nil)
 
 				// TODO: find a better way to trigger _store_routine_
 				b.Poll(nil)

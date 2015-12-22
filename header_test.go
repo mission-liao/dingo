@@ -1,8 +1,9 @@
-package dingo
+package dingo_test
 
 import (
 	"testing"
 
+	"github.com/mission-liao/dingo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,10 +15,10 @@ func TestHeader(t *testing.T) {
 		id := "041ebfa0-9b6e-11e5-ae12-0002a5d5c51b"
 		name := "test"
 
-		b, err := NewHeader(id, name).Flush(0)
+		b, err := dingo.NewHeader(id, name).Flush(0)
 		ass.Nil(err)
 
-		h, err := DecodeHeader(b)
+		h, err := dingo.DecodeHeader(b)
 		ass.Nil(err)
 		ass.Equal(name, h.Name())
 		ass.Equal(id, h.ID())
@@ -28,10 +29,10 @@ func TestHeader(t *testing.T) {
 		id := "4c257820-9b6e-11e5-b7d5-0002a5d5c51b"
 		name := ""
 
-		b, err := NewHeader(id, name).Flush(0)
+		b, err := dingo.NewHeader(id, name).Flush(0)
 		ass.Nil(err)
 
-		h, err := DecodeHeader(b)
+		h, err := dingo.DecodeHeader(b)
 		ass.Nil(err)
 		ass.Equal(name, h.Name())
 		ass.Equal(id, h.ID())
@@ -42,11 +43,11 @@ func TestHeader(t *testing.T) {
 		id := "7dd224e0-9b6e-11e5-aa62-0002a5d5c51b"
 		name := ""
 
-		b, err := NewHeader(id, name).Flush(0)
+		b, err := dingo.NewHeader(id, name).Flush(0)
 		ass.Nil(err)
 
 		b[0] ^= 0xff
-		h, err := DecodeHeader(b)
+		h, err := dingo.DecodeHeader(b)
 		ass.NotNil(err)
 		ass.Nil(h)
 	}
@@ -56,10 +57,10 @@ func TestHeader(t *testing.T) {
 		id := "7dd224e0-9b6e-11e5-aa62-0002a5d5c51b"
 		name := ""
 
-		b, err := NewHeader(id, name).Flush(0)
+		b, err := dingo.NewHeader(id, name).Flush(0)
 		ass.Nil(err)
 
-		h, err := DecodeHeader(b[:17])
+		h, err := dingo.DecodeHeader(b[:17])
 		ass.NotNil(err)
 		ass.Nil(h)
 	}
@@ -69,7 +70,7 @@ func TestHeader(t *testing.T) {
 		id := "7dd224e0-9b6e-11e5-aa62-0002a5d5c51b"
 		name := "test"
 
-		h := NewHeader(id, name)
+		h := dingo.NewHeader(id, name)
 
 		// append several dummy payloads
 		for i := 0; i < 1000; i++ {
@@ -79,7 +80,7 @@ func TestHeader(t *testing.T) {
 		b, err := h.Flush(0)
 		ass.Nil(err)
 
-		h, err = DecodeHeader(b)
+		h, err = dingo.DecodeHeader(b)
 		ass.Nil(err)
 		ass.NotNil(h)
 		ass.Len(h.Registry(), 1000)
@@ -92,7 +93,7 @@ func TestHeader(t *testing.T) {
 		b, err = h.Flush(0)
 		ass.Nil(err)
 
-		h, err = DecodeHeader(b)
+		h, err = dingo.DecodeHeader(b)
 		ass.Nil(err)
 		ass.NotNil(h)
 		ass.Len(h.Registry(), 0)
@@ -112,10 +113,10 @@ func TestHeader(t *testing.T) {
 		id := "0"
 		name := "test"
 
-		b, err := NewHeader(id, name).Flush(0)
+		b, err := dingo.NewHeader(id, name).Flush(0)
 		ass.Nil(err)
 
-		h, err := DecodeHeader(b)
+		h, err := dingo.DecodeHeader(b)
 		ass.Nil(err)
 		ass.Equal(name, h.Name())
 		ass.Equal(id, h.ID())
