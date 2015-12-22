@@ -86,7 +86,7 @@ func (me *resultTestSuite) TestWait() {
 		me.Equal(ResultError.Timeout, r.Wait(100*time.Millisecond))
 
 		// a report
-		report, err := task.ComposeReport(s, v, e)
+		report, err := task.composeReport(s, v, e)
 		me.Nil(err)
 		if err != nil {
 			return
@@ -139,7 +139,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		reports := make(chan *Report, 10)
 		res := NewResult(reports, nil)
 
-		rep, err := task.ComposeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
+		rep, err := task.composeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
 		me.Nil(err)
 		if err != nil {
 			return
@@ -164,7 +164,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		reports := make(chan *Report, 10)
 		res := NewResult(reports, nil)
 
-		rep, err := task.ComposeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
+		rep, err := task.composeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
 		me.Nil(err)
 		if err != nil {
 			return
@@ -190,7 +190,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		reports := make(chan *Report, 10)
 		res := NewResult(reports, nil)
 
-		rep, err := task.ComposeReport(Status.Fail, nil, errors.New("test string"))
+		rep, err := task.composeReport(Status.Fail, nil, errors.New("test string"))
 		me.Nil(err)
 		if err != nil {
 			return
@@ -215,7 +215,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		reports := make(chan *Report, 10)
 		res := NewResult(reports, nil)
 
-		rep, err := task.ComposeReport(Status.Fail, nil, errors.New("test string"))
+		rep, err := task.composeReport(Status.Fail, nil, errors.New("test string"))
 		me.Nil(err)
 		if err != nil {
 			return
@@ -300,7 +300,7 @@ func (me *resultTestSuite) TestThen() {
 		me.Equal(ResultError.NoHandler, res.Then())
 
 		// success
-		rep, err := task.ComposeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
+		rep, err := task.composeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
 		me.Nil(err)
 		if err != nil {
 			return
@@ -325,7 +325,7 @@ func (me *resultTestSuite) TestThen() {
 		res := NewResult(reports, nil)
 
 		// fail
-		rep, err := task.ComposeReport(Status.Fail, nil, errors.New("test string"))
+		rep, err := task.composeReport(Status.Fail, nil, errors.New("test string"))
 		me.Nil(err)
 		if err != nil {
 			return
@@ -382,7 +382,7 @@ func (me *resultTestSuite) TestOnOK() {
 	}
 
 	// compose a success report
-	rep, err := task.ComposeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
+	rep, err := task.composeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
 	me.Nil(err)
 	if err != nil {
 		return

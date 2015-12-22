@@ -249,11 +249,11 @@ func (me *_workers) _worker_routine_(
 			r    *Report
 			err_ error
 		)
-		r, err_ = task.ComposeReport(status, payload, err)
+		r, err_ = task.composeReport(status, payload, err)
 		if err_ != nil {
-			r, err_ = task.ComposeReport(Status.Fail, nil, NewErr(0, err_))
+			r, err_ = task.composeReport(Status.Fail, nil, NewErr(0, err_))
 			if err_ != nil {
-				events <- NewEventFromError(InstT.WORKER, err_)
+				events <- NewEventFromError(ObjT.WORKER, err_)
 				return
 			}
 		}
@@ -295,7 +295,7 @@ func (me *_workers) _worker_routine_(
 		// compose a report -- done / fail
 		if err != nil {
 			status = Status.Fail
-			events <- NewEventFromError(InstT.WORKER, err_)
+			events <- NewEventFromError(ObjT.WORKER, err_)
 		} else {
 			status = Status.Success
 		}

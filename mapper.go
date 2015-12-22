@@ -142,7 +142,7 @@ func (m *_mappers) _mapper_routine_(
 		var rpt TaskReceipt
 		if err != nil {
 			// send an error event
-			events <- NewEventFromError(InstT.MAPPER, err)
+			events <- NewEventFromError(ObjT.MAPPER, err)
 
 			if err == errWorkerNotFound {
 				rpt = TaskReceipt{

@@ -21,7 +21,10 @@ type localBackend struct {
 	unSent    []*ReportEnvelope
 }
 
-// factory
+/*
+ A Backend implementation based on 'channel'. Users can provide a channel and
+ share it between multiple Reporter(s) and Store(s) to connect them.
+*/
 func NewLocalBackend(cfg *Config, to chan *ReportEnvelope) (v *localBackend, err error) {
 	v = &localBackend{
 		cfg:       cfg,

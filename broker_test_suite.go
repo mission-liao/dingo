@@ -7,6 +7,23 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+/*
+ All dingo.Broker provider should pass this test suite.
+ Example testing code:
+  type myBrokerTestSuite struct {
+    dingo.BrokerTestSuite
+  }
+  func TestMyBrokerTestSuite(t *testing.T) {
+    suite.Run(t, &myBrokerTestSuite{
+      dingo.BrokerTestSuite{
+        Gen: func() (interface{}, error) {
+          // generate a new instance of your backend.
+          // both dingo.Broker and dingo.NamedBroker are acceptable.
+        },
+      },
+    })
+  }
+*/
 type BrokerTestSuite struct {
 	suite.Suite
 
@@ -16,6 +33,12 @@ type BrokerTestSuite struct {
 	Csm           Consumer
 	Ncsm          NamedConsumer
 	ConsumerNames []string
+}
+
+func (me *BrokerTestSuite) SetupSuite() {
+}
+
+func (me *BrokerTestSuite) TearDownSuite() {
 }
 
 func (me *BrokerTestSuite) SetupTest() {
@@ -41,7 +64,7 @@ func (me *BrokerTestSuite) TearDownTest() {
 	me.Nil(me.Pdc.(Object).Close())
 }
 
-func (me *BrokerTestSuite) AddListener(name string, receipts <-chan *TaskReceipt) (tasks <-chan []byte, err error) {
+func (me *BrokerTestSuite) addListener(name string, receipts <-chan *TaskReceipt) (tasks <-chan []byte, err error) {
 	if me.Csm != nil {
 		tasks, err = me.Csm.AddListener(receipts)
 	} else if me.Ncsm != nil {
@@ -51,7 +74,7 @@ func (me *BrokerTestSuite) AddListener(name string, receipts <-chan *TaskReceipt
 	return
 }
 
-func (me *BrokerTestSuite) StopAllListeners() (err error) {
+func (me *BrokerTestSuite) stopAllListeners() (err error) {
 	if me.Csm != nil {
 		err = me.Csm.StopAllListeners()
 	} else if me.Ncsm != nil {
@@ -72,7 +95,7 @@ func (me *BrokerTestSuite) TestBasic() {
 	me.Nil(me.Trans.Register("", func() {}, Encode.Default, Encode.Default, ID.Default))
 	// init one listener
 	receipts := make(chan *TaskReceipt, 10)
-	tasks, err := me.AddListener("", receipts)
+	tasks, err := me.addListener("", receipts)
 	me.Nil(err)
 	me.NotNil(tasks)
 	if tasks == nil {
@@ -112,7 +135,7 @@ func (me *BrokerTestSuite) TestBasic() {
 	}
 
 	// stop all listener
-	me.Nil(me.StopAllListeners())
+	me.Nil(me.stopAllListeners())
 }
 
 func (me *BrokerTestSuite) _simplified_mapper_(

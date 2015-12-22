@@ -57,7 +57,7 @@ func (me *BridgeTestSuite) TearDownTest() {
 }
 
 func (me *BridgeTestSuite) send(reports chan<- *Report, task *Task, s int16) {
-	r, err := task.ComposeReport(s, nil, nil)
+	r, err := task.composeReport(s, nil, nil)
 	me.Nil(err)
 
 	reports <- r
@@ -115,7 +115,7 @@ func (me *BridgeTestSuite) TestSendTask() {
 
 	// make sure task is received through listeners
 	tReceived := <-tasks
-	me.True(t.AlmostEqual(tReceived))
+	me.True(t.almostEqual(tReceived))
 
 	// send a receipt withoug blocked,
 	// which means someone is waiting
@@ -170,7 +170,7 @@ func (me *BridgeTestSuite) TestAddListener() {
 		pass = true
 	}
 	me.True(pass)
-	me.True(t.AlmostEqual(tReceived))
+	me.True(t.almostEqual(tReceived))
 
 	// close all listeners
 	me.Nil(me.bg.StopAllListeners())
@@ -208,7 +208,7 @@ func (me *BridgeTestSuite) TestReport() {
 
 	// normal report
 	{
-		input, err := t.ComposeReport(Status.Sent, nil, nil)
+		input, err := t.composeReport(Status.Sent, nil, nil)
 		me.Nil(err)
 		reports <- input
 		r, ok := <-outputs
@@ -219,7 +219,7 @@ func (me *BridgeTestSuite) TestReport() {
 	// a report with 'Done' == true
 	// the output channel should be closed
 	{
-		input, err := t.ComposeReport(Status.Success, nil, nil)
+		input, err := t.composeReport(Status.Success, nil, nil)
 		me.Nil(err)
 		reports <- input
 		r, ok := <-outputs
@@ -263,15 +263,15 @@ func (me *BridgeTestSuite) TestPoll() {
 	// reports belongs to one task should be sent
 	// to the same reporter
 	for k, t := range ts {
-		r, err := t.ComposeReport(Status.Sent, nil, nil)
+		r, err := t.composeReport(Status.Sent, nil, nil)
 		me.Nil(err)
 		rs[k/2] <- r
 
-		r, err = t.ComposeReport(Status.Progress, nil, nil)
+		r, err = t.composeReport(Status.Progress, nil, nil)
 		me.Nil(err)
 		rs[k/2] <- r
 
-		r, err = t.ComposeReport(Status.Success, nil, nil)
+		r, err = t.composeReport(Status.Success, nil, nil)
 		me.Nil(err)
 		rs[k/2] <- r
 	}
@@ -300,14 +300,14 @@ func (me *BridgeTestSuite) TestPoll() {
 }
 
 func (me *BridgeTestSuite) TestExist() {
-	me.True(me.bg.Exists(InstT.REPORTER))
-	me.True(me.bg.Exists(InstT.CONSUMER))
-	me.True(me.bg.Exists(InstT.PRODUCER))
-	me.True(me.bg.Exists(InstT.STORE))
+	me.True(me.bg.Exists(ObjT.REPORTER))
+	me.True(me.bg.Exists(ObjT.CONSUMER))
+	me.True(me.bg.Exists(ObjT.PRODUCER))
+	me.True(me.bg.Exists(ObjT.STORE))
 
 	// checking should be ==, not &=
-	me.False(me.bg.Exists(InstT.STORE | InstT.REPORTER))
-	me.False(me.bg.Exists(InstT.ALL))
+	me.False(me.bg.Exists(ObjT.STORE | ObjT.REPORTER))
+	me.False(me.bg.Exists(ObjT.ALL))
 }
 
 func (me *BridgeTestSuite) TestFinalReportWhenShutdown() {
@@ -333,11 +333,11 @@ func (me *BridgeTestSuite) TestFinalReportWhenShutdown() {
 	me.Nil(err)
 
 	// send reports: Sent, but not the final one
-	r, err := task.ComposeReport(Status.Sent, nil, nil)
+	r, err := task.composeReport(Status.Sent, nil, nil)
 	me.Nil(err)
 	reports <- r
 	o := <-out
-	me.True(o.AlmostEqual(r))
+	me.True(o.almostEqual(r))
 
 	// close bridge, a 'Shutdown' report should be received.
 	me.Nil(me.bg.Close())

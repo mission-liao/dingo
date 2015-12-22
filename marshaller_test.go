@@ -43,8 +43,7 @@ func (me *MarshallerTestSuite) TestTask() {
 			me.Nil(err)
 			me.NotNil(t)
 			if t != nil {
-				// me.True(t.Equal(task))
-				me.Equal(t.H, task.H)
+				me.True(t.almostEqual(task))
 				me.True(t.Option().IgnoreReport())
 			}
 		}
@@ -66,7 +65,7 @@ func (me *MarshallerTestSuite) TestReport() {
 	fn := func() (a float64, b, c string) { return }
 
 	{
-		report, err := task.ComposeReport(
+		report, err := task.composeReport(
 			Status.Sent,
 			[]interface{}{float64(2.5), "user", "password"},
 			errors.New("test error"),
@@ -85,7 +84,7 @@ func (me *MarshallerTestSuite) TestReport() {
 			me.Nil(err)
 			me.NotNil(r)
 			if r != nil {
-				me.True(r.Equal(report))
+				me.Equal(report, r)
 				me.True(r.Option().IgnoreReport())
 			}
 		}

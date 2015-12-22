@@ -11,6 +11,7 @@ type ReportEnvelope struct {
 }
 
 var ReporterEvent = struct {
+	// a sequence of reports from this task is about to fire.
 	BeforeReport int
 }{
 	1,

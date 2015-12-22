@@ -1,9 +1,13 @@
 package dingo
 
 var Encode = struct {
-	Default  int
-	JSON     int
-	GOB      int
+	// Default marshalling mode
+	Default int
+	// JSON marshalling mode
+	JSON int
+	// Gob marshalling mode
+	GOB int
+	// JSON-Safe marshalling mode
 	JSONSAFE int
 }{
 	0, 1, 2, 3,
@@ -12,7 +16,7 @@ var Encode = struct {
 /*
  Marshaller(s) is the major component between []interface{} and []byte.
   - Note: all marshalled []byte should be prefixed with a Header.
-  - Note: all implemented functions should be thread-safe.
+  - Note: all implemented functions should be routine(thread)-safe.
 */
 type Marshaller interface {
 

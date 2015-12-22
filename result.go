@@ -6,27 +6,24 @@ import (
 )
 
 var ResultError = struct {
-	NoChannel     error
-	Timeout       error
-	ChannelClosed error
-	NoHandler     error
-}{
 	// the report channel returned from 'dingo' is nil
-	errors.New("channel is nil"),
-
+	NoChannel error
 	// timeout
-	errors.New("time out"),
-
+	Timeout error
 	// the report channel is closed
-	errors.New("channel closed"),
-
+	ChannelClosed error
 	// there is no handler registered, shouldn't call .Then()
+	NoHandler error
+}{
+	errors.New("channel is nil"),
+	errors.New("time out"),
+	errors.New("channel closed"),
 	errors.New("no handler registered"),
 }
 
 /*
- Result is a wrapper of chan *Report, taking care of the logic to handle
- asynchronous result from 'dingo'.
+ Result is a wrapper of chan *dingo.Report returned from dingo.App.Call,
+ taking care of the logic to handle asynchronous result from 'dingo'.
 
  Example usage:
   r := dingo.NewResult(app.Call(...))

@@ -7,6 +7,22 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+/*
+ All dingo.Backend provider should pass this test suite.
+ Example testing code:
+  type myBackendTestSuite struct {
+    dingo.BackendTestSuite
+  }
+  func TestMyBackendTestSuite(t *testing.T) {
+    suite.Run(t, &myBackendTestSuite{
+      dingo.BackendTestSuite{
+        Gen: func() (dingo.Backend, error) {
+          // generate a new instance of your backend.
+        },
+      },
+    })
+  }
+*/
 type BackendTestSuite struct {
 	suite.Suite
 
@@ -69,7 +85,7 @@ func (me *BackendTestSuite) TestBasic() {
 	me.Nil(me.Rpt.ReporterHook(ReporterEvent.BeforeReport, task))
 
 	// send a report
-	report, err := task.ComposeReport(Status.Sent, make([]interface{}, 0), nil)
+	report, err := task.composeReport(Status.Sent, make([]interface{}, 0), nil)
 	me.Nil(err)
 	{
 		b, err := me.Trans.EncodeReport(report)
@@ -92,7 +108,7 @@ func (me *BackendTestSuite) TestBasic() {
 		}
 		r, err := me.Trans.DecodeReport(v)
 		me.Nil(err)
-		me.True(report.Equal(r))
+		me.Equal(r, report)
 	}
 
 	// done polling
@@ -102,7 +118,7 @@ func (me *BackendTestSuite) TestBasic() {
 }
 
 func (me *BackendTestSuite) send(task *Task, s int16) {
-	r, err := task.ComposeReport(s, nil, nil)
+	r, err := task.composeReport(s, nil, nil)
 	me.Nil(err)
 
 	b, err := me.Trans.EncodeReport(r)

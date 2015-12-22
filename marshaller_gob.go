@@ -9,6 +9,7 @@ import (
 )
 
 /*
+ A marshaller implemented via gob encoding.
  Note: this Marshaller can work with both GenericInvoker and LazyInvoker.
 */
 type GobMarshaller struct{}

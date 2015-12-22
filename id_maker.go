@@ -5,8 +5,10 @@ import (
 )
 
 var ID = struct {
+	// default ID maker
 	Default int
-	UUID    int
+	// an ID maker implemented via uuid4
+	UUID int
 }{
 	0, 1,
 }

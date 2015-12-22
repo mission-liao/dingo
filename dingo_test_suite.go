@@ -38,25 +38,25 @@ func (me *DingoTestSuite) SetupSuite() {
 
 	// broker
 	if me.Brk != nil {
-		_, used, err := me.App_.Use(me.Brk, InstT.DEFAULT)
+		_, used, err := me.App_.Use(me.Brk, ObjT.DEFAULT)
 		me.Nil(err)
-		me.Equal(InstT.PRODUCER|InstT.CONSUMER, used)
+		me.Equal(ObjT.PRODUCER|ObjT.CONSUMER, used)
 	} else {
 		me.NotNil(me.Nbrk)
-		_, used, err := me.App_.Use(me.Nbrk, InstT.DEFAULT)
+		_, used, err := me.App_.Use(me.Nbrk, ObjT.DEFAULT)
 		me.Nil(err)
-		me.Equal(InstT.PRODUCER|InstT.CONSUMER, used)
+		me.Equal(ObjT.PRODUCER|ObjT.CONSUMER, used)
 	}
 
 	// backend
 	me.Bkd, err = me.GenBackend()
 	me.Nil(err)
-	_, used, err := me.App_.Use(me.Bkd, InstT.DEFAULT)
+	_, used, err := me.App_.Use(me.Bkd, ObjT.DEFAULT)
 	me.Nil(err)
-	me.Equal(InstT.REPORTER|InstT.STORE, used)
+	me.Equal(ObjT.REPORTER|ObjT.STORE, used)
 
 	// events
-	me.eid, me.events, err = me.App_.Listen(InstT.ALL, EventLvl.DEBUG, 0)
+	me.eid, me.events, err = me.App_.Listen(ObjT.ALL, EventLvl.DEBUG, 0)
 	me.Nil(err)
 }
 
@@ -101,7 +101,7 @@ func (me *DingoTestSuite) newCaller() (app *App, err error) {
 		return
 	}
 
-	_, _, err = app.Use(v, InstT.PRODUCER)
+	_, _, err = app.Use(v, ObjT.PRODUCER)
 	me.Nil(err)
 	if err != nil {
 		return
@@ -113,7 +113,7 @@ func (me *DingoTestSuite) newCaller() (app *App, err error) {
 		return
 	}
 
-	_, _, err = app.Use(b, InstT.STORE)
+	_, _, err = app.Use(b, ObjT.STORE)
 	me.Nil(err)
 	if err != nil {
 		return
@@ -135,7 +135,7 @@ func (me *DingoTestSuite) newWorker() (app *App, err error) {
 		return
 	}
 
-	_, _, err = app.Use(v, InstT.CONSUMER)
+	_, _, err = app.Use(v, ObjT.CONSUMER)
 	me.Nil(err)
 	if err != nil {
 		return
@@ -147,7 +147,7 @@ func (me *DingoTestSuite) newWorker() (app *App, err error) {
 		return
 	}
 
-	_, _, err = app.Use(b, InstT.REPORTER)
+	_, _, err = app.Use(b, ObjT.REPORTER)
 	me.Nil(err)
 	if err != nil {
 		return

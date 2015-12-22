@@ -21,7 +21,8 @@ type localBroker struct {
  A Broker implementation based on 'channel'. Users can provide a channel and
  share it between multiple Producer(s) and Consumer(s) to connect them.
 
- This one only implements Consumer interface, not the NamedConsumer one.
+ This one only implements Consumer interface, not the NamedConsumer one. So
+ the dispatching of tasks relies on dingo.mapper
 */
 func NewLocalBroker(cfg *Config, to chan []byte) (v *localBroker, err error) {
 	v = &localBroker{
@@ -52,7 +53,7 @@ func (me *localBroker) _consumer_routine_(quit <-chan int, wait *sync.WaitGroup,
 
 			h, err := DecodeHeader(v)
 			if err != nil {
-				events <- NewEventFromError(InstT.CONSUMER, err)
+				events <- NewEventFromError(ObjT.CONSUMER, err)
 				break
 			}
 
@@ -64,7 +65,7 @@ func (me *localBroker) _consumer_routine_(quit <-chan int, wait *sync.WaitGroup,
 
 			if reply.ID != h.ID() {
 				events <- NewEventFromError(
-					InstT.CONSUMER,
+					ObjT.CONSUMER,
 					errors.New(fmt.Sprintf("expected: %v, received: %v", h, reply)),
 				)
 				break

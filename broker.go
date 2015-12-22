@@ -10,7 +10,11 @@ type NamedBroker interface {
 	NamedConsumer
 }
 
+/*
+ event IDs that might be passed to dingo.Producer.ProducerHook
+*/
 var ProducerEvent = struct {
+	// a new kind of task is declared.
 	DeclareTask int
 }{
 	1,
@@ -40,7 +44,8 @@ type Producer interface {
  Consumer(s) would consume tasks from broker(s). This kind of Consumer(s) is easier
  to implement, every task is sent to a single queue, and consumed from a single queue.
 
- The interaction between Consumer(s) and dingo are asynchronous by channels.
+ The interaction between Consumer(s) and dingo are asynchronous by the channel you provide
+ in 'AddListener'.
 */
 type Consumer interface {
 	// create a new listener to receive tasks
@@ -81,8 +86,9 @@ type NamedConsumer interface {
 }
 
 var ReceiptStatus = struct {
-	OK               int
-	NOK              int
+	// this task is received successfully.
+	OK int
+	// dingo can't find workers for this tasks
 	WORKER_NOT_FOUND int
 }{
 	1, 2, 3,

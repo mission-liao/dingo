@@ -6,15 +6,20 @@ import (
 )
 
 /*
-A generic error that could be marshalled/unmarshalled by JSON.
+ A generic error that could be marshalled/unmarshalled by JSON.
 */
 type Error struct {
 	C int32
 	M string
 }
 
+/*
+ Error code used in dingo.Error
+*/
 var ErrCode = struct {
-	Panic    int32
+	// the worker function panic
+	Panic int32
+	// dingo.App shutdown
 	Shutdown int32
 }{
 	1, 2,
@@ -31,10 +36,6 @@ func NewErr(code int32, err error) *Error {
 		C: code,
 		M: err.Error(),
 	}
-}
-
-func NoErr() *Error {
-	return &Error{}
 }
 
 func (me *Error) Code() int32   { return me.C }

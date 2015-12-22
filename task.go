@@ -4,13 +4,24 @@ import (
 	"reflect"
 )
 
-// TODO: TimeGetter
-
 type TaskPayload struct {
 	O *Option
 	A []interface{}
 }
 
+/*
+ This struct records all infomation required for task execution, including:
+  - name(type) of task
+  - identifier of this task, which should be unique among all tasks of the same name.
+  - arguments to be passed into worker function
+  - execution option
+
+ You don't have to know what it is unless you try to implement:
+  - dingo.Marshaller
+  - dingo.Invoker
+ You don't have to create it by yourself, every time you call
+ dingo.App.Call, one is generated automatically.
+*/
 type Task struct {
 	H *Header
 	P *TaskPayload
@@ -29,15 +40,11 @@ func composeTask(name string, opt *Option, args []interface{}) (*Task, error) {
 	}, nil
 }
 
-//
-// getter
-//
-func (t *Task) ID() string             { return t.H.I }
-func (t *Task) Name() string           { return t.H.N }
-func (t *Task) Option() *Option        { return t.P.O }
-func (t *Task) Args() []interface{}    { return t.P.A }
-func (t *Task) Equal(other *Task) bool { return reflect.DeepEqual(t, other) }
-func (t *Task) AlmostEqual(other *Task) (same bool) {
+func (t *Task) ID() string          { return t.H.I }
+func (t *Task) Name() string        { return t.H.N }
+func (t *Task) Option() *Option     { return t.P.O }
+func (t *Task) Args() []interface{} { return t.P.A }
+func (t *Task) almostEqual(other *Task) (same bool) {
 	same = t.H.I == other.H.I && t.H.N == other.H.N && reflect.DeepEqual(t.P.O, other.P.O)
 	if !same {
 		return
@@ -56,7 +63,7 @@ func (t *Task) AlmostEqual(other *Task) (same bool) {
 //
 // APIs
 //
-func (t *Task) ComposeReport(s int16, r []interface{}, err interface{}) (*Report, error) {
+func (t *Task) composeReport(s int16, r []interface{}, err interface{}) (*Report, error) {
 	var err_ *Error
 	if err != nil {
 		switch v := err.(type) {

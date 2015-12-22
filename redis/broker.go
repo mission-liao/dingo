@@ -116,7 +116,7 @@ func (me *broker) _consumer_routine_(
 			// blocking call on redis server
 			reply, err := conn.Do("BRPOP", qn, me.cfg.GetListenTimeout())
 			if err != nil {
-				events <- dingo.NewEventFromError(dingo.InstT.CONSUMER, err)
+				events <- dingo.NewEventFromError(dingo.ObjT.CONSUMER, err)
 				break
 			}
 
@@ -130,14 +130,14 @@ func (me *broker) _consumer_routine_(
 			v, ok := reply.([]interface{})
 			if !ok {
 				events <- dingo.NewEventFromError(
-					dingo.InstT.CONSUMER,
+					dingo.ObjT.CONSUMER,
 					errors.New(fmt.Sprintf("invalid reply: %v", reply)),
 				)
 				break
 			}
 			if len(v) != 2 {
 				events <- dingo.NewEventFromError(
-					dingo.InstT.CONSUMER,
+					dingo.ObjT.CONSUMER,
 					errors.New(fmt.Sprintf("invalid reply: %v", reply)),
 				)
 				break
@@ -146,7 +146,7 @@ func (me *broker) _consumer_routine_(
 			b, ok := v[1].([]byte)
 			if !ok {
 				events <- dingo.NewEventFromError(
-					dingo.InstT.CONSUMER,
+					dingo.ObjT.CONSUMER,
 					errors.New(fmt.Sprintf("invalid reply: %v", reply)),
 				)
 				break
@@ -154,7 +154,7 @@ func (me *broker) _consumer_routine_(
 
 			h, err := dingo.DecodeHeader(b)
 			if err != nil {
-				events <- dingo.NewEventFromError(dingo.InstT.CONSUMER, err)
+				events <- dingo.NewEventFromError(dingo.ObjT.CONSUMER, err)
 				break
 			}
 
@@ -166,7 +166,7 @@ func (me *broker) _consumer_routine_(
 
 			if rcpt.ID != h.ID() {
 				events <- dingo.NewEventFromError(
-					dingo.InstT.CONSUMER,
+					dingo.ObjT.CONSUMER,
 					errors.New(fmt.Sprintf("expected: %v, received: %v", h, rcpt)),
 				)
 				break

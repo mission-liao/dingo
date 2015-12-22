@@ -33,7 +33,7 @@ type Report struct {
 var Status = struct {
 	None int16
 
-	// the task is sent to the broker.
+	// the task is sent to the consumer.
 	Sent int16
 
 	// the task is sent to workers.
@@ -58,17 +58,16 @@ func (r *Report) Status() int16 { return r.P.S }
 func (r *Report) Error() *Error               { return r.P.E }
 func (r *Report) Option() *Option             { return r.P.O }
 func (r *Report) Return() []interface{}       { return r.P.R }
-func (r *Report) SetReturn(ret []interface{}) { r.P.R = ret }
+func (r *Report) setReturn(ret []interface{}) { r.P.R = ret }
 
 //
 // checker
 //
 
-func (r *Report) Done() bool               { return r.P.S == Status.Success || r.P.S == Status.Fail }
-func (r *Report) OK() bool                 { return r.P.S == Status.Success }
-func (r *Report) Fail() bool               { return r.P.S == Status.Fail }
-func (r *Report) Equal(other *Report) bool { return reflect.DeepEqual(r, other) }
-func (r *Report) AlmostEqual(other *Report) (same bool) {
+func (r *Report) Done() bool { return r.P.S == Status.Success || r.P.S == Status.Fail }
+func (r *Report) OK() bool   { return r.P.S == Status.Success }
+func (r *Report) Fail() bool { return r.P.S == Status.Fail }
+func (r *Report) almostEqual(other *Report) (same bool) {
 	same = r.H.I == other.H.I &&
 		r.H.N == other.H.N &&
 		r.P.S == other.P.S &&

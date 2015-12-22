@@ -31,11 +31,11 @@ func TestMgrMarshallers(t *testing.T) {
 		// decode by json
 		t, err := trans.DecodeTask(b)
 		ass.Nil(err)
-		ass.True(t.Equal(task))
+		ass.Equal(task, t)
 	}
 
 	{
-		report, err := task.ComposeReport(Status.Success, []interface{}{"test", int64(2)}, errors.New("test error"))
+		report, err := task.composeReport(Status.Success, []interface{}{"test", int64(2)}, errors.New("test error"))
 		ass.Nil(err)
 
 		// report encoded by gob
@@ -51,7 +51,7 @@ func TestMgrMarshallers(t *testing.T) {
 		// decode by gob
 		r, err := trans.DecodeReport(b)
 		ass.Nil(err)
-		ass.True(r.Equal(report))
+		ass.Equal(report, r)
 	}
 }
 
@@ -78,7 +78,7 @@ func TestMgrInvokers(t *testing.T) {
 	ass.Equal(int8(3), ret[0].(int8))
 
 	// Compose a Report, with wrong type of output
-	report, err := task.ComposeReport(Status.Success, []interface{}{int32(2)}, nil)
+	report, err := task.composeReport(Status.Success, []interface{}{int32(2)}, nil)
 	ass.Nil(err)
 
 	// fix Return, the type of return value would become 'int8'

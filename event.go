@@ -16,7 +16,10 @@ var EventLvl = struct {
 	3,
 }
 
+/*
+ */
 type Event struct {
+	// origin of event: please refer to dingo.ObjT for possible values.
 	Origin  int
 	Time    time.Time
 	Level   int

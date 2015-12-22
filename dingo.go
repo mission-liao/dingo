@@ -1,3 +1,47 @@
+/*
+ A task/job <=> worker framework for #golang.
+
+ Goal
+
+ This library tries to make tasks invoking / monitoring as easy as possible.
+  - any function can be a worker function, as long as types of its parameters are supported.
+  - return values are accessible.
+  - invoking tasks is similar to invoke functions locally.
+  - could be used locally as a queue for background jobs, or remotely as a distributed task queue when connected with AMQP or Redis.
+
+ Design
+
+ The design is inspired by
+  https://github.com/RichardKnop/machinery
+  http://www.celeryproject.org/
+
+ A short version of "how a task is invoked" is:
+  -------- caller ---------
+  - users input arguments are treated as []interface{}
+  - marshall []interface{} to []byte
+  - send []byte to broker
+  - polling return values from the store
+  -------- worker ---------
+  - consume []byte from broker
+  - unmarshall []byte to []interface{}(underlying types might be different)
+  - try to apply type-correction on []interface{}
+  - invoking the worker function
+  - convert its return values to []interface{}
+  - marshall []interface{} to []byte
+  - send []byte to the store
+  -------- worker ---------
+  - the byte stream of return values is ready after polling
+  - unmarshall []byte to []interface{}
+  - try to apply type-correction on []interface{}
+  - return []interface{} to users.
+
+ This library highly relies on reflection to provide flexibility, therefore,
+ it may run more slowly than other libraries without using reflection. To overcome this,
+ users can provide customized marshaller(s) and invoker(s) without using reflection. These
+ customization are task specific, thus users may choose the default marsahller/invoker for
+ most tasks, and provide customized marshaller/invoker to those tasks that are performance-critical.
+
+*/
 package dingo
 
 import (
@@ -8,33 +52,6 @@ import (
 	"sync/atomic"
 	"time"
 )
-
-/*
- Types of instances
-*/
-var InstT = struct {
-	DEFAULT        int
-	REPORTER       int
-	STORE          int
-	PRODUCER       int
-	CONSUMER       int
-	MAPPER         int
-	WORKER         int
-	BRIDGE         int
-	NAMED_CONSUMER int
-	ALL            int
-}{
-	0,
-	(1 << 0),
-	(1 << 1),
-	(1 << 2),
-	(1 << 3),
-	(1 << 4),
-	(1 << 5),
-	(1 << 6),
-	(1 << 7),
-	int(^uint(0) >> 1), // Max int
-}
 
 type _eventListener struct {
 	targets, level int
@@ -64,7 +81,7 @@ type App struct {
 /*
  "nameOfBridge" refers to different modes of dingo:
   - "local": an App works in local mode, which is similar to other background worker framework.
-  - "remote": an App works in remote mode, brokers(ex. AMQP...) and backends(ex. redis..., if required) would be needed to work.
+  - "remote": an App works in remote(distributed) mode, brokers(ex. AMQP...) and backends(ex. redis..., if required) would be needed to work.
 */
 func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 	v := &App{
@@ -302,7 +319,7 @@ func (me *App) Allocate(name string, count, share int) (remain int, err error) {
 		reports []<-chan *Report
 	)
 
-	if me.b.Exists(InstT.NAMED_CONSUMER) {
+	if me.b.Exists(ObjT.NAMED_CONSUMER) {
 		receipts := make(chan *TaskReceipt, 10)
 		tasks, err = me.b.AddNamedListener(name, receipts)
 		if err != nil {
@@ -312,7 +329,7 @@ func (me *App) Allocate(name string, count, share int) (remain int, err error) {
 		if err != nil {
 			return
 		}
-	} else if me.b.Exists(InstT.CONSUMER) {
+	} else if me.b.Exists(ObjT.CONSUMER) {
 		reports, remain, err = me.mappers.allocateWorkers(name, count, share)
 		if err != nil {
 			return
@@ -346,18 +363,18 @@ func (me *App) SetOption(name string, opt *Option) error {
 
  parameters:
   - obj: object to be attached
-  - types: interfaces contained in 'obj', refer to dingo.InstT
+  - types: interfaces contained in 'obj', refer to dingo.ObjT
  returns:
   - id: identifier assigned to this object, 0 is invalid value
   - err: errors
 
  For a producer, the right combination of "types" is
- InstT.PRODUCER|InstT.STORE, if reporting is not required,
- then only InstT.PRODUCER is used.
+ ObjT.PRODUCER|ObjT.STORE, if reporting is not required,
+ then only ObjT.PRODUCER is used.
 
  For a consumer, the right combination of "types" is
- InstT.CONSUMER|InstT.REPORTER, if reporting is not reuqired(make sure there is no producer await),
- then only InstT.CONSUMER is used.
+ ObjT.CONSUMER|ObjT.REPORTER, if reporting is not reuqired(make sure there is no producer await),
+ then only ObjT.CONSUMER is used.
 */
 func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 	me.objsLock.Lock()
@@ -386,21 +403,21 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 		}
 	}()
 
-	if types == InstT.DEFAULT {
+	if types == ObjT.DEFAULT {
 		producer, _ = obj.(Producer)
 		consumer, _ = obj.(Consumer)
 		namedConsumer, _ = obj.(NamedConsumer)
 		store, _ = obj.(Store)
 		reporter, _ = obj.(Reporter)
 	} else {
-		if types&InstT.PRODUCER == InstT.PRODUCER {
+		if types&ObjT.PRODUCER == ObjT.PRODUCER {
 			producer, ok = obj.(Producer)
 			if !ok {
 				err = errors.New("producer is not found")
 				return
 			}
 		}
-		if types&InstT.CONSUMER == InstT.CONSUMER {
+		if types&ObjT.CONSUMER == ObjT.CONSUMER {
 			namedConsumer, ok = obj.(NamedConsumer)
 			if !ok {
 				consumer, ok = obj.(Consumer)
@@ -410,19 +427,19 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 				}
 			}
 		}
-		if types&InstT.NAMED_CONSUMER == InstT.NAMED_CONSUMER {
+		if types&ObjT.NAMED_CONSUMER == ObjT.NAMED_CONSUMER {
 			namedConsumer, ok = obj.(NamedConsumer)
 			if !ok {
 			}
 		}
-		if types&InstT.STORE == InstT.STORE {
+		if types&ObjT.STORE == ObjT.STORE {
 			store, ok = obj.(Store)
 			if !ok {
 				err = errors.New("store is not found")
 				return
 			}
 		}
-		if types&InstT.REPORTER == InstT.REPORTER {
+		if types&ObjT.REPORTER == ObjT.REPORTER {
 			reporter, ok = obj.(Reporter)
 			if !ok {
 				err = errors.New("reporter is not found")
@@ -433,17 +450,17 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 
 	if producer != nil {
 		err = me.b.AttachProducer(producer)
-		if err != nil && types != InstT.DEFAULT {
+		if err != nil && types != ObjT.DEFAULT {
 			return
 		}
-		used |= InstT.PRODUCER
+		used |= ObjT.PRODUCER
 	}
 	if consumer != nil || namedConsumer != nil {
 		err = me.b.AttachConsumer(consumer, namedConsumer)
-		if err != nil && types != InstT.DEFAULT {
+		if err != nil && types != ObjT.DEFAULT {
 			return
 		}
-		if err == nil && me.b.Exists(InstT.CONSUMER) {
+		if err == nil && me.b.Exists(ObjT.CONSUMER) {
 			var (
 				remain int
 				tasks  <-chan *Task
@@ -458,28 +475,31 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 				me.mappers.more(tasks, receipts)
 			}
 		}
-		used |= InstT.CONSUMER
+		used |= ObjT.CONSUMER
 	}
 	if reporter != nil {
 		err = me.b.AttachReporter(reporter)
-		if err != nil && types != InstT.DEFAULT {
+		if err != nil && types != ObjT.DEFAULT {
 			return
 		}
-		used |= InstT.REPORTER
+		used |= ObjT.REPORTER
 	}
 	if store != nil {
 		err = me.b.AttachStore(store)
-		if err != nil && types != InstT.DEFAULT {
+		if err != nil && types != ObjT.DEFAULT {
 			return
 		}
-		used |= InstT.STORE
+		used |= ObjT.STORE
 	}
 
 	return
 }
 
 /*
- Initiate a task by providing "name" and execution-"option" of tasks.
+ Initiate a task by providing:
+  - "name" of tasks
+  - execution-"option" of tasks, could be nil
+  - argument of corresponding worker function.
 
  A reporting channel would be returned for callers to monitor the status of tasks,
  and access its result. A suggested procedure to monitor reporting channels is
@@ -510,7 +530,7 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
  Multiple reports would be sent for each task:
   - Sent: the task is already sent to brokers.
   - Progress: the consumer received this task, and about to execute it
-  - Done: this task is finished without error.
+  - Success: this task is finished without error.
   - Fail: this task failed for some reason.
  Noted: the 'Fail' here doesn't mean your worker function is failed,
  it means "dingo" doesn't execute your worker function properly.
@@ -555,25 +575,25 @@ func (me *App) Call(name string, opt *Option, args ...interface{}) (reports <-ch
  Get the channel to receive events from 'dingo'.
 
  "targets" are instances you want to monitor, they include:
-  - InstT.REPORTER: the Reporter instance attached to this App.
-  - InstT.STORE: the Store instance attached to this App.
-  - InstT.PRODUCER: the Producer instance attached to this App.
-  - InstT.CONSUMER: the Consumer/NamedConsumer instance attached to this App.
-  - InstT.MAPPER: the internal component, turn if on when debug.
-  - InstT.WORKER: the internal component, turn it on when debug.
-  - InstT.BRIDGE: the internal component, turn it on when debug.
-  - InstT.ALL: every instance.
+  - dingo.ObjT.REPORTER: the Reporter instance attached to this App.
+  - dingo.ObjT.STORE: the Store instance attached to this App.
+  - dingo.ObjT.PRODUCER: the Producer instance attached to this App.
+  - dingo.ObjT.CONSUMER: the Consumer/NamedConsumer instance attached to this App.
+  - dingo.ObjT.MAPPER: the internal component, turn if on when debug.
+  - dingo.ObjT.WORKER: the internal component, turn it on when debug.
+  - dingo.ObjT.BRIDGE: the internal component, turn it on when debug.
+  - dingo.ObjT.ALL: every instance.
  They are bit flags and can be combined as "targets", like:
-  InstT.BRIDGE | InstT.WORKER | ...
+  ObjT.BRIDGE | ObjT.WORKER | ...
 
  "level" are minimal severity level expected, include:
-  - ErrLvl.DEBUG
-  - ErrLvl.INFO
-  - ErrLvl.WARNING
-  - ErrLvl.Error
+  - dingo.EventLvl.DEBUG
+  - dingo.EventLvl.INFO
+  - dingo.EventLvl.WARNING
+  - dingo.EventLvl.Error
 
  "id" is the identity of this event channel, which could be used to stop
- monitoring by calling App.StopListen.
+ monitoring by calling dingo.App.StopListen.
 
  In general, a dedicated go routine would be initiated for this channel,
  with an infinite for loop, like this:
@@ -629,7 +649,8 @@ func (me *App) Listen(targets, level, expectedId int) (id int, events <-chan *Ev
 /*
  Stop listening events.
 
- Note: quit signals won't be sent for those channels stopped by App.StopListen.
+ Note: those channels stopped by App.StopListen wouldn't be closed but only
+ be reclaimed by GC.
 */
 func (me *App) StopListen(id int) (err error) {
 	// the implementation below

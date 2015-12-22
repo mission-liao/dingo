@@ -66,7 +66,7 @@ func (me *remoteBridgeTestSuite) TestReturnFix() {
 	me.Nil(err)
 
 	// compose a corresponding report
-	r, err := t.ComposeReport(Status.Success, []interface{}{int(6)}, nil)
+	r, err := t.composeReport(Status.Success, []interface{}{int(6)}, nil)
 	me.Nil(err)
 
 	// attach a reporting channel

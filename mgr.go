@@ -377,7 +377,7 @@ func (me *mgr) Return(r *Report) (err error) {
 	var ret []interface{}
 	ret, err = m.(Invoker).Return(opt.fn, r.Return())
 	if err == nil {
-		r.SetReturn(ret)
+		r.setReturn(ret)
 	}
 	return
 }

@@ -6,6 +6,7 @@ import (
 )
 
 /*
+ A marshaller implemented via json encoding.
  Note: this Marshaller can only work with GenericInvoker.
 */
 type JsonMarshaller struct{}

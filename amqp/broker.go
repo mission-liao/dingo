@@ -292,7 +292,7 @@ func (me *broker) _consumer_routine_(
 		nil,   // args
 	)
 	if err != nil {
-		events <- dingo.NewEventFromError(dingo.InstT.CONSUMER, err)
+		events <- dingo.NewEventFromError(dingo.ObjT.CONSUMER, err)
 		return
 	}
 
@@ -311,7 +311,7 @@ func (me *broker) _consumer_routine_(
 				defer func() {
 					if err != nil || !ok {
 						d.Nack(false, false)
-						events <- dingo.NewEventFromError(dingo.InstT.CONSUMER, err)
+						events <- dingo.NewEventFromError(dingo.ObjT.CONSUMER, err)
 					} else {
 						d.Ack(false)
 					}
@@ -348,7 +348,7 @@ func (me *broker) _consumer_routine_(
 clean:
 	err_ := ci.Channel.Cancel(tag, false)
 	if err_ != nil {
-		events <- dingo.NewEventFromError(dingo.InstT.CONSUMER, err_)
+		events <- dingo.NewEventFromError(dingo.ObjT.CONSUMER, err_)
 		// should we return here?,
 		// we still need to clean the delivery channel...
 	}

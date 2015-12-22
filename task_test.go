@@ -28,7 +28,7 @@ func TestTaskEqual(t *testing.T) {
 		ass.Nil(err)
 
 		o.H.I = t.H.ID()
-		ass.True(t.Equal(o))
+		ass.Equal(o, t)
 	}
 
 	// diff map
@@ -46,7 +46,7 @@ func TestTaskEqual(t *testing.T) {
 		ass.Nil(err)
 
 		o.H.I = t.H.ID()
-		ass.False(t.Equal(o))
+		ass.NotEqual(t, o)
 	}
 
 	// only Name is different
@@ -58,7 +58,7 @@ func TestTaskEqual(t *testing.T) {
 		ass.Nil(err)
 
 		o.H.I = t.H.ID()
-		ass.False(t.Equal(o))
+		ass.NotEqual(t, o)
 	}
 
 	// sequence of args is different
@@ -70,7 +70,7 @@ func TestTaskEqual(t *testing.T) {
 		ass.Nil(err)
 
 		o.H.I = t.H.ID()
-		ass.False(t.Equal(o))
+		ass.NotEqual(t, o)
 	}
 
 	// different args
@@ -82,7 +82,7 @@ func TestTaskEqual(t *testing.T) {
 		ass.Nil(err)
 
 		o.H.I = t.H.ID()
-		ass.False(t.Equal(o))
+		ass.NotEqual(t, o)
 	}
 
 	// different option
@@ -94,6 +94,6 @@ func TestTaskEqual(t *testing.T) {
 		ass.Nil(err)
 
 		o.H.I = t.H.ID()
-		ass.False(t.Equal(o))
+		ass.NotEqual(t, o)
 	}
 }
