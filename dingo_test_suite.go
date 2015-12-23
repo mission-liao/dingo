@@ -32,6 +32,7 @@ func (me *DingoSingleAppTestSuite) SetupTest() {
 	me.Nil(err)
 	me.EventMux.Handle(func(val interface{}, _ int) {
 		me.Nil(val)
+		me.Nil(val.(*Event).Payload)
 	})
 	_, err = me.EventMux.More(1)
 	me.Nil(err)

@@ -368,3 +368,9 @@ func (me *BrokerTestSuite) TestDuplicated() {
 		me.Equal(1, v)
 	}
 }
+
+func (me *BrokerTestSuite) TestExpect() {
+	me.NotNil(me.Pdc.(Object).Expect(ObjT.REPORTER))
+	me.NotNil(me.Pdc.(Object).Expect(ObjT.STORE))
+	me.NotNil(me.Pdc.(Object).Expect(ObjT.ALL))
+}

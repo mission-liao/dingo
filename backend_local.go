@@ -1,6 +1,8 @@
 package dingo
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 )
 
@@ -114,6 +116,23 @@ clean:
 // Object interface
 //
 
+func (me *localBackend) Expect(types int) (err error) {
+	if types&^(ObjT.REPORTER|ObjT.STORE) != 0 {
+		err = errors.New(fmt.Sprintf("unsupported types: %v", types))
+		return
+	}
+
+	if types&ObjT.STORE == ObjT.STORE {
+		func() {
+			me.storeLock.Lock()
+			defer me.storeLock.Unlock()
+			go me._store_routine_(me.stores.New(), me.stores.Wait(), me.stores.Events())
+		}()
+	}
+
+	return
+}
+
 func (me *localBackend) Events() ([]<-chan *Event, error) {
 	return []<-chan *Event{
 		me.reporters.Events(),
@@ -160,11 +179,6 @@ func (me *localBackend) Report(reports <-chan *ReportEnvelope) (id int, err erro
 func (me *localBackend) Poll(meta Meta) (reports <-chan []byte, err error) {
 	me.storeLock.Lock()
 	defer me.storeLock.Unlock()
-
-	if !me.isStored {
-		me.isStored = true
-		go me._store_routine_(me.stores.New(), me.stores.Wait(), me.stores.Events())
-	}
 
 	if meta == nil {
 		return

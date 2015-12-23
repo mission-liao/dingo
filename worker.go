@@ -180,6 +180,15 @@ func (me *_workers) more(name string, count, share int) (remain int, reports []<
 // Object interface
 //
 
+func (me *_workers) Expect(types int) (err error) {
+	if types != ObjT.WORKER {
+		err = errors.New(fmt.Sprintf("Unsupported types: %v", types))
+		return
+	}
+
+	return
+}
+
 func (me *_workers) Events() ([]<-chan *Event, error) {
 	return []<-chan *Event{
 		me.events,

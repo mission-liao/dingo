@@ -74,6 +74,15 @@ func (me *_mappers) allocateWorkers(name string, count, share int) ([]<-chan *Re
 // Object interface
 //
 
+func (me *_mappers) Expect(types int) (err error) {
+	if types != ObjT.MAPPER {
+		err = errors.New(fmt.Sprintf("Unsupported types: %v", types))
+		return
+	}
+
+	return
+}
+
 func (me *_mappers) Events() (ret []<-chan *Event, err error) {
 	ret, err = me.workers.Events()
 	if err != nil {
@@ -146,16 +155,19 @@ func (m *_mappers) _mapper_routine_(
 
 			if err == errWorkerNotFound {
 				rpt = TaskReceipt{
+					ID:     t.ID(),
 					Status: ReceiptStatus.WORKER_NOT_FOUND,
 				}
 			} else {
 				rpt = TaskReceipt{
+					ID:      t.ID(),
 					Status:  ReceiptStatus.NOK,
 					Payload: err,
 				}
 			}
 		} else {
 			rpt = TaskReceipt{
+				ID:     t.ID(),
 				Status: ReceiptStatus.OK,
 			}
 		}

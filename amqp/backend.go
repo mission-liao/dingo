@@ -78,6 +78,15 @@ func NewBackend(cfg *AmqpConfig) (v *backend, err error) {
 // dingo.Object interface
 //
 
+func (me *backend) Expect(types int) (err error) {
+	if types&^(dingo.ObjT.REPORTER|dingo.ObjT.STORE) != 0 {
+		err = errors.New(fmt.Sprintf("unsupported types: %v", types))
+		return
+	}
+
+	return
+}
+
 func (me *backend) Events() ([]<-chan *dingo.Event, error) {
 	return []<-chan *dingo.Event{
 		me.reporters.Events(),

@@ -79,6 +79,15 @@ clean:
 // Object interface
 //
 
+func (me *localBroker) Expect(types int) (err error) {
+	if types&^(ObjT.PRODUCER|ObjT.CONSUMER) != 0 {
+		err = errors.New(fmt.Sprintf("unsupported types: %v", types))
+		return
+	}
+
+	return
+}
+
 func (me *localBroker) Events() ([]<-chan *Event, error) {
 	return []<-chan *Event{
 		me.listeners.Events(),

@@ -40,9 +40,9 @@ func TestLocalBackendSuite(t *testing.T) {
 		dingo.BackendTestSuite{
 			Gen: func() (b dingo.Backend, err error) {
 				b, err = dingo.NewLocalBackend(dingo.DefaultConfig(), nil)
-
-				// TODO: find a better way to trigger _store_routine_
-				b.Poll(nil)
+				if err == nil {
+					err = b.(dingo.Object).Expect(dingo.ObjT.REPORTER | dingo.ObjT.STORE)
+				}
 				return
 			},
 		},

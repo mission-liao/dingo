@@ -55,9 +55,12 @@ var ObjT = struct {
  All objects attached via dingo.App.Use should implement this interface.
 */
 type Object interface {
-	//
+	// what dingo expects from this object
+	Expect(types int) error
+
+	// allow dingo to attach event channels used in this object
 	Events() ([]<-chan *Event, error)
 
-	//
+	// releasing resource
 	Close() error
 }

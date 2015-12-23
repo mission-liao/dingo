@@ -39,6 +39,15 @@ func NewBroker(cfg *RedisConfig) (v *broker, err error) {
 // dingo.Object interface
 //
 
+func (me *broker) Expect(types int) (err error) {
+	if types&^(dingo.ObjT.PRODUCER|dingo.ObjT.NAMED_CONSUMER) != 0 {
+		err = errors.New(fmt.Sprintf("unsupported types: %v", types))
+		return
+	}
+
+	return
+}
+
 func (me *broker) Events() ([]<-chan *dingo.Event, error) {
 	return []<-chan *dingo.Event{
 		me.listeners.Events(),

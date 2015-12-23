@@ -244,3 +244,10 @@ func (me *BackendTestSuite) TestSameID() {
 
 	me.Tasks = append(me.Tasks, tasks...)
 }
+
+func (me *BackendTestSuite) TestExpect() {
+	me.NotNil(me.Bkd.(Object).Expect(ObjT.PRODUCER))
+	me.NotNil(me.Bkd.(Object).Expect(ObjT.CONSUMER))
+	me.NotNil(me.Bkd.(Object).Expect(ObjT.NAMED_CONSUMER))
+	me.NotNil(me.Bkd.(Object).Expect(ObjT.ALL))
+}

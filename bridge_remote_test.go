@@ -23,15 +23,14 @@ func (me *remoteBridgeTestSuite) SetupTest() {
 	me.Nil(err)
 	me.Nil(me.bg.AttachProducer(me.brk.(Producer)))
 	me.Nil(me.bg.AttachConsumer(me.brk.(Consumer), nil))
+	me.Nil(me.brk.(Object).Expect(ObjT.PRODUCER | ObjT.CONSUMER))
 
 	// backend
 	me.bkd, err = NewLocalBackend(DefaultConfig(), nil)
 	me.Nil(err)
 	me.Nil(me.bg.AttachReporter(me.bkd.(Reporter)))
 	me.Nil(me.bg.AttachStore(me.bkd.(Store)))
-
-	// TODO: find a better way to trigger _store_routine_
-	me.bkd.Poll(nil)
+	me.Nil(me.bkd.(Object).Expect(ObjT.REPORTER | ObjT.STORE))
 }
 
 func (me *remoteBridgeTestSuite) TearDownTest() {

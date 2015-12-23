@@ -126,7 +126,7 @@ func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 	if err != nil {
 		return
 	}
-	err = v.attachEvents(v.mappers)
+	err = v.attachObject(v.mappers, ObjT.MAPPER)
 	if err != nil {
 		return
 	}
@@ -141,7 +141,7 @@ func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 	if err != nil {
 		return
 	}
-	err = v.attachEvents(v.workers)
+	err = v.attachObject(v.workers, ObjT.WORKER)
 	if err != nil {
 		return
 	}
@@ -150,8 +150,13 @@ func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 	return
 }
 
-func (me *App) attachEvents(obj Object) (err error) {
+func (me *App) attachObject(obj Object, types int) (err error) {
 	if obj == nil {
+		return
+	}
+
+	err = obj.Expect(types)
+	if err != nil {
 		return
 	}
 
@@ -404,7 +409,7 @@ func (me *App) SetOption(name string, opt *Option) error {
  ObjT.CONSUMER|ObjT.REPORTER, if reporting is not reuqired(make sure there is no producer await),
  then only ObjT.CONSUMER is used.
 */
-func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
+func (me *App) Use(obj Object, types int) (id int, used int, err error) {
 	me.objsLock.Lock()
 	defer me.objsLock.Unlock()
 
@@ -425,6 +430,11 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 	}
 
 	defer func() {
+		err_ := me.attachObject(obj.(Object), used)
+		if err == nil {
+			err = err_
+		}
+
 		me.objs[id] = &_object{
 			used: used,
 			obj:  obj,
@@ -488,13 +498,24 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 		if err != nil && types != ObjT.DEFAULT {
 			return
 		}
+
+		if err == nil {
+			if me.b.Exists(ObjT.CONSUMER) {
+				used |= ObjT.CONSUMER
+			} else if me.b.Exists(ObjT.NAMED_CONSUMER) {
+				used |= ObjT.NAMED_CONSUMER
+			} else {
+				err = errors.New("there is no consumer exists in bridge")
+				return
+			}
+		}
+
 		if err == nil {
 			err = me.allocateMappers()
 			if err != nil {
 				return
 			}
 		}
-		used |= ObjT.CONSUMER
 	}
 	if reporter != nil {
 		err = me.b.AttachReporter(reporter)
