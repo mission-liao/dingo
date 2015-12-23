@@ -65,7 +65,6 @@ func (me *resultTestSuite) TestNew() {
 func (me *resultTestSuite) TestWait() {
 	me.Nil(me.trans.Register(
 		"TestWait", func() {},
-		Encode.Default, Encode.Default,
 	))
 
 	// compose a task
@@ -124,7 +123,6 @@ func (me *resultTestSuite) TestChannelClose() {
 func (me *resultTestSuite) TestHandlerWithWait() {
 	me.Nil(me.trans.Register(
 		"TestHandlerWithWait", func() {},
-		Encode.Default, Encode.Default,
 	))
 
 	// compose a task
@@ -279,7 +277,6 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 func (me *resultTestSuite) TestThen() {
 	me.Nil(me.trans.Register(
 		"TestThen", func() {},
-		Encode.Default, Encode.Default,
 	))
 
 	// compose a task
@@ -371,7 +368,6 @@ func (me *resultTestSuite) TestOnOK() {
 	// should be panic when invoking is failed.
 	me.Nil(me.trans.Register(
 		"TestOnOK", func() {},
-		Encode.Default, Encode.Default,
 	))
 
 	// compose a task

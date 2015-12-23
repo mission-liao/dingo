@@ -57,7 +57,6 @@ func (me *remoteBridgeTestSuite) TestReturnFix() {
 	me.Nil(me.trans.Register(
 		"ReturnFix",
 		func() float64 { return 0 },
-		Encode.Default, Encode.Default,
 	))
 
 	// compose a task

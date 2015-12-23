@@ -78,7 +78,6 @@ func (me *mapperTestSuite) TestParellelMapping() {
 	}
 	me.Nil(me._trans.Register(
 		"ParellelMapping", fn,
-		Encode.Default, Encode.Default,
 	))
 
 	reports, remain, err := me._mps.allocateWorkers("ParellelMapping", 1, 0)

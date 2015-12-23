@@ -31,7 +31,7 @@ func ExampleApp_local() {
 				fmt.Printf("%v\n", msg)
 			}
 		}
-	}, dingo.Encode.Default, dingo.Encode.Default)
+	})
 	if err != nil {
 		return
 	}
@@ -60,4 +60,24 @@ func ExampleApp_local() {
 			return
 		}
 	}
+}
+
+func ExampleApp_Use_caller() {
+	// this example demostrate a caller based on AMQP, used along with ExampleApp_Use_worker
+	var err error
+	defer func() {
+		if err != nil {
+			fmt.Printf("%v\n", err)
+		}
+	}()
+}
+
+func ExampleApp_Use_worker() {
+	// this example demonstrate a worker based on AMQP, used along with ExampleApp_Use_caller
+	var err error
+	defer func() {
+		if err != nil {
+			fmt.Printf("%v\n", err)
+		}
+	}()
 }

@@ -59,6 +59,8 @@ type redisMultiAppTestSuite struct {
 func TestDingoRedisMultiAppSuite(t *testing.T) {
 	suite.Run(t, &redisMultiAppTestSuite{
 		dingo.DingoMultiAppTestSuite{
+			CountOfCallers: 3,
+			CountOfWorkers: 3,
 			GenCaller: func() (app *dingo.App, err error) {
 				app, err = dingo.NewApp("remote", nil)
 				if err != nil {

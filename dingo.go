@@ -5,8 +5,7 @@
 
  This library tries to make tasks invoking / monitoring as easy as possible.
   - any function can be a worker function, as long as types of its parameters are supported.
-  - return values are accessible.
-  - invoking tasks is similar to invoke functions locally.
+  - return values of worker functions are also accessible.
   - could be used locally as a queue for background jobs, or remotely as a distributed task queue when connected with AMQP or Redis.
 
  Design
@@ -15,7 +14,7 @@
   https://github.com/RichardKnop/machinery
   http://www.celeryproject.org/
 
- A short version of "how a task is invoked" is:
+ A short version of "how a task is invoked" in this library is:
   -------- caller ---------
   - users input arguments are treated as []interface{}
   - marshall []interface{} to []byte
@@ -41,6 +40,15 @@
  customization are task specific, thus users may choose the default marsahller/invoker for
  most tasks, and provide customized marshaller/invoker to those tasks that are performance-critical.
 
+ Customization
+
+ These concept are virtualized for extensibility and customization, please refer to
+ corresponding reference for details:
+  - Generation of ID: dingo.IDMaker
+  - Parameter Marshalling: dingo.Marshaller
+  - Worker Function Invoking: dingo.Invoker
+  - Task Publishing/Consuming: dingo.Producer/dingo.Consumer/dingo.NamedConsumer
+  - Report Publishing/Consuming: dingo.Reporter/dingo.Store
 */
 package dingo
 
@@ -300,13 +308,12 @@ func (me *App) AddIdMaker(expectedId int, m IDMaker) error {
  parameters:
   - name: name of tasks
   - fn: the function that actually perform the task.
-  - taskMash, reportMash: id of Marshaller for 'Task' and 'Report'
 
  returns:
   - err: any error produced
 */
-func (me *App) Register(name string, fn interface{}, taskMash, reportMash int) (err error) {
-	err = me.trans.Register(name, fn, taskMash, reportMash)
+func (me *App) Register(name string, fn interface{}) (err error) {
+	err = me.trans.Register(name, fn)
 	if err != nil {
 		return
 	}
@@ -390,9 +397,20 @@ func (me *App) SetOption(name string, opt *Option) error {
 }
 
 /*
+ Set marshallers used for marshalling tasks and reports
+
+ parameters:
+  - name: name of tasks
+  - taskMash, reportMash: id of Marshaller for 'Task' and 'Report'
+*/
+func (me *App) SetMarshaller(name string, taskMash, reportMash int) error {
+	return me.trans.SetMarshaller(name, taskMash, reportMash)
+}
+
+/*
  Set IDMaker used for a specific kind of tasks
 
- Parameters:
+ parameters:
   - name: name of tasks
   - idmaker: id of IDMaker you would like to use when generating tasks.
 */

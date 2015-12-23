@@ -119,31 +119,14 @@ func (me *mgr) AddMarshaller(id int, m Marshaller) (err error) {
 	return
 }
 
-func (me *mgr) Register(name string, fn interface{}, msTask, msReport int) (err error) {
+func (me *mgr) Register(name string, fn interface{}) (err error) {
 	if uint(len(name)) >= ^uint(0) {
 		err = errors.New(fmt.Sprintf("length of name exceeds maximum: %v", len(name)))
 		return
 	}
 
-	// check existence of marshaller IDs
 	ms := me.ms.Load().(map[int]Marshaller)
-	chk := func(id int) (err error) {
-		if v, ok := ms[id]; ok {
-			err = v.Prepare(name, fn)
-			if err != nil {
-				return
-			}
-		} else {
-			err = errors.New(fmt.Sprintf("marshaller id:%v is not registered", id))
-			return
-		}
-		return
-	}
-	err = chk(msTask)
-	if err != nil {
-		return
-	}
-	err = chk(msReport)
+	err = ms[Encode.Default].Prepare(name, fn)
 	if err != nil {
 		return
 	}
@@ -166,10 +149,55 @@ func (me *mgr) Register(name string, fn interface{}, msTask, msReport int) (err 
 		opt: NewOption(),
 		mash: struct {
 			task, report int
-		}{msTask, msReport},
+		}{Encode.Default, Encode.Default},
 		idMaker: ID.Default,
 	}
 	me.fn2opt.Store(nfns)
+	return
+}
+
+func (me *mgr) SetMarshaller(name string, msTask, msReport int) (err error) {
+	me.fn2optLock.Lock()
+	defer me.fn2optLock.Unlock()
+
+	fns := me.fn2opt.Load().(map[string]*fnOpt)
+	opt, ok := fns[name]
+	if !ok {
+		err = errors.New(fmt.Sprintf("name %v doesn't exists", name))
+		return
+	}
+
+	// check existence of marshaller IDs
+	ms := me.ms.Load().(map[int]Marshaller)
+	chk := func(id int) (err error) {
+		if v, ok := ms[id]; ok {
+			err = v.Prepare(name, opt.fn)
+			if err != nil {
+				return
+			}
+		} else {
+			err = errors.New(fmt.Sprintf("marshaller id:%v is not registered", id))
+			return
+		}
+		return
+	}
+	err = chk(msTask)
+	if err != nil {
+		return
+	}
+	err = chk(msReport)
+	if err != nil {
+		return
+	}
+
+	nfns := make(map[string]*fnOpt)
+	for k := range fns {
+		nfns[k] = fns[k]
+	}
+	nfns[name].mash.task = msTask
+	nfns[name].mash.report = msReport
+	me.fn2opt.Store(nfns)
+
 	return
 }
 

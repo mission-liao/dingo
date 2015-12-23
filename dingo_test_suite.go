@@ -54,7 +54,7 @@ func (me *DingoSingleAppTestSuite) TestBasic() {
 		func(n int) int {
 			called = n
 			return n + 1
-		}, Encode.Default, Encode.Default,
+		},
 	)
 	me.Nil(err)
 	remain, err := me.App_.Allocate("TestBasic", 1, 1)
@@ -118,7 +118,10 @@ type DingoMultiAppTestSuite struct {
 	EventMux                       *mux
 }
 
-func (me *DingoMultiAppTestSuite) SetupSuite()    {}
+func (me *DingoMultiAppTestSuite) SetupSuite() {
+	me.NotEqual(0, me.CountOfCallers)
+	me.NotEqual(0, me.CountOfWorkers)
+}
 func (me *DingoMultiAppTestSuite) TearDownSuite() {}
 
 func (me *DingoMultiAppTestSuite) SetupTest() {
@@ -175,12 +178,12 @@ func (me *DingoMultiAppTestSuite) TearDownTest() {
 	me.EventMux.Close()
 }
 
-func (me *DingoMultiAppTestSuite) register(name string, fn interface{}, encodeT, encodeR int) {
+func (me *DingoMultiAppTestSuite) register(name string, fn interface{}) {
 	for _, v := range me.Callers {
-		me.Nil(v.Register(name, fn, encodeT, encodeR))
+		me.Nil(v.Register(name, fn))
 	}
 	for _, v := range me.Workers {
-		me.Nil(v.Register(name, fn, encodeT, encodeR))
+		me.Nil(v.Register(name, fn))
 	}
 }
 
@@ -209,7 +212,7 @@ func (me *DingoMultiAppTestSuite) TestOrder() {
 	}
 
 	// register worker function
-	me.register("TestOrder", work, Encode.Default, Encode.Default)
+	me.register("TestOrder", work)
 	me.setOption("TestOrder", NewOption().SetMonitorProgress(true))
 	me.allocate("TestOrder", 1, 1)
 

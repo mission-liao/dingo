@@ -98,7 +98,6 @@ func (me *BridgeTestSuite) TestSendTask() {
 	me.trans.Register(
 		"SendTask",
 		func() {},
-		Encode.Default, Encode.Default,
 	)
 
 	// add listener
@@ -129,7 +128,6 @@ func (me *BridgeTestSuite) TestAddListener() {
 	me.trans.Register(
 		"AddListener",
 		func() {},
-		Encode.Default, Encode.Default,
 	)
 
 	// prepare listeners
@@ -193,7 +191,6 @@ func (me *BridgeTestSuite) TestReport() {
 	me.Nil(me.trans.Register(
 		"Report",
 		func() {},
-		Encode.Default, Encode.Default,
 	))
 
 	// attach reporter channel
@@ -234,7 +231,6 @@ func (me *BridgeTestSuite) TestPoll() {
 	me.Nil(me.trans.Register(
 		"Poll",
 		func() {},
-		Encode.Default, Encode.Default,
 	))
 	count := 1
 
@@ -318,7 +314,6 @@ func (me *BridgeTestSuite) TestFinalReportWhenShutdown() {
 	me.Nil(me.trans.Register(
 		"FinalReportWhenShutdown",
 		func() {},
-		Encode.Default, Encode.Default,
 	))
 
 	// a report channel
@@ -362,7 +357,7 @@ func (me *BridgeTestSuite) TestDifferentReportsWithSameID() {
 	for i := 0; i < countOfTypes; i++ {
 		name := fmt.Sprintf("DifferentReportsWithSameID.%d", i)
 		me.Nil(me.trans.AddIdMaker(100+i, &testSeqID{}))
-		me.Nil(me.trans.Register(name, func() {}, Encode.Default, Encode.Default))
+		me.Nil(me.trans.Register(name, func() {}))
 		me.Nil(me.trans.SetIDMaker(name, 100+i))
 
 		for j := 0; j < countOfTasks; j++ {

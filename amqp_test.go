@@ -59,6 +59,8 @@ type amqpMultiAppTestSuite struct {
 func TestDingoAmqpMultiAppSuite(t *testing.T) {
 	suite.Run(t, &amqpMultiAppTestSuite{
 		dingo.DingoMultiAppTestSuite{
+			CountOfCallers: 3,
+			CountOfWorkers: 3,
 			GenCaller: func() (app *dingo.App, err error) {
 				app, err = dingo.NewApp("remote", nil)
 				if err != nil {
