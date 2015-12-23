@@ -9,40 +9,51 @@ import (
 )
 
 //
-// local(Broker) + local(Backend)
+// local(Broker) + local(Backend), Single App
 //
 
-type localTestSuite struct {
-	dingo.DingoTestSuite
+type localSingleAppTestSuite struct {
+	dingo.DingoSingleAppTestSuite
 	wireBroker  chan []byte
 	wireBackend chan *dingo.ReportEnvelope
 }
 
-func (me *localTestSuite) SetupSuite() {
-	me.reset()
-	me.DingoTestSuite.SetupSuite()
-}
-
-func (me *localTestSuite) SetupTest() {
-	me.reset()
-}
-
-func (me *localTestSuite) reset() {
+func (me *localSingleAppTestSuite) SetupTest() {
 	// reset the 'virtual wire' for every test
 	me.wireBroker, me.wireBackend = make(chan []byte, 10), make(chan *dingo.ReportEnvelope, 10)
 
-	me.DingoTestSuite.GenBroker = func() (v interface{}, err error) {
-		v, err = dingo.NewLocalBroker(dingo.DefaultConfig(), me.wireBroker)
+	me.GenApp = func() (app *dingo.App, err error) {
+		app, err = dingo.NewApp("remote", nil)
+		if err != nil {
+			return
+		}
+
+		brk, err := dingo.NewLocalBroker(dingo.DefaultConfig(), me.wireBroker)
+		if err != nil {
+			return
+		}
+		_, _, err = app.Use(brk, dingo.ObjT.DEFAULT)
+		if err != nil {
+			return
+		}
+
+		bkd, err := dingo.NewLocalBackend(dingo.DefaultConfig(), me.wireBackend)
+		if err != nil {
+			return
+		}
+		_, _, err = app.Use(bkd, dingo.ObjT.DEFAULT)
+		if err != nil {
+			return
+		}
+
 		return
 	}
-	me.DingoTestSuite.GenBackend = func() (b dingo.Backend, err error) {
-		b, err = dingo.NewLocalBackend(dingo.DefaultConfig(), me.wireBackend)
-		return
-	}
+
+	me.DingoSingleAppTestSuite.SetupTest()
 }
 
-func TestDingoLocalSuite(t *testing.T) {
-	suite.Run(t, &localTestSuite{})
+func TestDingoLocalSingleSuite(t *testing.T) {
+	suite.Run(t, &localSingleAppTestSuite{})
 }
 
 //
@@ -52,7 +63,7 @@ func TestDingoLocalSuite(t *testing.T) {
 // thus we only test it here.
 //
 
-func (me *localTestSuite) TestIgnoreReport() {
+func (me *localSingleAppTestSuite) TestIgnoreReport() {
 	// initiate workers
 	me.Nil(me.App_.Register(
 		"TestIgnoreReport", func() {},
@@ -176,7 +187,7 @@ func (me *testMyInvoker) Return(f interface{}, returns []interface{}) ([]interfa
 	return returns, nil
 }
 
-func (me *localTestSuite) TestMyMarshaller() {
+func (me *localSingleAppTestSuite) TestMyMarshaller() {
 	fn := func(n int, name string) (msg string, count int) {
 		msg = name + "_'s message"
 		count = n + 1
@@ -240,7 +251,7 @@ func (me *testMyCodec) DecodeReturn(fn interface{}, bs [][]byte) ([]interface{},
 	return []interface{}{msg, count}, nil
 }
 
-func (me *localTestSuite) TestCustomMarshaller() {
+func (me *localSingleAppTestSuite) TestCustomMarshaller() {
 	fn := func(n int, name string) (msg string, count int) {
 		msg = name + "_'s message"
 		count = n + 1
@@ -315,7 +326,7 @@ func (me *testMyMinimalCodec) DecodeReturn(fn interface{}, bs [][]byte) (val []i
 	return
 }
 
-func (me *localTestSuite) TestCustomMarshallerWithMinimalFunc() {
+func (me *localSingleAppTestSuite) TestCustomMarshallerWithMinimalFunc() {
 	called := false
 	fn := func() {
 		called = true
@@ -360,4 +371,115 @@ finished:
 		}
 	}
 	me.True(called)
+}
+
+//
+// local(Broker) + local(Backend), multi App
+//
+
+type localMultiAppTestSuite struct {
+	dingo.DingoMultiAppTestSuite
+
+	wireBroker  chan []byte
+	wireBackend chan *dingo.ReportEnvelope
+}
+
+func (me *localMultiAppTestSuite) SetupTest() {
+	// reset the 'virtual wire' for every test
+	me.wireBroker, me.wireBackend = make(chan []byte, 10), make(chan *dingo.ReportEnvelope, 10)
+
+	me.GenCaller = func() (app *dingo.App, err error) {
+		app, err = dingo.NewApp("remote", nil)
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+
+		brk, err := dingo.NewLocalBroker(dingo.DefaultConfig(), me.wireBroker)
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+		_, _, err = app.Use(brk, dingo.ObjT.PRODUCER)
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+
+		bkd, err := dingo.NewLocalBackend(dingo.DefaultConfig(), me.wireBackend)
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+		_, _, err = app.Use(bkd, dingo.ObjT.STORE)
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+
+		return
+	}
+
+	me.GenWorker = func() (app *dingo.App, err error) {
+		app, err = dingo.NewApp("remote", nil)
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+
+		brk, err := dingo.NewLocalBroker(dingo.DefaultConfig(), me.wireBroker)
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+		_, _, err = app.Use(brk, dingo.ObjT.CONSUMER)
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+
+		bkd, err := dingo.NewLocalBackend(dingo.DefaultConfig(), me.wireBackend)
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+		_, _, err = app.Use(bkd, dingo.ObjT.REPORTER)
+		me.Nil(err)
+		if err != nil {
+			return
+		}
+
+		return
+	}
+
+	me.DingoMultiAppTestSuite.SetupTest()
+}
+
+func TestDingoLocalMultiAppSuite(t *testing.T) {
+	suite.Run(t, &localMultiAppTestSuite{
+		dingo.DingoMultiAppTestSuite{
+			CountOfCallers: 1,
+			CountOfWorkers: 1,
+		},
+		nil,
+		nil,
+	})
+}
+
+//
+// local mode
+//
+
+type localModeTestSuite struct {
+	dingo.DingoSingleAppTestSuite
+}
+
+func TestDingoLocalModeTestSuite(t *testing.T) {
+	suite.Run(t, &localModeTestSuite{
+		dingo.DingoSingleAppTestSuite{
+			GenApp: func() (*dingo.App, error) {
+				return dingo.NewApp("local", nil)
+			},
+		},
+	})
 }

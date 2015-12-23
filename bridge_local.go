@@ -14,29 +14,24 @@ type localStorePoller struct {
 
 type localBridge struct {
 	objLock   sync.RWMutex
-	needed    int
+	supported int
 	broker    chan *Task
 	listeners *Routines
 	reporters *Routines
 	pollers   chan *localStorePoller
 	events    chan *Event
-	eventMux  *mux
 }
 
 func newLocalBridge(args ...interface{}) (b bridge) {
 	v := &localBridge{
 		events:    make(chan *Event, 10),
-		eventMux:  newMux(),
 		listeners: NewRoutines(),
 		reporters: NewRoutines(),
 		broker:    make(chan *Task, 10),
 		pollers:   make(chan *localStorePoller, 10),
+		supported: ObjT.REPORTER | ObjT.STORE | ObjT.PRODUCER | ObjT.CONSUMER,
 	}
 	b = v
-
-	v.eventMux.Handle(func(val interface{}, _ int) {
-		v.events <- val.(*Event)
-	})
 
 	return
 }
@@ -53,7 +48,6 @@ func (me *localBridge) Close() (err error) {
 
 	me.listeners.Close()
 	me.reporters.Close()
-	me.eventMux.Close()
 
 	close(me.broker)
 	me.broker = make(chan *Task, 10)
@@ -67,11 +61,6 @@ func (me *localBridge) Register(name string, fn interface{}) (err error) {
 func (me *localBridge) SendTask(t *Task) (err error) {
 	me.objLock.RLock()
 	defer me.objLock.RUnlock()
-
-	if me.needed&ObjT.PRODUCER == 0 {
-		err = errors.New("producer is not attached")
-		return
-	}
 
 	me.broker <- t
 	return
@@ -88,11 +77,6 @@ func (me *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *Task
 
 	tasks2 := make(chan *Task, 10)
 	tasks = tasks2
-
-	if me.needed&ObjT.CONSUMER == 0 {
-		err = errors.New("consumer is not attached")
-		return
-	}
 
 	go func(
 		quit <-chan int,
@@ -169,11 +153,6 @@ func (me *localBridge) StopAllListeners() (err error) {
 	me.objLock.Lock()
 	defer me.objLock.Unlock()
 
-	if me.needed&ObjT.CONSUMER == 0 {
-		err = errors.New("consumer is not attached")
-		return
-	}
-
 	me.listeners.Close()
 	return
 }
@@ -181,11 +160,6 @@ func (me *localBridge) StopAllListeners() (err error) {
 func (me *localBridge) Report(reports <-chan *Report) (err error) {
 	me.objLock.RLock()
 	defer me.objLock.RUnlock()
-
-	if me.needed&ObjT.REPORTER == 0 {
-		err = errors.New("reporter is not attached")
-		return
-	}
 
 	go func(
 		quit <-chan int,
@@ -349,10 +323,6 @@ func (me *localBridge) Report(reports <-chan *Report) (err error) {
 }
 
 func (me *localBridge) Poll(t *Task) (reports <-chan *Report, err error) {
-	if me.needed&ObjT.STORE == 0 {
-		err = errors.New("store is not attached")
-		return
-	}
 	reports2 := make(chan *Report, Status.Count)
 	me.pollers <- &localStorePoller{
 		task:    t,
@@ -364,22 +334,18 @@ func (me *localBridge) Poll(t *Task) (reports <-chan *Report, err error) {
 }
 
 func (me *localBridge) AttachReporter(r Reporter) (err error) {
-	me.needed |= ObjT.REPORTER
 	return
 }
 
 func (me *localBridge) AttachStore(s Store) (err error) {
-	me.needed |= ObjT.STORE
 	return
 }
 
 func (me *localBridge) AttachProducer(p Producer) (err error) {
-	me.needed |= ObjT.PRODUCER
 	return
 }
 
 func (me *localBridge) AttachConsumer(c Consumer, nc NamedConsumer) (err error) {
-	me.needed |= ObjT.CONSUMER
 	return
 }
 
@@ -387,13 +353,13 @@ func (me *localBridge) Exists(it int) bool {
 	// make sure only one component is selected
 	switch it {
 	case ObjT.PRODUCER:
-		return me.needed&it == it
+		return me.supported&it == it
 	case ObjT.CONSUMER:
-		return me.needed&it == it
+		return me.supported&it == it
 	case ObjT.REPORTER:
-		return me.needed&it == it
+		return me.supported&it == it
 	case ObjT.STORE:
-		return me.needed&it == it
+		return me.supported&it == it
 	}
 
 	return false

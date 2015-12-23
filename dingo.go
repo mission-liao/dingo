@@ -84,6 +84,9 @@ type App struct {
   - "remote": an App works in remote(distributed) mode, brokers(ex. AMQP...) and backends(ex. redis..., if required) would be needed to work.
 */
 func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
+	if cfg == nil {
+		cfg = DefaultConfig()
+	}
 	v := &App{
 		objs:     make(map[int]*_object),
 		eventMux: newMux(),
@@ -124,6 +127,11 @@ func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 		return
 	}
 	err = v.attachEvents(v.mappers)
+	if err != nil {
+		return
+	}
+	// 'local' mode
+	err = v.allocateMappers()
 	if err != nil {
 		return
 	}
@@ -174,6 +182,26 @@ func (me *App) attachEvents(obj Object) (err error) {
 		}
 		eids = append(eids, id)
 	}
+	return
+}
+
+func (me *App) allocateMappers() (err error) {
+	if me.b.Exists(ObjT.CONSUMER) {
+		var (
+			remain int
+			tasks  <-chan *Task
+		)
+		for remain = me.cfg.Mappers_; remain > 0; remain-- {
+			receipts := make(chan *TaskReceipt, 10)
+			tasks, err = me.b.AddListener(receipts)
+			if err != nil {
+				return
+			}
+
+			me.mappers.more(tasks, receipts)
+		}
+	}
+
 	return
 }
 
@@ -460,19 +488,10 @@ func (me *App) Use(obj interface{}, types int) (id int, used int, err error) {
 		if err != nil && types != ObjT.DEFAULT {
 			return
 		}
-		if err == nil && me.b.Exists(ObjT.CONSUMER) {
-			var (
-				remain int
-				tasks  <-chan *Task
-			)
-			for remain = me.cfg.Mappers_; remain > 0; remain-- {
-				receipts := make(chan *TaskReceipt, 10)
-				tasks, err = me.b.AddListener(receipts)
-				if err != nil {
-					return
-				}
-
-				me.mappers.more(tasks, receipts)
+		if err == nil {
+			err = me.allocateMappers()
+			if err != nil {
+				return
 			}
 		}
 		used |= ObjT.CONSUMER

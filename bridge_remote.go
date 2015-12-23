@@ -25,7 +25,6 @@ type remoteBridge struct {
 	storers   *Routines
 	doners    chan Meta
 	events    chan *Event
-	eventMux  *mux
 	trans     *mgr
 }
 
@@ -35,15 +34,10 @@ func newRemoteBridge(trans *mgr) (b bridge) {
 		reporters: NewRoutines(),
 		storers:   NewRoutines(),
 		events:    make(chan *Event, 10),
-		eventMux:  newMux(),
 		doners:    make(chan Meta, 10),
 		trans:     trans,
 	}
 	b = v
-
-	v.eventMux.Handle(func(val interface{}, _ int) {
-		v.events <- val.(*Event)
-	})
 
 	return
 }
@@ -53,7 +47,6 @@ func (me *remoteBridge) Close() (err error) {
 	me.reporters.Close()
 	me.storers.Close()
 
-	me.eventMux.Close()
 	close(me.events)
 	me.events = make(chan *Event, 10)
 
@@ -269,7 +262,6 @@ func (me *remoteBridge) Poll(t *Task) (reports <-chan *Report, err error) {
 			case _, _ = <-quit:
 				break finished
 			case v, ok := <-inputs:
-				_ = "breakpoint"
 				if !ok {
 					break finished
 				}
