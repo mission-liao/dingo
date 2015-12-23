@@ -11,12 +11,12 @@ import (
 
 type resultTestSuite struct {
 	suite.Suite
-	trans *mgr
+	trans *fnMgr
 }
 
 func TestResultSuite(t *testing.T) {
 	suite.Run(t, &resultTestSuite{
-		trans: newMgr(),
+		trans: newFnMgr(),
 	})
 }
 

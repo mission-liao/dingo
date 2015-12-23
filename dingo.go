@@ -81,7 +81,7 @@ type App struct {
 	eventOut     atomic.Value
 	eventOutLock sync.Mutex
 	b            bridge
-	trans        *mgr
+	trans        *fnMgr
 	mappers      *_mappers
 	workers      *_workers
 }
@@ -98,7 +98,7 @@ func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 	v := &App{
 		objs:     make(map[int]*_object),
 		eventMux: newMux(),
-		trans:    newMgr(),
+		trans:    newFnMgr(),
 		cfg:      *cfg,
 	}
 	v.b = newBridge(nameOfBridge, v.trans)

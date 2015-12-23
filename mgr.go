@@ -16,7 +16,10 @@ type fnOpt struct {
 	opt     *Option
 }
 
-type mgr struct {
+/*
+ every setting related to worker functions is here.
+*/
+type fnMgr struct {
 	msLock     sync.Mutex
 	ms         atomic.Value
 	imsLock    sync.Mutex
@@ -25,8 +28,8 @@ type mgr struct {
 	fn2opt     atomic.Value
 }
 
-func newMgr() (c *mgr) {
-	c = &mgr{}
+func newFnMgr() (c *fnMgr) {
+	c = &fnMgr{}
 
 	// init for marshaller's'
 	ms := make(map[int]Marshaller)
@@ -74,7 +77,7 @@ func newMgr() (c *mgr) {
 	return
 }
 
-func (me *mgr) AddIdMaker(id int, m IDMaker) (err error) {
+func (me *fnMgr) AddIdMaker(id int, m IDMaker) (err error) {
 	me.imsLock.Lock()
 	defer me.imsLock.Unlock()
 
@@ -93,7 +96,7 @@ func (me *mgr) AddIdMaker(id int, m IDMaker) (err error) {
 	return
 }
 
-func (me *mgr) AddMarshaller(id int, m Marshaller) (err error) {
+func (me *fnMgr) AddMarshaller(id int, m Marshaller) (err error) {
 	// a Marshaller should depend on an Invoker
 	_, ok := m.(Invoker)
 	if !ok {
@@ -119,7 +122,7 @@ func (me *mgr) AddMarshaller(id int, m Marshaller) (err error) {
 	return
 }
 
-func (me *mgr) Register(name string, fn interface{}) (err error) {
+func (me *fnMgr) Register(name string, fn interface{}) (err error) {
 	if uint(len(name)) >= ^uint(0) {
 		err = errors.New(fmt.Sprintf("length of name exceeds maximum: %v", len(name)))
 		return
@@ -156,7 +159,7 @@ func (me *mgr) Register(name string, fn interface{}) (err error) {
 	return
 }
 
-func (me *mgr) SetMarshaller(name string, msTask, msReport int) (err error) {
+func (me *fnMgr) SetMarshaller(name string, msTask, msReport int) (err error) {
 	me.fn2optLock.Lock()
 	defer me.fn2optLock.Unlock()
 
@@ -201,7 +204,7 @@ func (me *mgr) SetMarshaller(name string, msTask, msReport int) (err error) {
 	return
 }
 
-func (me *mgr) SetOption(name string, opt *Option) (err error) {
+func (me *fnMgr) SetOption(name string, opt *Option) (err error) {
 	if opt == nil {
 		err = errors.New("nil Option is not acceptable")
 		return
@@ -225,7 +228,7 @@ func (me *mgr) SetOption(name string, opt *Option) (err error) {
 	return
 }
 
-func (me *mgr) SetIDMaker(name string, id int) (err error) {
+func (me *fnMgr) SetIDMaker(name string, id int) (err error) {
 	// check existence of id
 	ims := me.ims.Load().(map[int]IDMaker)
 	_, ok := ims[id]
@@ -252,7 +255,7 @@ func (me *mgr) SetIDMaker(name string, id int) (err error) {
 	return
 }
 
-func (me *mgr) GetOption(name string) (opt *Option, err error) {
+func (me *fnMgr) GetOption(name string) (opt *Option, err error) {
 	fns := me.fn2opt.Load().(map[string]*fnOpt)
 	if fn, ok := fns[name]; ok {
 		opt = fn.opt
@@ -263,7 +266,7 @@ func (me *mgr) GetOption(name string) (opt *Option, err error) {
 	return
 }
 
-func (me *mgr) ComposeTask(name string, o *Option, args []interface{}) (t *Task, err error) {
+func (me *fnMgr) ComposeTask(name string, o *Option, args []interface{}) (t *Task, err error) {
 	fn := me.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[name]
 	if !ok {
@@ -297,7 +300,7 @@ func (me *mgr) ComposeTask(name string, o *Option, args []interface{}) (t *Task,
 	return
 }
 
-func (me *mgr) EncodeTask(task *Task) (b []byte, err error) {
+func (me *fnMgr) EncodeTask(task *Task) (b []byte, err error) {
 	fn := me.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[task.Name()]
 	if !ok {
@@ -316,7 +319,7 @@ func (me *mgr) EncodeTask(task *Task) (b []byte, err error) {
 	return
 }
 
-func (me *mgr) DecodeTask(b []byte) (task *Task, err error) {
+func (me *fnMgr) DecodeTask(b []byte) (task *Task, err error) {
 	h, err := DecodeHeader(b)
 	if err != nil {
 		return
@@ -342,7 +345,7 @@ func (me *mgr) DecodeTask(b []byte) (task *Task, err error) {
 	return
 }
 
-func (me *mgr) EncodeReport(report *Report) (b []byte, err error) {
+func (me *fnMgr) EncodeReport(report *Report) (b []byte, err error) {
 	// looking for marshaller-option
 	fn := me.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[report.Name()]
@@ -363,7 +366,7 @@ func (me *mgr) EncodeReport(report *Report) (b []byte, err error) {
 	return
 }
 
-func (me *mgr) DecodeReport(b []byte) (report *Report, err error) {
+func (me *fnMgr) DecodeReport(b []byte) (report *Report, err error) {
 	h, err := DecodeHeader(b)
 	if err != nil {
 		return
@@ -389,7 +392,7 @@ func (me *mgr) DecodeReport(b []byte) (report *Report, err error) {
 	return
 }
 
-func (me *mgr) Call(t *Task) (ret []interface{}, err error) {
+func (me *fnMgr) Call(t *Task) (ret []interface{}, err error) {
 	// looking for marshaller-option
 	fn := me.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[t.Name()]
@@ -410,7 +413,7 @@ func (me *mgr) Call(t *Task) (ret []interface{}, err error) {
 	return
 }
 
-func (me *mgr) Return(r *Report) (err error) {
+func (me *fnMgr) Return(r *Report) (err error) {
 	// looking for marshaller-option
 	fn := me.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[r.Name()]

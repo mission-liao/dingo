@@ -37,7 +37,7 @@ type _workers struct {
 	workers     atomic.Value
 	events      chan *Event
 	eventMux    *mux
-	trans       *mgr
+	trans       *fnMgr
 	hooks       exHooks
 }
 
@@ -214,7 +214,7 @@ func (me *_workers) Close() (err error) {
 }
 
 // factory function
-func newWorkers(trans *mgr, hooks exHooks) (w *_workers, err error) {
+func newWorkers(trans *fnMgr, hooks exHooks) (w *_workers, err error) {
 	w = &_workers{
 		events:   make(chan *Event, 10),
 		eventMux: newMux(),

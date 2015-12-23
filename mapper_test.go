@@ -11,7 +11,7 @@ type mapperTestSuite struct {
 
 	_mps            *_mappers
 	_tasks          chan *Task
-	_trans          *mgr
+	_trans          *fnMgr
 	_hooks          exHooks
 	_countOfMappers int
 	_receiptsMux    *mux
@@ -20,7 +20,7 @@ type mapperTestSuite struct {
 
 func TestMapperSuite(t *testing.T) {
 	suite.Run(t, &mapperTestSuite{
-		_trans:          newMgr(),
+		_trans:          newFnMgr(),
 		_hooks:          newLocalBridge().(exHooks),
 		_tasks:          make(chan *Task, 5),
 		_countOfMappers: 3,

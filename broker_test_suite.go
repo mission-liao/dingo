@@ -27,7 +27,7 @@ import (
 type BrokerTestSuite struct {
 	suite.Suite
 
-	Trans         *mgr
+	Trans         *fnMgr
 	Gen           func() (interface{}, error)
 	Pdc           Producer
 	Csm           Consumer
@@ -57,7 +57,7 @@ func (me *BrokerTestSuite) SetupTest() {
 	}
 
 	me.ConsumerNames = []string{}
-	me.Trans = newMgr()
+	me.Trans = newFnMgr()
 }
 
 func (me *BrokerTestSuite) TearDownTest() {

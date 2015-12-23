@@ -10,7 +10,7 @@ import (
 
 func TestMgrMarshallers(t *testing.T) {
 	ass := assert.New(t)
-	trans := newMgr()
+	trans := newFnMgr()
 	ass.Nil(trans.Register("TestMgrMarshallers", func() {}))
 	ass.Nil(trans.SetMarshaller("TestMgrMarshallers", Encode.JSON, Encode.GOB))
 	task, err := trans.ComposeTask("TestMgrMarshallers", nil, []interface{}{float64(1)})
@@ -64,7 +64,7 @@ func TestMgrInvokers(t *testing.T) {
 	}
 
 	ass := assert.New(t)
-	trans := newMgr()
+	trans := newFnMgr()
 	ass.Nil(trans.Register("TestMgrInvokers", fn))
 	ass.Nil(trans.SetMarshaller("TestMgrInvokers", Encode.JSON, Encode.JSON))
 
@@ -91,7 +91,7 @@ func TestMgrInvokers(t *testing.T) {
 
 func TestMgrOption(t *testing.T) {
 	ass := assert.New(t)
-	trans := newMgr()
+	trans := newFnMgr()
 
 	// name doesn't register
 	ass.NotNil(trans.SetOption("TestMgrOption", NewOption()))
@@ -118,7 +118,7 @@ func TestMgrOption(t *testing.T) {
 
 func TestMgrRegister(t *testing.T) {
 	ass := assert.New(t)
-	trans := newMgr()
+	trans := newFnMgr()
 
 	// register a function, with not-existed marshaller id.
 	ass.Nil(trans.Register("TestMgrResgister", func() {}))
@@ -141,7 +141,7 @@ func (me *testAlwaysErrorIDMaker) NewID() (string, error) { return "", errors.Ne
 
 func TestMgrIDMaker(t *testing.T) {
 	ass := assert.New(t)
-	trans := newMgr()
+	trans := newFnMgr()
 
 	// register a function
 	ass.Nil(trans.Register("TestMgrIDMaker", func() {}))
