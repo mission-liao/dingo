@@ -75,7 +75,7 @@ func (me *BackendTestSuite) TearDownTest() {
 
 func (me *BackendTestSuite) TestBasic() {
 	// register an encoding for this method
-	me.Nil(me.Trans.Register("basic", func() {}, Encode.Default, Encode.Default, ID.Default))
+	me.Nil(me.Trans.Register("basic", func() {}, Encode.Default, Encode.Default))
 
 	// compose a dummy task
 	task, err := me.Trans.ComposeTask("basic", nil, []interface{}{})
@@ -163,7 +163,7 @@ func (me *BackendTestSuite) chks(task *Task, wait *sync.WaitGroup) {
 
 func (me *BackendTestSuite) TestOrder() {
 	// send reports of tasks, make sure their order correct
-	me.Nil(me.Trans.Register("order", func() {}, Encode.Default, Encode.Default, ID.Default))
+	me.Nil(me.Trans.Register("order", func() {}, Encode.Default, Encode.Default))
 
 	var (
 		tasks []*Task
@@ -198,9 +198,9 @@ type testSeqID struct {
 	cur int
 }
 
-func (me *testSeqID) NewID() string {
+func (me *testSeqID) NewID() (string, error) {
 	me.cur++
-	return fmt.Sprintf("%d", me.cur)
+	return fmt.Sprintf("%d", me.cur), nil
 }
 
 func (me *BackendTestSuite) TestSameID() {
@@ -218,7 +218,8 @@ func (me *BackendTestSuite) TestSameID() {
 	for i := 0; i < countOfTypes; i++ {
 		name := fmt.Sprintf("SameID.%d", i)
 		me.Nil(me.Trans.AddIdMaker(100+i, &testSeqID{}))
-		me.Nil(me.Trans.Register(name, func() {}, Encode.Default, Encode.Default, 100+i))
+		me.Nil(me.Trans.Register(name, func() {}, Encode.Default, Encode.Default))
+		me.Nil(me.Trans.SetIDMaker(name, 100+i))
 
 		for j := 0; j < countOfTasks; j++ {
 			t, err := me.Trans.ComposeTask(name, nil, nil)

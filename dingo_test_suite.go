@@ -54,7 +54,7 @@ func (me *DingoSingleAppTestSuite) TestBasic() {
 		func(n int) int {
 			called = n
 			return n + 1
-		}, Encode.Default, Encode.Default, ID.Default,
+		}, Encode.Default, Encode.Default,
 	)
 	me.Nil(err)
 	remain, err := me.App_.Allocate("TestBasic", 1, 1)
@@ -175,12 +175,12 @@ func (me *DingoMultiAppTestSuite) TearDownTest() {
 	me.EventMux.Close()
 }
 
-func (me *DingoMultiAppTestSuite) register(name string, fn interface{}, encodeT, encodeR, id int) {
+func (me *DingoMultiAppTestSuite) register(name string, fn interface{}, encodeT, encodeR int) {
 	for _, v := range me.Callers {
-		me.Nil(v.Register(name, fn, encodeT, encodeR, id))
+		me.Nil(v.Register(name, fn, encodeT, encodeR))
 	}
 	for _, v := range me.Workers {
-		me.Nil(v.Register(name, fn, encodeT, encodeR, id))
+		me.Nil(v.Register(name, fn, encodeT, encodeR))
 	}
 }
 
@@ -209,7 +209,7 @@ func (me *DingoMultiAppTestSuite) TestOrder() {
 	}
 
 	// register worker function
-	me.register("TestOrder", work, Encode.Default, Encode.Default, ID.Default)
+	me.register("TestOrder", work, Encode.Default, Encode.Default)
 	me.setOption("TestOrder", NewOption().SetMonitorProgress(true))
 	me.allocate("TestOrder", 1, 1)
 

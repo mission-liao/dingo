@@ -51,7 +51,7 @@ func (me *workerTestSuite) TestParellelRun() {
 	}
 	me.Nil(me._trans.Register(
 		"TestParellelRun", fn,
-		Encode.Default, Encode.Default, ID.Default,
+		Encode.Default, Encode.Default,
 	))
 	reports, remain, err := me._ws.allocate("TestParellelRun", tasks, nil, 3, 0)
 	me.Nil(err)
@@ -83,7 +83,7 @@ func (me *workerTestSuite) TestParellelRun() {
 func (me *workerTestSuite) TestPanic() {
 	// allocate workers
 	tasks := make(chan *Task)
-	me.Nil(me._trans.Register("TestPanic", func() { panic("QQ") }, Encode.Default, Encode.Default, ID.Default))
+	me.Nil(me._trans.Register("TestPanic", func() { panic("QQ") }, Encode.Default, Encode.Default))
 	reports, remain, err := me._ws.allocate("TestPanic", tasks, nil, 1, 0)
 	me.Nil(err)
 	me.Equal(0, remain)
@@ -107,7 +107,7 @@ func (me *workerTestSuite) TestPanic() {
 func (me *workerTestSuite) TestIgnoreReport() {
 	// allocate workers
 	tasks := make(chan *Task)
-	me.Nil(me._trans.Register("TestIgnoreReport", func() {}, Encode.Default, Encode.Default, ID.Default))
+	me.Nil(me._trans.Register("TestIgnoreReport", func() {}, Encode.Default, Encode.Default))
 	reports, remain, err := me._ws.allocate("TestIgnoreReport", tasks, nil, 1, 0)
 	me.Nil(err)
 	me.Equal(0, remain)
@@ -133,7 +133,7 @@ func (me *workerTestSuite) TestIgnoreReport() {
 func (me *workerTestSuite) TestMonitorProgress() {
 	// allocate workers
 	tasks := make(chan *Task)
-	me.Nil(me._trans.Register("TestOnlyResult", func() {}, Encode.Default, Encode.Default, ID.Default))
+	me.Nil(me._trans.Register("TestOnlyResult", func() {}, Encode.Default, Encode.Default))
 	reports, remain, err := me._ws.allocate("TestOnlyResult", tasks, nil, 1, 0)
 	me.Nil(err)
 	me.Equal(0, remain)

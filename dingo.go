@@ -301,13 +301,12 @@ func (me *App) AddIdMaker(expectedId int, m IDMaker) error {
   - name: name of tasks
   - fn: the function that actually perform the task.
   - taskMash, reportMash: id of Marshaller for 'Task' and 'Report'
-  - idmaker: id of IDMaker you would like to use when generating tasks.
 
  returns:
   - err: any error produced
 */
-func (me *App) Register(name string, fn interface{}, taskMash, reportMash, idmaker int) (err error) {
-	err = me.trans.Register(name, fn, taskMash, reportMash, idmaker)
+func (me *App) Register(name string, fn interface{}, taskMash, reportMash int) (err error) {
+	err = me.trans.Register(name, fn, taskMash, reportMash)
 	if err != nil {
 		return
 	}
@@ -388,6 +387,17 @@ func (me *App) Allocate(name string, count, share int) (remain int, err error) {
 */
 func (me *App) SetOption(name string, opt *Option) error {
 	return me.trans.SetOption(name, opt)
+}
+
+/*
+ Set IDMaker used for a specific kind of tasks
+
+ Parameters:
+  - name: name of tasks
+  - idmaker: id of IDMaker you would like to use when generating tasks.
+*/
+func (me *App) SetIDMaker(name string, id int) error {
+	return me.trans.SetIDMaker(name, id)
 }
 
 /*

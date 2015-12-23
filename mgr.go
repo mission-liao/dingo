@@ -119,7 +119,7 @@ func (me *mgr) AddMarshaller(id int, m Marshaller) (err error) {
 	return
 }
 
-func (me *mgr) Register(name string, fn interface{}, msTask, msReport int, idMaker int) (err error) {
+func (me *mgr) Register(name string, fn interface{}, msTask, msReport int) (err error) {
 	if uint(len(name)) >= ^uint(0) {
 		err = errors.New(fmt.Sprintf("length of name exceeds maximum: %v", len(name)))
 		return
@@ -148,13 +148,6 @@ func (me *mgr) Register(name string, fn interface{}, msTask, msReport int, idMak
 		return
 	}
 
-	// check existence of idMaker's ID
-	ims := me.ims.Load().(map[int]IDMaker)
-	if _, ok := ims[idMaker]; !ok {
-		err = errors.New(fmt.Sprintf("idmaker id:%v is not registered", idMaker))
-		return
-	}
-
 	// insert the newly created record
 	me.fn2optLock.Lock()
 	defer me.fn2optLock.Unlock()
@@ -174,7 +167,7 @@ func (me *mgr) Register(name string, fn interface{}, msTask, msReport int, idMak
 		mash: struct {
 			task, report int
 		}{msTask, msReport},
-		idMaker: idMaker,
+		idMaker: ID.Default,
 	}
 	me.fn2opt.Store(nfns)
 	return
@@ -199,6 +192,33 @@ func (me *mgr) SetOption(name string, opt *Option) (err error) {
 		nfns[k] = fns[k]
 	}
 	nfns[name].opt = opt
+	me.fn2opt.Store(nfns)
+
+	return
+}
+
+func (me *mgr) SetIDMaker(name string, id int) (err error) {
+	// check existence of id
+	ims := me.ims.Load().(map[int]IDMaker)
+	_, ok := ims[id]
+	if !ok {
+		err = errors.New(fmt.Sprintf("idMaker not found: %v %v", name, id))
+		return
+	}
+
+	me.fn2optLock.Lock()
+	defer me.fn2optLock.Unlock()
+
+	fns := me.fn2opt.Load().(map[string]*fnOpt)
+	if _, ok := fns[name]; !ok {
+		err = errors.New(fmt.Sprintf("name %v doesn't exists", name))
+		return
+	}
+	nfns := make(map[string]*fnOpt)
+	for k := range fns {
+		nfns[k] = fns[k]
+	}
+	nfns[name].idMaker = id
 	me.fn2opt.Store(nfns)
 
 	return
@@ -234,8 +254,13 @@ func (me *mgr) ComposeTask(name string, o *Option, args []interface{}) (t *Task,
 		o = NewOption()
 	}
 
+	id, err := m.NewID()
+	if err != nil {
+		return
+	}
+
 	t = &Task{
-		H: NewHeader(m.NewID(), name),
+		H: NewHeader(id, name),
 		P: &TaskPayload{
 			O: o,
 			A: args,

@@ -27,17 +27,23 @@ type Task struct {
 	P *TaskPayload
 }
 
-func composeTask(name string, opt *Option, args []interface{}) (*Task, error) {
+func composeTask(name string, opt *Option, args []interface{}) (t *Task, err error) {
 	if opt == nil {
 		opt = NewOption() // make sure it's the default option
 	}
-	return &Task{
-		H: NewHeader((&uuidMaker{}).NewID(), name),
+	id, err := (&uuidMaker{}).NewID()
+	if err != nil {
+		return
+	}
+
+	t = &Task{
+		H: NewHeader(id, name),
 		P: &TaskPayload{
 			O: opt,
 			A: args,
 		},
-	}, nil
+	}
+	return
 }
 
 func (t *Task) ID() string          { return t.H.I }

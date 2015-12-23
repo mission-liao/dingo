@@ -19,12 +19,12 @@ var ID = struct {
 */
 type IDMaker interface {
 	// routine(thread) safe is required.
-	NewID() string
+	NewID() (string, error)
 }
 
 // default IDMaker
 type uuidMaker struct{}
 
-func (*uuidMaker) NewID() string {
-	return uuid.NewV4().String()
+func (*uuidMaker) NewID() (string, error) {
+	return uuid.NewV4().String(), nil
 }

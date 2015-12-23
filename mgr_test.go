@@ -11,7 +11,7 @@ import (
 func TestMgrMarshallers(t *testing.T) {
 	ass := assert.New(t)
 	trans := newMgr()
-	ass.Nil(trans.Register("TestMgrMarshallers", func() {}, Encode.JSON, Encode.GOB, ID.Default))
+	ass.Nil(trans.Register("TestMgrMarshallers", func() {}, Encode.JSON, Encode.GOB))
 	task, err := trans.ComposeTask("TestMgrMarshallers", nil, []interface{}{float64(1)})
 	task.H.I = "a2a2da60-9cba-11e5-b690-0002a5d5c51b" // fix ID for testing
 	ass.Nil(err)
@@ -64,7 +64,7 @@ func TestMgrInvokers(t *testing.T) {
 
 	ass := assert.New(t)
 	trans := newMgr()
-	ass.Nil(trans.Register("TestMgrInvokers", fn, Encode.JSON, Encode.JSON, ID.Default))
+	ass.Nil(trans.Register("TestMgrInvokers", fn, Encode.JSON, Encode.JSON))
 
 	// compose a task, with wrong type of input
 	task, err := trans.ComposeTask("TestMgrInvokers", nil, []interface{}{int32(3)})
@@ -100,7 +100,7 @@ func TestMgrOption(t *testing.T) {
 	ass.Nil(opt)
 
 	// regist a record
-	ass.Nil(trans.Register("TestMgrOption", func() {}, Encode.Default, Encode.Default, ID.Default))
+	ass.Nil(trans.Register("TestMgrOption", func() {}, Encode.Default, Encode.Default))
 
 	// ok
 	ass.Nil(trans.SetOption("TestMgrOption", NewOption()))
@@ -119,11 +119,43 @@ func TestMgrRegister(t *testing.T) {
 	trans := newMgr()
 
 	// register a function, with not-existed marshaller id.
-	ass.NotNil(trans.Register("TestMgrResgister", func() {}, 100, 100, 100))
+	ass.NotNil(trans.Register("TestMgrResgister", func() {}, 100, 100))
 
 	// register a function with default marshaller id
-	ass.Nil(trans.Register("TestMgrMarshallers1", func() {}, Encode.Default, Encode.Default, ID.Default))
+	ass.Nil(trans.Register("TestMgrMarshallers1", func() {}, Encode.Default, Encode.Default))
 
 	// register something already registered
-	ass.NotNil(trans.Register("TestMgrMarshallers1", func() {}, Encode.Default, Encode.Default, ID.Default))
+	ass.NotNil(trans.Register("TestMgrMarshallers1", func() {}, Encode.Default, Encode.Default))
+}
+
+type testAlwaysOneIDMaker struct{}
+
+func (me *testAlwaysOneIDMaker) NewID() (string, error) { return "1", nil }
+
+type testAlwaysErrorIDMaker struct{}
+
+func (me *testAlwaysErrorIDMaker) NewID() (string, error) { return "", errors.New("test error") }
+
+func TestMgrIDMaker(t *testing.T) {
+	ass := assert.New(t)
+	trans := newMgr()
+
+	// register a function
+	ass.Nil(trans.Register("TestMgrIDMaker", func() {}, Encode.Default, Encode.Default))
+
+	// add IDMaker(s)
+	ass.Nil(trans.AddIdMaker(101, &testAlwaysOneIDMaker{}))
+	ass.Nil(trans.AddIdMaker(102, &testAlwaysErrorIDMaker{}))
+
+	// always "1"
+	ass.Nil(trans.SetIDMaker("TestMgrIDMaker", 101))
+	task, err := trans.ComposeTask("TestMgrIDMaker", nil, nil)
+	ass.Nil(err)
+	ass.Equal("1", task.ID())
+
+	// always error
+	ass.Nil(trans.SetIDMaker("TestMgrIDMaker", 102))
+	task, err = trans.ComposeTask("TestMgrIDMaker", nil, nil)
+	ass.Equal("test error", err.Error())
+	ass.Nil(task)
 }

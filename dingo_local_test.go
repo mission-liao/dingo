@@ -67,7 +67,7 @@ func (me *localSingleAppTestSuite) TestIgnoreReport() {
 	// initiate workers
 	me.Nil(me.App_.Register(
 		"TestIgnoreReport", func() {},
-		dingo.Encode.Default, dingo.Encode.Default, dingo.ID.Default,
+		dingo.Encode.Default, dingo.Encode.Default,
 	))
 	remain, err := me.App_.Allocate("TestIgnoreReport", 1, 1)
 	me.Equal(0, remain)
@@ -203,7 +203,7 @@ func (me *localSingleAppTestSuite) TestMyMarshaller() {
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.App_.Register("TestMyMarshaller", fn, mid, mid, dingo.ID.Default))
+	me.Nil(me.App_.Register("TestMyMarshaller", fn, mid, mid))
 	remain, err := me.App_.Allocate("TestMyMarshaller", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
@@ -270,7 +270,7 @@ func (me *localSingleAppTestSuite) TestCustomMarshaller() {
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.App_.Register("TestCustomMarshaller", fn, mid, mid, dingo.ID.Default))
+	me.Nil(me.App_.Register("TestCustomMarshaller", fn, mid, mid))
 	remain, err := me.App_.Allocate("TestCustomMarshaller", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
@@ -344,7 +344,7 @@ func (me *localSingleAppTestSuite) TestCustomMarshallerWithMinimalFunc() {
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.App_.Register("TestCustomMarshallerWithMinimalFunc", fn, mid, mid, dingo.ID.Default))
+	me.Nil(me.App_.Register("TestCustomMarshallerWithMinimalFunc", fn, mid, mid))
 	remain, err := me.App_.Allocate("TestCustomMarshallerWithMinimalFunc", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)

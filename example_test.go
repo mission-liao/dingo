@@ -31,7 +31,7 @@ func ExampleApp_local() {
 				fmt.Printf("%v\n", msg)
 			}
 		}
-	}, dingo.Encode.Default, dingo.Encode.Default, dingo.ID.Default)
+	}, dingo.Encode.Default, dingo.Encode.Default)
 	if err != nil {
 		return
 	}

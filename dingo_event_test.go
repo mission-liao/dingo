@@ -73,7 +73,7 @@ func TestDingoEvent(t *testing.T) {
 	}
 
 	// register a task
-	err = app.Register("TestDingoEvent", func() {}, dingo.Encode.Default, dingo.Encode.Default, dingo.ID.Default)
+	err = app.Register("TestDingoEvent", func() {}, dingo.Encode.Default, dingo.Encode.Default)
 	ass.Nil(err)
 	if err != nil {
 		return
