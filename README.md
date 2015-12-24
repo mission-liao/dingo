@@ -2,7 +2,7 @@
 
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/mission-liao/dingo) [![Build Status](https://travis-ci.org/mission-liao/dingo.svg)](https://travis-ci.org/mission-liao/dingo) [![Coverage Status](https://coveralls.io/repos/mission-liao/dingo/badge.svg?branch=master&service=github)](https://coveralls.io/github/mission-liao/dingo?branch=master)
 
-I initiated this project after [machinery](https://github.com/RichardKnop/machinery), which is a great library and tends to provide a replacement of [Celery](http://www.celeryproject.org/) in #golang. The reasons to create (yet) another task system are:
+I initiated this project after [machinery](https://github.com/RichardKnop/machinery), which is a great library and tends to provide a replacement of [Celery](http://www.celeryproject.org/) in #golang. The reasons to create (yet) another task library are:
 - to make sending tasks as easy as possible
 - callers receive reports through a holy channel.
 - I want to get familiar with those concepts of #golagn: **interface**, **routine**, **channel**, and a distributed task framework is a good topic for practice, :)
@@ -53,12 +53,12 @@ func main() {
 
 ##Features
 
-###Invoking Worker Functions with Arbitary Fingerprints
+###Invoking Worker Functions with Arbitary Signatures
 The most compatible exchange format is []byte, to marshall in/out your parameters to []byte, we rely these builtin encoders:
  - encoding/json
  - encoding/gob
 
-Type info are deduced from the fingerprints of worker functions. With these type info, parameters are unmarshalled from []byte to cloeset type. A __type correction__ procedure would be applied on those parameters before invoking.
+Type info are deduced from the signatures of worker functions. With these type info, parameters are unmarshalled from []byte to cloeset type. A __type correction__ procedure would be applied on those parameters before invoking.
 
 Obviously, it's hard (not impossible) to handle all types in #golang, these are unsupported by dingo as far as I know:
  - interface: unmarshalling requires concrete types
@@ -71,6 +71,17 @@ And yes, return values of worker functions would also be __type corrected__.
 You would prefer a small, local worker pool at early stage, and transfer to a distributed one when stepping in production. There is nothing much to do for transfering (besides debugging, :( )
 
 You've seen a demo for local mode, and it's easy to make it distributed by attaching corresponding components at caller-side and worker-side. A demo can be checked: [caller](https://godoc.org/github.com/mission-liao/dingo#example-App-Use-Caller) and [worker](https://godoc.org/github.com/mission-liao/dingo#ex-App-Use-Worker).
+
+In short, at __Caller__ side, you need to:
+ - register worker functions for tasks
+ - config __default-option__, __id-maker__, __marshaller__ for tasks if needed.
+ - attach __Producer__, __Store__
+
+And at __Worker__ side, you need to:
+ - register the same worker function as the one on __Caller__ side for tasks
+ - config __marshaller__ for tasks if needed, the marshaller used for __Caller__ and __Worker__ should be sync.
+ - attach __Consumer__ (or __NamedConsumer__), __Reporter__
+ - allocate worker routines
 
 ###Customizable
 Many core behaviors can be customized:
