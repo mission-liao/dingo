@@ -14,10 +14,13 @@ install:
     - go get github.com/garyburd/redigo/redis
     - go get github.com/stretchr/testify/suite
     - go get github.com/stretchr/testify/assert
+    - go get golang.org/x/tools/cmd/cover
+    - go get github.com/mattn/goveralls
 
 env:
     - AMQP_URL=amqp://guest:guest@127.0.0.1:5672/ GOMAXPROCS=2
 
 script:
-    go test -v ./...
+    go test -v -covermode=count -coverprofile=coverage.out ./...
+    $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN
 
