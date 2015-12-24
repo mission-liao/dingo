@@ -12,6 +12,8 @@ install:
     - go get github.com/satori/go.uuid
     - go get github.com/streadway/amqp
     - go get github.com/garyburd/redigo/redis
+    - go get github.com/stretchr/testify/suite
+    - go get github.com/stretchr/testify/assert
 
 env:
     - AMQP_URL=amqp://guest:guest@127.0.0.1:5672/ GOMAXPROCS=2
