@@ -7,7 +7,7 @@ I initiated this project after [machinery](https://github.com/RichardKnop/machin
 - callers receive reports through a holy channel.
 - I want to get familiar with those concepts of #golagn: **interface**, **routine**, **channel**, and a distributed task framework is a good topic for practice, :)
 
-Here is a quick demo of this project in local mode as a background job pools:
+Here is a quick demo of this project in local mode as a background job pool:
 ```go
 package main
 
@@ -70,7 +70,7 @@ The most compatible exchange format is []byte, to marshall in/out your parameter
  - encoding/json
  - encoding/gob
 
-Type info are deduced from the signatures of worker functions. With these type info, parameters are unmarshalled from []byte to cloeset type. A __type correction__ procedure would be applied on those parameters before invoking.
+Type info are deduced from the signatures of worker functions you register. With those type info, parameters are unmarshalled from []byte to cloeset type. A __type correction__ procedure would be applied on those parameters before invoking.
 
 Obviously, it's hard (not impossible) to handle all types in #golang, these are unsupported by dingo as far as I know:
  - interface: unmarshalling requires concrete types. (so __error__ can be marshalled, but can't be un-marshalled)
@@ -80,9 +80,9 @@ Obviously, it's hard (not impossible) to handle all types in #golang, these are 
 And yes, return values of worker functions would also be __type corrected__.
 
 ###A Distributed Task Framework with Local Mode
-You would prefer a small, local worker pool at early stage, and transfer to a distributed one when stepping in production. There is nothing much to do for transfering (besides debugging, :( )
+You would prefer a small, local worker pool at early stage, and transfer to a distributed one when stepping in production. In dingo, there is nothing much to do for transfering (besides debugging, :( )
 
-You've seen a demo for local mode, and it's easy to make it distributed by attaching corresponding components at caller-side and worker-side. A demo can be checked: [caller](https://godoc.org/github.com/mission-liao/dingo#example-App-Use-Caller) and [worker](https://godoc.org/github.com/mission-liao/dingo#ex-App-Use-Worker).
+You've seen a demo for local mode, and it's easy to make it distributed by attaching corresponding components at caller-side and worker-side. A demo: [caller](https://godoc.org/github.com/mission-liao/dingo#example-App-Use-Caller) and [worker](https://godoc.org/github.com/mission-liao/dingo#ex-App-Use-Worker).
 
 In short, at __Caller__ side, you need to:
  - register worker functions for tasks
@@ -104,7 +104,7 @@ Many core behaviors can be customized:
  - Report Publishing/Consuming: [Reporter](https://godoc.org/github.com/mission-liao/dingo#Reporter)/[Store](https://godoc.org/github.com/mission-liao/dingo#Store)
 
 ##Troubleshooting
-Most APIs in this library are executed asynchronously in separated go-routines. Therefore, we can't report a failure by returning an error. Instead, an event channel could be subscribed for listening error events.
+Most APIs in this library are executed asynchronously in separated go-routines. Therefore, we can't report a failure by returning an error. Instead, an event channel could be subscribed for failure events.
 ```go
 // subscribe a event channel
 _, events, err := app.Listen(dingo.ObjT.ALL, dingo.EventLvl.DEBUG, 0)
