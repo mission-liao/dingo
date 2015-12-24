@@ -44,11 +44,25 @@
 
  These concept are virtualized for extensibility and customization, please refer to
  corresponding reference for details:
-  - Generation of ID: dingo.IDMaker
+  - Generation of ID for new tasks: dingo.IDMaker
   - Parameter Marshalling: dingo.Marshaller
   - Worker Function Invoking: dingo.Invoker
   - Task Publishing/Consuming: dingo.Producer/dingo.Consumer/dingo.NamedConsumer
   - Report Publishing/Consuming: dingo.Reporter/dingo.Store
+
+ Parameter Types
+
+ Many parmeter types are supported by this library, except:
+  - interface: no way to know the underlying type of an interface.
+  - chan: not supported yet.
+  - private field in struct, they would be ignored by most encoders. To support this,
+    you need to provide a customized marshaller and invoker that can recognize those
+	private fields.
+
+ TroubleShooting
+
+ It's relative hard to debug a multi-routine library. To know what's wrong inside, users
+ can subscribe to receive failure events.(App.Listen)
 */
 package dingo
 
@@ -72,7 +86,8 @@ type _object struct {
 }
 
 /*
- */
+ Core component of dingo.
+*/
 type App struct {
 	cfg          Config
 	objsLock     sync.RWMutex
