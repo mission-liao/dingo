@@ -313,15 +313,15 @@ func (me *testCustomMarshallerCodec) DecodeReturn(_ interface{}, bs [][]byte) (v
 	return
 }
 
-type testMyInvoker struct{}
+type testMyInvoker3 struct{}
 
-func (me *testMyInvoker) Call(f interface{}, param []interface{}) ([]interface{}, error) {
+func (me *testMyInvoker3) Call(f interface{}, param []interface{}) ([]interface{}, error) {
 	fmt.Println("my invoker is called for Call")
 	// type assertion
 	ret := f.(func([]string) string)(param[0].([]string))
 	return []interface{}{ret}, nil
 }
-func (me *testMyInvoker) Return(f interface{}, returns []interface{}) ([]interface{}, error) {
+func (me *testMyInvoker3) Return(f interface{}, returns []interface{}) ([]interface{}, error) {
 	fmt.Println("my invoker is called for Return")
 	return returns, nil
 }
@@ -370,10 +370,10 @@ func ExampleCustomMarshaller() {
 
 	// register customize marshaller & invoker
 	err = app.AddMarshaller(101, &struct {
-		testMyInvoker
+		testMyInvoker3
 		dingo.CustomMarshaller
 	}{
-		testMyInvoker{},
+		testMyInvoker3{},
 		dingo.CustomMarshaller{Codec: &testCustomMarshallerCodec{}},
 	})
 	if err != nil {
