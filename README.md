@@ -53,7 +53,19 @@ func main() {
 
 ##Features
 
-###Invoking Worker Functions with Arbitary Signatures
+###Invoking Worker Functions with (almost) Arbitary Signatures
+These functions can be handled by dingo:
+```go
+type Person struct {
+  ID int
+  Name string
+}
+func NewEmployee(p *Person, age int) (failed bool) { ... } // struct, OK
+func GetEmployees(age int) (employees map[string]*Person) { ... } // map of struct, OK
+func DeleteEmployees(names []string) (count int) { ... } // slice, OK
+func DoNothing () { ... } // OK
+```
+
 The most compatible exchange format is []byte, to marshall in/out your parameters to []byte, we rely these builtin encoders:
  - encoding/json
  - encoding/gob
@@ -61,7 +73,7 @@ The most compatible exchange format is []byte, to marshall in/out your parameter
 Type info are deduced from the signatures of worker functions. With these type info, parameters are unmarshalled from []byte to cloeset type. A __type correction__ procedure would be applied on those parameters before invoking.
 
 Obviously, it's hard (not impossible) to handle all types in #golang, these are unsupported by dingo as far as I know:
- - interface: unmarshalling requires concrete types
+ - interface: unmarshalling requires concrete types. (so __error__ can be marshalled, but can't be un-marshalled)
  - chan: haven't tried yet
  - private field in struct: they are ignore by json/gob, but it's still possible to support them by providing customized marshaller and invoker. (please search 'ExampleCustomMarshaller' for details)
  
