@@ -24,12 +24,18 @@ func TestMuxDifferentType(t *testing.T) {
 	cStr := make(chan string, 1)
 	iStr, err := m.Register(cStr, 0)
 	ass.Nil(err)
+	if err != nil {
+		return
+	}
 	ass.Equal(0, iStr)
 
 	// prepare for integer channel
 	cInt := make(chan int, 1)
 	iInt, err := m.Register(cInt, 0)
 	ass.Nil(err)
+	if err != nil {
+		return
+	}
 	ass.NotEqual(0, iInt)
 
 	// add a handler

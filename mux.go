@@ -157,24 +157,14 @@ func (mx *mux) Unregister(id int) (ch interface{}, err error) {
 }
 
 func (mx *mux) Handle(handler func(interface{}, int)) {
-	func() {
-		mx.handlersLock.Lock()
-		defer mx.handlersLock.Unlock()
+	mx.handlersLock.Lock()
+	defer mx.handlersLock.Unlock()
 
-		m := mx.handlers.Load().([]func(interface{}, int))
-		nm := make([]func(interface{}, int), 0, len(m)+1)
-		copy(nm, m)
-		nm = append(nm, handler)
-		mx.handlers.Store(nm)
-	}()
-
-	mx.rsLock.Lock()
-	defer mx.rsLock.Unlock()
-
-	touched := time.Now()
-	for _, v := range mx.changed {
-		v <- touched
-	}
+	m := mx.handlers.Load().([]func(interface{}, int))
+	nm := make([]func(interface{}, int), 0, len(m)+1)
+	copy(nm, m)
+	nm = append(nm, handler)
+	mx.handlers.Store(nm)
 }
 
 func (mx *mux) muxRoutine(quit <-chan int, wait *sync.WaitGroup, changed <-chan time.Time) {
@@ -221,9 +211,6 @@ func (mx *mux) muxRoutine(quit <-chan int, wait *sync.WaitGroup, changed <-chan 
 		})
 
 		lenOfcases = len(m)
-
-		// update handlers
-		handlers = mx.handlers.Load().([]func(interface{}, int))
 	}
 
 	update()
@@ -268,6 +255,7 @@ func (mx *mux) muxRoutine(quit <-chan int, wait *sync.WaitGroup, changed <-chan 
 		// other registered channels
 		default:
 			// send to handlers
+			handlers = mx.handlers.Load().([]func(interface{}, int))
 			for _, v := range handlers {
 				v(value.Interface(), keys[chosen])
 			}
@@ -298,6 +286,7 @@ cleanup:
 		case len(cond) - 1:
 			return
 		default:
+			handlers = mx.handlers.Load().([]func(interface{}, int))
 			for _, v := range handlers {
 				v(value.Interface(), keys[chosen])
 			}
