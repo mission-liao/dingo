@@ -121,13 +121,16 @@ func (me *remoteBridge) StopAllListeners() (err error) {
 	me.consumerLock.RLock()
 	defer me.consumerLock.RUnlock()
 
-	if me.consumer == nil {
-		return
-	}
-
-	err = me.consumer.StopAllListeners()
-	if err != nil {
-		return
+	if me.consumer != nil {
+		err = me.consumer.StopAllListeners()
+		if err != nil {
+			return
+		}
+	} else if me.namedConsumer != nil {
+		err = me.namedConsumer.StopAllListeners()
+		if err != nil {
+			return
+		}
 	}
 
 	me.listeners.Close()
@@ -416,6 +419,18 @@ func (me *remoteBridge) ReporterHook(eventID int, payload interface{}) (err erro
 	return
 }
 
+func (me *remoteBridge) StoreHook(eventID int, payload interface{}) (err error) {
+	me.storeLock.Lock()
+	defer me.storeLock.Unlock()
+
+	if me.store == nil {
+		return
+	}
+
+	err = me.store.StoreHook(eventID, payload)
+	return
+}
+
 func (me *remoteBridge) ProducerHook(eventID int, payload interface{}) (err error) {
 	me.producerLock.Lock()
 	defer me.producerLock.Unlock()
@@ -425,6 +440,25 @@ func (me *remoteBridge) ProducerHook(eventID int, payload interface{}) (err erro
 	}
 
 	err = me.producer.ProducerHook(eventID, payload)
+	return
+}
+
+func (me *remoteBridge) ConsumerHook(eventID int, payload interface{}) (err error) {
+	me.consumerLock.Lock()
+	defer me.consumerLock.Unlock()
+
+	if me.consumer != nil {
+		err = me.consumer.ConsumerHook(eventID, payload)
+		if err != nil {
+			return
+		}
+	} else if me.namedConsumer != nil {
+		err = me.namedConsumer.ConsumerHook(eventID, payload)
+		if err != nil {
+			return
+		}
+	}
+
 	return
 }
 

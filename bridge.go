@@ -7,7 +7,9 @@ package dingo
 // just exposing 'exHooks' to them.
 type exHooks interface {
 	ReporterHook(eventID int, payload interface{}) (err error)
+	StoreHook(eventID int, payload interface{}) (err error)
 	ProducerHook(eventID int, payload interface{}) (err error)
+	ConsumerHook(eventID int, payload interface{}) (err error)
 }
 
 type bridge interface {

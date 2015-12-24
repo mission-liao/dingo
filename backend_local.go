@@ -176,6 +176,7 @@ func (me *localBackend) Report(reports <-chan *ReportEnvelope) (id int, err erro
 // Store
 //
 
+func (me *localBackend) StoreHook(eventID int, payload interface{}) (err error) { return }
 func (me *localBackend) Poll(meta Meta) (reports <-chan []byte, err error) {
 	me.storeLock.Lock()
 	defer me.storeLock.Unlock()

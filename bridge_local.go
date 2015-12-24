@@ -366,7 +366,17 @@ func (me *localBridge) ReporterHook(eventID int, payload interface{}) (err error
 	return
 }
 
+func (me *localBridge) StoreHook(eventID int, payload interface{}) (err error) {
+	// there is no external object 'really' attached.
+	return
+}
+
 func (me *localBridge) ProducerHook(eventID int, payload interface{}) (err error) {
+	// there is no external object 'really' attached.
+	return
+}
+
+func (me *localBridge) ConsumerHook(eventID int, payload interface{}) (err error) {
 	// there is no external object 'really' attached.
 	return
 }

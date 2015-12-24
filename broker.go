@@ -40,6 +40,9 @@ type Producer interface {
 	Send(meta Meta, b []byte) error
 }
 
+var ConsumerEvent = struct {
+}{}
+
 /*
  Consumer(s) would consume tasks from broker(s). This kind of Consumer(s) is easier
  to implement, every task is sent to a single queue, and consumed from a single queue.
@@ -48,6 +51,14 @@ type Producer interface {
  in 'AddListener'.
 */
 type Consumer interface {
+	// hook for listening event from dingo
+	// parameter:
+	// - eventID: which event?
+	// - payload: corresponding payload, its type depends on 'eventID'
+	// returns:
+	// - err: errors
+	ConsumerHook(eventID int, payload interface{}) (err error)
+
 	// create a new listener to receive tasks
 	//
 	// parameters:
@@ -70,6 +81,14 @@ type Consumer interface {
  and each one of them handles different sets of worker functions.
 */
 type NamedConsumer interface {
+	// hook for listening event from dingo
+	// parameter:
+	// - eventID: which event?
+	// - payload: corresponding payload, its type depends on 'eventID'
+	// returns:
+	// - err: errors
+	ConsumerHook(eventID int, payload interface{}) (err error)
+
 	// create a new consumer to receive tasks
 	//
 	// parameters:

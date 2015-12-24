@@ -170,6 +170,7 @@ func (me *backend) Report(reports <-chan *dingo.ReportEnvelope) (id int, err err
 // Store interface
 //
 
+func (me *backend) StoreHook(eventID int, payload interface{}) (err error) { return }
 func (me *backend) Poll(meta dingo.Meta) (reports <-chan []byte, err error) {
 	// bind to the queue for this task
 	tag, qName, rKey := getConsumerTag(meta), getQueueName(meta), getRoutingKey(meta)

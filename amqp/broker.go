@@ -208,6 +208,7 @@ func (me *broker) Send(id dingo.Meta, body []byte) (err error) {
 // Consumer interface
 //
 
+func (me *broker) ConsumerHook(eventID int, payload interface{}) (err error) { return }
 func (me *broker) AddListener(name string, receipts <-chan *dingo.TaskReceipt) (tasks <-chan []byte, err error) {
 	ci, err := me.receiver.Channel()
 	if err != nil {

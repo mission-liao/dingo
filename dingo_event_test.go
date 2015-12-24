@@ -39,7 +39,8 @@ func (me *testFakeStore) Events() ([]<-chan *dingo.Event, error) {
 		me.events,
 	}, nil
 }
-func (me *testFakeStore) Close() (err error) { return }
+func (me *testFakeStore) Close() (err error)                          { return }
+func (me *testFakeStore) StoreHook(id int, p interface{}) (err error) { return }
 func (me *testFakeStore) Poll(meta dingo.Meta) (reports <-chan []byte, err error) {
 	me.events <- dingo.NewEvent(
 		dingo.ObjT.STORE,

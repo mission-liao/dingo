@@ -39,10 +39,21 @@ type Reporter interface {
 	Report(reports <-chan *ReportEnvelope) (id int, err error)
 }
 
+var StoreEvent = struct {
+}{}
+
 /*
  Store(s) is responsible for receiving reports from backend(s)
 */
 type Store interface {
+	// hook for listening events from dingo
+	// parameter:
+	// - eventID: which event?
+	// - payload: corresponding payload, its type depends on 'eventID'
+	// returns:
+	// - err: errors
+	StoreHook(eventID int, payload interface{}) (err error)
+
 	// polling reports for tasks
 	//
 	// parameters:
