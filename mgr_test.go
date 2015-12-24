@@ -133,11 +133,11 @@ func TestMgrRegister(t *testing.T) {
 
 type testAlwaysOneIDMaker struct{}
 
-func (me *testAlwaysOneIDMaker) NewID() (string, error) { return "1", nil }
+func (idm *testAlwaysOneIDMaker) NewID() (string, error) { return "1", nil }
 
 type testAlwaysErrorIDMaker struct{}
 
-func (me *testAlwaysErrorIDMaker) NewID() (string, error) { return "", errors.New("test error") }
+func (idm *testAlwaysErrorIDMaker) NewID() (string, error) { return "", errors.New("test error") }
 
 func TestMgrIDMaker(t *testing.T) {
 	ass := assert.New(t)
@@ -147,8 +147,8 @@ func TestMgrIDMaker(t *testing.T) {
 	ass.Nil(trans.Register("TestMgrIDMaker", func() {}))
 
 	// add IDMaker(s)
-	ass.Nil(trans.AddIdMaker(101, &testAlwaysOneIDMaker{}))
-	ass.Nil(trans.AddIdMaker(102, &testAlwaysErrorIDMaker{}))
+	ass.Nil(trans.AddIDMaker(101, &testAlwaysOneIDMaker{}))
+	ass.Nil(trans.AddIDMaker(102, &testAlwaysErrorIDMaker{}))
 
 	// always "1"
 	ass.Nil(trans.SetIDMaker("TestMgrIDMaker", 101))

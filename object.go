@@ -1,38 +1,37 @@
 package dingo
 
-/*
- Types of object, they are bit flag and can be combined.
- These flags are used in:
-  - dingo.Use
-  - dingo.Listen
+/*ObjT are types of object, they are bit flag and can be combined.
+These flags are used in:
+ - dingo.Use
+ - dingo.Listen
 */
 var ObjT = struct {
 	/*
 		when this type used in dingo.App.Use, it means let
 		dingo decide which type would be registered to dingo.App.
 	*/
-	DEFAULT int
+	Default int
 	// this object provides dingo.Reporter interface
-	REPORTER int
+	Reporter int
 	// this object provides dingo.Store interface
-	STORE int
+	Store int
 	// this object provides dingo.Producer interface
-	PRODUCER int
+	Producer int
 	// this object provides dingo.Consumer/dingo.NamedConsumer interface
-	CONSUMER int
+	Consumer int
 	// this is a dingo.mapper object
-	MAPPER int
+	Mapper int
 	// this is a dingo.worker object
-	WORKER int
+	Worker int
 	// this object provides dingo.bridge interface
-	BRIDGE int
+	Bridge int
 	// this object provides dingo.NamedConsumer interface
-	NAMED_CONSUMER int
+	NamedConsumer int
 	/*
 		all object types, when used in dingo.App.Listen, it means
 		listen to events from all possible origins.
 	*/
-	ALL int
+	All int
 }{
 	0,
 	(1 << 0),
@@ -46,13 +45,12 @@ var ObjT = struct {
 	int(^uint(0) >> 1), // Max int
 }
 
-/*
- An object implements this interface means:
-  - dingo can have a trigger to release the resource allocated by this object.
-  - dingo can aggregate events raised from this object, (those events can be subscribed
-    by dingo.App.Listen)
+/*Object is an interface, and an object implements this interface means:
+ - dingo can have a trigger to release the resource allocated by this object.
+ - dingo can aggregate events raised from this object, (those events can be subscribed
+   by dingo.App.Listen)
 
- All objects attached via dingo.App.Use should implement this interface.
+All objects attached via dingo.App.Use should implement this interface.
 */
 type Object interface {
 	// what dingo expects from this object

@@ -21,7 +21,6 @@ package dingo
 //
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -60,46 +59,46 @@ func newMux() (m *mux) {
 }
 
 //
-func (me *mux) More(count int) (remain int, err error) {
+func (mx *mux) More(count int) (remain int, err error) {
 	remain = count
 	for ; remain > 0; remain-- {
 		c := make(chan time.Time, 10)
-		me.changed = append(me.changed, c)
-		go me._mux_routine_(me.rs.New(), me.rs.Wait(), c)
+		mx.changed = append(mx.changed, c)
+		go mx.muxRoutine(mx.rs.New(), mx.rs.Wait(), c)
 	}
 	return
 }
 
 //
-func (me *mux) Close() {
+func (mx *mux) Close() {
 	func() {
-		me.rsLock.Lock()
-		defer me.rsLock.Unlock()
-		me.rs.Close()
+		mx.rsLock.Lock()
+		defer mx.rsLock.Unlock()
+		mx.rs.Close()
 
-		for _, v := range me.changed {
+		for _, v := range mx.changed {
 			close(v)
 		}
-		me.changed = make([]chan time.Time, 0, 10)
+		mx.changed = make([]chan time.Time, 0, 10)
 	}()
 
-	me.casesLock.Lock()
-	defer me.casesLock.Unlock()
-	me.cases.Store(make(map[int]interface{}))
+	mx.casesLock.Lock()
+	defer mx.casesLock.Unlock()
+	mx.cases.Store(make(map[int]interface{}))
 
-	me.handlersLock.Lock()
-	defer me.handlersLock.Unlock()
-	me.handlers.Store(make([]func(interface{}, int), 0, 10))
+	mx.handlersLock.Lock()
+	defer mx.handlersLock.Unlock()
+	mx.handlers.Store(make([]func(interface{}, int), 0, 10))
 }
 
 //
-func (me *mux) Register(ch interface{}, expectedId int) (id int, err error) {
+func (mx *mux) Register(ch interface{}, expectedID int) (id int, err error) {
 	func() {
-		me.casesLock.Lock()
-		defer me.casesLock.Unlock()
+		mx.casesLock.Lock()
+		defer mx.casesLock.Unlock()
 
-		m := me.cases.Load().(map[int]interface{})
-		id = expectedId
+		m := mx.cases.Load().(map[int]interface{})
+		id = expectedID
 		for {
 			if _, ok := m[id]; !ok {
 				break
@@ -108,77 +107,77 @@ func (me *mux) Register(ch interface{}, expectedId int) (id int, err error) {
 			id = rand.Int()
 		}
 
-		m_ := make(map[int]interface{})
-		for k, _ := range m {
-			m_[k] = m[k]
+		nm := make(map[int]interface{})
+		for k := range m {
+			nm[k] = m[k]
 		}
-		m_[id] = ch
-		me.cases.Store(m_)
+		nm[id] = ch
+		mx.cases.Store(nm)
 	}()
 
-	me.rsLock.Lock()
-	defer me.rsLock.Unlock()
+	mx.rsLock.Lock()
+	defer mx.rsLock.Unlock()
 
 	touched := time.Now()
-	for _, v := range me.changed {
+	for _, v := range mx.changed {
 		v <- touched
 	}
 	return
 }
 
 //
-func (me *mux) Unregister(id int) (ch interface{}, err error) {
+func (mx *mux) Unregister(id int) (ch interface{}, err error) {
 	func() {
-		me.casesLock.Lock()
-		defer me.casesLock.Unlock()
+		mx.casesLock.Lock()
+		defer mx.casesLock.Unlock()
 
 		var ok bool
-		m := me.cases.Load().(map[int]interface{})
+		m := mx.cases.Load().(map[int]interface{})
 		if ch, ok = m[id]; !ok {
-			err = errors.New(fmt.Sprintf("Id not found:%v", id))
+			err = fmt.Errorf("Id not found:%v", id)
 			return
 		}
 		delete(m, id)
 
-		m_ := make(map[int]interface{})
-		for k, _ := range m {
-			m_[k] = m[k]
+		nm := make(map[int]interface{})
+		for k := range m {
+			nm[k] = m[k]
 		}
-		me.cases.Store(m_)
+		mx.cases.Store(nm)
 	}()
 
-	me.rsLock.Lock()
-	defer me.rsLock.Unlock()
+	mx.rsLock.Lock()
+	defer mx.rsLock.Unlock()
 
 	touched := time.Now()
-	for _, v := range me.changed {
+	for _, v := range mx.changed {
 		v <- touched
 	}
 	return
 }
 
-func (me *mux) Handle(handler func(interface{}, int)) {
+func (mx *mux) Handle(handler func(interface{}, int)) {
 	func() {
-		me.handlersLock.Lock()
-		defer me.handlersLock.Unlock()
+		mx.handlersLock.Lock()
+		defer mx.handlersLock.Unlock()
 
-		m := me.handlers.Load().([]func(interface{}, int))
-		m_ := make([]func(interface{}, int), 0, len(m)+1)
-		copy(m_, m)
-		m_ = append(m_, handler)
-		me.handlers.Store(m_)
+		m := mx.handlers.Load().([]func(interface{}, int))
+		nm := make([]func(interface{}, int), 0, len(m)+1)
+		copy(nm, m)
+		nm = append(nm, handler)
+		mx.handlers.Store(nm)
 	}()
 
-	me.rsLock.Lock()
-	defer me.rsLock.Unlock()
+	mx.rsLock.Lock()
+	defer mx.rsLock.Unlock()
 
 	touched := time.Now()
-	for _, v := range me.changed {
+	for _, v := range mx.changed {
 		v <- touched
 	}
 }
 
-func (me *mux) _mux_routine_(quit <-chan int, wait *sync.WaitGroup, changed <-chan time.Time) {
+func (mx *mux) muxRoutine(quit <-chan int, wait *sync.WaitGroup, changed <-chan time.Time) {
 	defer wait.Done()
 	var (
 		cond       []reflect.SelectCase
@@ -194,7 +193,7 @@ func (me *mux) _mux_routine_(quit <-chan int, wait *sync.WaitGroup, changed <-ch
 	}
 
 	update := func() {
-		m := me.cases.Load().(map[int]interface{})
+		m := mx.cases.Load().(map[int]interface{})
 
 		keys = make([]int, 0, 10)
 		for k := range m {
@@ -224,7 +223,7 @@ func (me *mux) _mux_routine_(quit <-chan int, wait *sync.WaitGroup, changed <-ch
 		lenOfcases = len(m)
 
 		// update handlers
-		handlers = me.handlers.Load().([]func(interface{}, int))
+		handlers = mx.handlers.Load().([]func(interface{}, int))
 	}
 
 	update()

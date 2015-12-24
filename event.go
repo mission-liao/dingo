@@ -5,10 +5,10 @@ import (
 )
 
 var EventLvl = struct {
-	DEBUG   int
-	INFO    int
-	WARNING int
-	ERROR   int
+	Debug   int
+	Info    int
+	Warning int
+	Error   int
 }{
 	0,
 	1,
@@ -49,7 +49,7 @@ func NewEventFromError(orig int, err error) *Event {
 	return &Event{
 		Origin:  orig,
 		Time:    time.Now(),
-		Level:   EventLvl.ERROR,
+		Level:   EventLvl.Error,
 		Code:    EventCode.Generic,
 		Payload: err,
 	}

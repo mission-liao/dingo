@@ -28,7 +28,7 @@ func TestDingoAmqpSingleAppSuite(t *testing.T) {
 				if err != nil {
 					return
 				}
-				_, _, err = app.Use(brk, dingo.ObjT.DEFAULT)
+				_, _, err = app.Use(brk, dingo.ObjT.Default)
 				if err != nil {
 					return
 				}
@@ -37,7 +37,7 @@ func TestDingoAmqpSingleAppSuite(t *testing.T) {
 				if err != nil {
 					return
 				}
-				_, _, err = app.Use(bkd, dingo.ObjT.DEFAULT)
+				_, _, err = app.Use(bkd, dingo.ObjT.Default)
 				if err != nil {
 					return
 				}
@@ -70,7 +70,7 @@ func TestDingoAmqpMultiAppSuite(t *testing.T) {
 				if err != nil {
 					return
 				}
-				_, _, err = app.Use(brk, dingo.ObjT.PRODUCER)
+				_, _, err = app.Use(brk, dingo.ObjT.Producer)
 				if err != nil {
 					return
 				}
@@ -78,7 +78,7 @@ func TestDingoAmqpMultiAppSuite(t *testing.T) {
 				if err != nil {
 					return
 				}
-				_, _, err = app.Use(bkd, dingo.ObjT.STORE)
+				_, _, err = app.Use(bkd, dingo.ObjT.Store)
 				if err != nil {
 					return
 				}
@@ -94,7 +94,7 @@ func TestDingoAmqpMultiAppSuite(t *testing.T) {
 				if err != nil {
 					return
 				}
-				_, _, err = app.Use(brk, dingo.ObjT.NAMED_CONSUMER)
+				_, _, err = app.Use(brk, dingo.ObjT.NamedConsumer)
 				if err != nil {
 					return
 				}
@@ -102,7 +102,7 @@ func TestDingoAmqpMultiAppSuite(t *testing.T) {
 				if err != nil {
 					return
 				}
-				_, _, err = app.Use(bkd, dingo.ObjT.REPORTER)
+				_, _, err = app.Use(bkd, dingo.ObjT.Reporter)
 				if err != nil {
 					return
 				}

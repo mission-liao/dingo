@@ -35,135 +35,135 @@ type BackendTestSuite struct {
 	Tasks   []*Task
 }
 
-func (me *BackendTestSuite) SetupSuite() {
-	me.Trans = newFnMgr()
-	me.NotNil(me.Gen)
+func (ts *BackendTestSuite) SetupSuite() {
+	ts.Trans = newFnMgr()
+	ts.NotNil(ts.Gen)
 }
 
-func (me *BackendTestSuite) TearDownSuite() {
+func (ts *BackendTestSuite) TearDownSuite() {
 }
 
-func (me *BackendTestSuite) SetupTest() {
+func (ts *BackendTestSuite) SetupTest() {
 	var err error
 
-	me.Bkd, err = me.Gen()
-	me.Nil(err)
-	me.Rpt, me.Sto = me.Bkd.(Reporter), me.Bkd.(Store)
-	me.NotNil(me.Rpt)
-	me.NotNil(me.Sto)
+	ts.Bkd, err = ts.Gen()
+	ts.Nil(err)
+	ts.Rpt, ts.Sto = ts.Bkd.(Reporter), ts.Bkd.(Store)
+	ts.NotNil(ts.Rpt)
+	ts.NotNil(ts.Sto)
 
-	me.Reports = make(chan *ReportEnvelope, 10)
-	_, err = me.Rpt.Report(me.Reports)
-	me.Nil(err)
+	ts.Reports = make(chan *ReportEnvelope, 10)
+	_, err = ts.Rpt.Report(ts.Reports)
+	ts.Nil(err)
 
-	me.Tasks = []*Task{}
+	ts.Tasks = []*Task{}
 }
 
-func (me *BackendTestSuite) TearDownTest() {
-	me.Nil(me.Bkd.(Object).Close())
-	me.Bkd, me.Rpt, me.Sto = nil, nil, nil
+func (ts *BackendTestSuite) TearDownTest() {
+	ts.Nil(ts.Bkd.(Object).Close())
+	ts.Bkd, ts.Rpt, ts.Sto = nil, nil, nil
 
-	close(me.Reports)
-	me.Reports = nil
+	close(ts.Reports)
+	ts.Reports = nil
 
-	me.Tasks = nil
+	ts.Tasks = nil
 }
 
 //
 // test cases
 //
 
-func (me *BackendTestSuite) TestBasic() {
+func (ts *BackendTestSuite) TestBasic() {
 	// register an encoding for this method
-	me.Nil(me.Trans.Register("basic", func() {}))
+	ts.Nil(ts.Trans.Register("basic", func() {}))
 
 	// compose a dummy task
-	task, err := me.Trans.ComposeTask("basic", nil, []interface{}{})
-	me.Nil(err)
+	task, err := ts.Trans.ComposeTask("basic", nil, []interface{}{})
+	ts.Nil(err)
 
 	// trigger hook
-	me.Nil(me.Rpt.ReporterHook(ReporterEvent.BeforeReport, task))
+	ts.Nil(ts.Rpt.ReporterHook(ReporterEvent.BeforeReport, task))
 
 	// send a report
 	report, err := task.composeReport(Status.Sent, make([]interface{}, 0), nil)
-	me.Nil(err)
+	ts.Nil(err)
 	{
-		b, err := me.Trans.EncodeReport(report)
-		me.Nil(err)
-		me.Reports <- &ReportEnvelope{
+		b, err := ts.Trans.EncodeReport(report)
+		ts.Nil(err)
+		ts.Reports <- &ReportEnvelope{
 			ID:   report,
 			Body: b,
 		}
 	}
 
 	// polling
-	reports, err := me.Sto.Poll(task)
-	me.Nil(err)
-	me.NotNil(reports)
+	reports, err := ts.Sto.Poll(task)
+	ts.Nil(err)
+	ts.NotNil(reports)
 	select {
 	case v, ok := <-reports:
-		me.True(ok)
+		ts.True(ok)
 		if !ok {
 			break
 		}
-		r, err := me.Trans.DecodeReport(v)
-		me.Nil(err)
-		me.Equal(r, report)
+		r, err := ts.Trans.DecodeReport(v)
+		ts.Nil(err)
+		ts.Equal(r, report)
 	}
 
 	// done polling
-	me.Nil(me.Sto.Done(task))
+	ts.Nil(ts.Sto.Done(task))
 
-	me.Tasks = append(me.Tasks, task)
+	ts.Tasks = append(ts.Tasks, task)
 }
 
-func (me *BackendTestSuite) send(task *Task, s int16) {
+func (ts *BackendTestSuite) send(task *Task, s int16) {
 	r, err := task.composeReport(s, nil, nil)
-	me.Nil(err)
+	ts.Nil(err)
 
-	b, err := me.Trans.EncodeReport(r)
-	me.Nil(err)
+	b, err := ts.Trans.EncodeReport(r)
+	ts.Nil(err)
 
-	me.Reports <- &ReportEnvelope{task, b}
+	ts.Reports <- &ReportEnvelope{task, b}
 }
 
-func (me *BackendTestSuite) chk(task *Task, b []byte, s int16) {
-	r, err := me.Trans.DecodeReport(b)
-	me.Nil(err)
+func (ts *BackendTestSuite) chk(task *Task, b []byte, s int16) {
+	r, err := ts.Trans.DecodeReport(b)
+	ts.Nil(err)
 
 	if r != nil {
-		me.Equal(task.ID(), r.ID())
-		me.Equal(task.Name(), r.Name())
-		me.Equal(s, r.Status())
+		ts.Equal(task.ID(), r.ID())
+		ts.Equal(task.Name(), r.Name())
+		ts.Equal(s, r.Status())
 	}
 }
 
-func (me *BackendTestSuite) gen(task *Task, wait *sync.WaitGroup) {
+func (ts *BackendTestSuite) gen(task *Task, wait *sync.WaitGroup) {
 	defer wait.Done()
 
-	me.Nil(me.Rpt.ReporterHook(ReporterEvent.BeforeReport, task))
+	ts.Nil(ts.Rpt.ReporterHook(ReporterEvent.BeforeReport, task))
 
-	me.send(task, Status.Sent)
-	me.send(task, Status.Progress)
-	me.send(task, Status.Success)
+	ts.send(task, Status.Sent)
+	ts.send(task, Status.Progress)
+	ts.send(task, Status.Success)
 }
 
-func (me *BackendTestSuite) chks(task *Task, wait *sync.WaitGroup) {
+func (ts *BackendTestSuite) chks(task *Task, wait *sync.WaitGroup) {
 	defer wait.Done()
 
-	r, err := me.Sto.Poll(task)
-	me.Nil(err)
+	r, err := ts.Sto.Poll(task)
+	ts.Nil(err)
 
-	me.chk(task, <-r, Status.Sent)
-	me.chk(task, <-r, Status.Progress)
-	me.chk(task, <-r, Status.Success)
+	ts.chk(task, <-r, Status.Sent)
+	ts.chk(task, <-r, Status.Progress)
+	ts.chk(task, <-r, Status.Success)
 
-	me.Nil(me.Sto.Done(task))
+	ts.Nil(ts.Sto.Done(task))
 }
 
-func (me *BackendTestSuite) TestOrder() {
+func (ts *BackendTestSuite) TestOrder() {
 	// send reports of tasks, make sure their order correct
-	me.Nil(me.Trans.Register("order", func() {}))
+	ts.Nil(ts.Trans.Register("order", func() {}))
 
 	var (
 		tasks []*Task
@@ -171,11 +171,11 @@ func (me *BackendTestSuite) TestOrder() {
 	)
 
 	for i := 0; i < 100; i++ {
-		t, err := me.Trans.ComposeTask("order", nil, nil)
-		me.Nil(err)
+		t, err := ts.Trans.ComposeTask("order", nil, nil)
+		ts.Nil(err)
 		if t != nil {
 			wait.Add(1)
-			go me.gen(t, &wait)
+			go ts.gen(t, &wait)
 
 			tasks = append(tasks, t)
 		}
@@ -186,30 +186,30 @@ func (me *BackendTestSuite) TestOrder() {
 
 	for _, v := range tasks {
 		wait.Add(1)
-		go me.chks(v, &wait)
+		go ts.chks(v, &wait)
 	}
 	// wait for all chks routine
 	wait.Wait()
 
-	me.Tasks = append(me.Tasks, tasks...)
+	ts.Tasks = append(ts.Tasks, tasks...)
 }
 
 type testSeqID struct {
 	cur int
 }
 
-func (me *testSeqID) NewID() (string, error) {
-	me.cur++
-	return fmt.Sprintf("%d", me.cur), nil
+func (ts *testSeqID) NewID() (string, error) {
+	ts.cur++
+	return fmt.Sprintf("%d", ts.cur), nil
 }
 
-func (me *BackendTestSuite) TestSameID() {
+func (ts *BackendTestSuite) TestSameID() {
 	// different type of tasks, with the same id,
 	// backend(s) should not get mass.
 
 	var (
-		countOfTypes int = 10
-		countOfTasks int = 10
+		countOfTypes = 10
+		countOfTasks = 10
 		tasks        []*Task
 		wait         sync.WaitGroup
 	)
@@ -217,16 +217,16 @@ func (me *BackendTestSuite) TestSameID() {
 	// register idMaker, task
 	for i := 0; i < countOfTypes; i++ {
 		name := fmt.Sprintf("SameID.%d", i)
-		me.Nil(me.Trans.AddIdMaker(100+i, &testSeqID{}))
-		me.Nil(me.Trans.Register(name, func() {}))
-		me.Nil(me.Trans.SetIDMaker(name, 100+i))
+		ts.Nil(ts.Trans.AddIDMaker(100+i, &testSeqID{}))
+		ts.Nil(ts.Trans.Register(name, func() {}))
+		ts.Nil(ts.Trans.SetIDMaker(name, 100+i))
 
 		for j := 0; j < countOfTasks; j++ {
-			t, err := me.Trans.ComposeTask(name, nil, nil)
-			me.Nil(err)
+			t, err := ts.Trans.ComposeTask(name, nil, nil)
+			ts.Nil(err)
 			if t != nil {
 				wait.Add(1)
-				go me.gen(t, &wait)
+				go ts.gen(t, &wait)
 
 				tasks = append(tasks, t)
 			}
@@ -238,17 +238,17 @@ func (me *BackendTestSuite) TestSameID() {
 
 	for _, v := range tasks {
 		wait.Add(1)
-		go me.chks(v, &wait)
+		go ts.chks(v, &wait)
 	}
 	// wait for all chks routine
 	wait.Wait()
 
-	me.Tasks = append(me.Tasks, tasks...)
+	ts.Tasks = append(ts.Tasks, tasks...)
 }
 
-func (me *BackendTestSuite) TestExpect() {
-	me.NotNil(me.Bkd.(Object).Expect(ObjT.PRODUCER))
-	me.NotNil(me.Bkd.(Object).Expect(ObjT.CONSUMER))
-	me.NotNil(me.Bkd.(Object).Expect(ObjT.NAMED_CONSUMER))
-	me.NotNil(me.Bkd.(Object).Expect(ObjT.ALL))
+func (ts *BackendTestSuite) TestExpect() {
+	ts.NotNil(ts.Bkd.(Object).Expect(ObjT.Producer))
+	ts.NotNil(ts.Bkd.(Object).Expect(ObjT.Consumer))
+	ts.NotNil(ts.Bkd.(Object).Expect(ObjT.NamedConsumer))
+	ts.NotNil(ts.Bkd.(Object).Expect(ObjT.All))
 }

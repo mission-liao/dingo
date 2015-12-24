@@ -16,55 +16,55 @@ type DingoSingleAppTestSuite struct {
 	EventMux *mux
 }
 
-func (me *DingoSingleAppTestSuite) SetupSuite()    {}
-func (me *DingoSingleAppTestSuite) TearDownSuite() {}
+func (ts *DingoSingleAppTestSuite) SetupSuite()    {}
+func (ts *DingoSingleAppTestSuite) TearDownSuite() {}
 
-func (me *DingoSingleAppTestSuite) SetupTest() {
+func (ts *DingoSingleAppTestSuite) SetupTest() {
 	var err error
-	me.App_, err = me.GenApp()
-	me.Nil(err)
+	ts.App_, err = ts.GenApp()
+	ts.Nil(err)
 	if err != nil {
 		return
 	}
-	_, events, err := me.App_.Listen(ObjT.ALL, EventLvl.DEBUG, 0)
-	me.EventMux = newMux()
-	_, err = me.EventMux.Register(events, 0)
-	me.Nil(err)
-	me.EventMux.Handle(func(val interface{}, _ int) {
-		me.Nil(val)
-		me.Nil(val.(*Event).Payload)
+	_, events, err := ts.App_.Listen(ObjT.All, EventLvl.Debug, 0)
+	ts.EventMux = newMux()
+	_, err = ts.EventMux.Register(events, 0)
+	ts.Nil(err)
+	ts.EventMux.Handle(func(val interface{}, _ int) {
+		ts.Nil(val)
+		ts.Nil(val.(*Event).Payload)
 	})
-	_, err = me.EventMux.More(1)
-	me.Nil(err)
+	_, err = ts.EventMux.More(1)
+	ts.Nil(err)
 }
 
-func (me *DingoSingleAppTestSuite) TearDownTest() {
-	me.Nil(me.App_.Close())
-	me.EventMux.Close()
+func (ts *DingoSingleAppTestSuite) TearDownTest() {
+	ts.Nil(ts.App_.Close())
+	ts.EventMux.Close()
 }
 
 //
 // test cases
 //
 
-func (me *DingoSingleAppTestSuite) TestBasic() {
+func (ts *DingoSingleAppTestSuite) TestBasic() {
 	// register a set of workers
 	called := 0
-	err := me.App_.Register("TestBasic",
+	err := ts.App_.Register("TestBasic",
 		func(n int) int {
 			called = n
 			return n + 1
 		},
 	)
-	me.Nil(err)
-	remain, err := me.App_.Allocate("TestBasic", 1, 1)
-	me.Nil(err)
-	me.Equal(0, remain)
+	ts.Nil(err)
+	remain, err := ts.App_.Allocate("TestBasic", 1, 1)
+	ts.Nil(err)
+	ts.Equal(0, remain)
 
 	// call that function
-	reports, err := me.App_.Call("TestBasic", NewOption().SetMonitorProgress(true), 5)
-	me.Nil(err)
-	me.NotNil(reports)
+	reports, err := ts.App_.Call("TestBasic", NewOption().SetMonitorProgress(true), 5)
+	ts.Nil(err)
+	ts.NotNil(reports)
 
 	// await for reports
 	status := []int16{
@@ -76,25 +76,25 @@ func (me *DingoSingleAppTestSuite) TestBasic() {
 		done := false
 		select {
 		case v, ok := <-reports:
-			me.True(ok)
+			ts.True(ok)
 			if !ok {
 				break
 			}
 
 			// make sure the order of status is right
-			me.True(len(status) > 0)
+			ts.True(len(status) > 0)
 			if len(status) > 0 {
-				me.Equal(status[0], v.Status())
+				ts.Equal(status[0], v.Status())
 				status = status[1:]
 			}
 
 			if v.Done() {
-				me.Equal(5, called)
-				me.Len(v.Return(), 1)
+				ts.Equal(5, called)
+				ts.Len(v.Return(), 1)
 				if len(v.Return()) > 0 {
 					ret, ok := v.Return()[0].(int)
-					me.True(ok)
-					me.Equal(called+1, ret)
+					ts.True(ok)
+					ts.Equal(called+1, ret)
 				}
 				done = true
 			}
@@ -118,86 +118,86 @@ type DingoMultiAppTestSuite struct {
 	EventMux                       *mux
 }
 
-func (me *DingoMultiAppTestSuite) SetupSuite() {
-	me.NotEqual(0, me.CountOfCallers)
-	me.NotEqual(0, me.CountOfWorkers)
+func (ts *DingoMultiAppTestSuite) SetupSuite() {
+	ts.NotEqual(0, ts.CountOfCallers)
+	ts.NotEqual(0, ts.CountOfWorkers)
 }
-func (me *DingoMultiAppTestSuite) TearDownSuite() {}
+func (ts *DingoMultiAppTestSuite) TearDownSuite() {}
 
-func (me *DingoMultiAppTestSuite) SetupTest() {
+func (ts *DingoMultiAppTestSuite) SetupTest() {
 	var err error
-	me.EventMux = newMux()
-	me.EventMux.Handle(func(val interface{}, _ int) {
-		me.Nil(val)
+	ts.EventMux = newMux()
+	ts.EventMux.Handle(func(val interface{}, _ int) {
+		ts.Nil(val)
 	})
-	_, err = me.EventMux.More(1)
-	me.Nil(err)
+	_, err = ts.EventMux.More(1)
+	ts.Nil(err)
 
 	// prepare callers
-	for i := 0; i < me.CountOfCallers; i++ {
-		app, err := me.GenCaller()
-		me.Nil(err)
+	for i := 0; i < ts.CountOfCallers; i++ {
+		app, err := ts.GenCaller()
+		ts.Nil(err)
 		if err != nil {
 			return
 		}
-		me.Callers = append(me.Callers, app)
+		ts.Callers = append(ts.Callers, app)
 
 		// listen to events
-		_, events, err := app.Listen(ObjT.ALL, EventLvl.DEBUG, 0)
-		me.Nil(err)
+		_, events, err := app.Listen(ObjT.All, EventLvl.Debug, 0)
+		ts.Nil(err)
 		if err != nil {
 			return
 		}
-		_, err = me.EventMux.Register(events, 0)
-		me.Nil(err)
+		_, err = ts.EventMux.Register(events, 0)
+		ts.Nil(err)
 		if err != nil {
 			return
 		}
 	}
 
 	// prepare workers
-	for i := 0; i < me.CountOfWorkers; i++ {
-		app, err := me.GenWorker()
-		me.Nil(err)
+	for i := 0; i < ts.CountOfWorkers; i++ {
+		app, err := ts.GenWorker()
+		ts.Nil(err)
 		if err != nil {
 			return
 		}
-		me.Workers = append(me.Workers, app)
+		ts.Workers = append(ts.Workers, app)
 	}
 }
 
-func (me *DingoMultiAppTestSuite) TearDownTest() {
-	for _, v := range me.Callers {
-		me.Nil(v.Close())
+func (ts *DingoMultiAppTestSuite) TearDownTest() {
+	for _, v := range ts.Callers {
+		ts.Nil(v.Close())
 	}
 
-	for _, v := range me.Workers {
-		me.Nil(v.Close())
+	for _, v := range ts.Workers {
+		ts.Nil(v.Close())
 	}
 
-	me.EventMux.Close()
+	ts.EventMux.Close()
 }
 
-func (me *DingoMultiAppTestSuite) register(name string, fn interface{}) {
-	for _, v := range me.Callers {
-		me.Nil(v.Register(name, fn))
+func (ts *DingoMultiAppTestSuite) register(name string, fn interface{}) {
+	for _, v := range ts.Callers {
+		ts.Nil(v.Register(name, fn))
 	}
-	for _, v := range me.Workers {
-		me.Nil(v.Register(name, fn))
-	}
-}
-
-func (me *DingoMultiAppTestSuite) setOption(name string, opt *Option) {
-	for _, v := range me.Callers {
-		me.Nil(v.SetOption(name, opt))
+	for _, v := range ts.Workers {
+		ts.Nil(v.Register(name, fn))
 	}
 }
 
-func (me *DingoMultiAppTestSuite) allocate(name string, count, share int) {
-	for _, v := range me.Workers {
+func (ts *DingoMultiAppTestSuite) setOption(name string, opt *Option) {
+	for _, v := range ts.Callers {
+		ts.Nil(v.SetOption(name, opt))
+	}
+}
+
+func (ts *DingoMultiAppTestSuite) allocate(name string, count, share int) {
+	for _, v := range ts.Workers {
 		remain, err := v.Allocate(name, count, share)
-		me.Equal(0, remain)
-		me.Nil(err)
+		ts.Equal(0, remain)
+		ts.Nil(err)
 	}
 }
 
@@ -205,24 +205,24 @@ func (me *DingoMultiAppTestSuite) allocate(name string, count, share int) {
 // test cases
 //
 
-func (me *DingoMultiAppTestSuite) TestOrder() {
+func (ts *DingoMultiAppTestSuite) TestOrder() {
 	countOfTasks := 5
 	work := func(n int, name string) (int, string) {
 		return n + 1, name + "b"
 	}
 
 	// register worker function
-	me.register("TestOrder", work)
-	me.setOption("TestOrder", NewOption().SetMonitorProgress(true))
-	me.allocate("TestOrder", 1, 1)
+	ts.register("TestOrder", work)
+	ts.setOption("TestOrder", NewOption().SetMonitorProgress(true))
+	ts.allocate("TestOrder", 1, 1)
 
 	// sending tasks
 	reports := [][]<-chan *Report{}
-	for k, v := range me.Callers {
+	for k, v := range ts.Callers {
 		rs := []<-chan *Report{}
 		for i := 0; i < countOfTasks; i++ {
 			rep, err := v.Call("TestOrder", nil, k, fmt.Sprintf("%d.%d", k, i))
-			me.Nil(err)
+			ts.Nil(err)
 			if err != nil {
 				return
 			}
@@ -237,29 +237,29 @@ func (me *DingoMultiAppTestSuite) TestOrder() {
 		for i, v := range rs {
 			// sent
 			rep := <-v
-			me.Equal(Status.Sent, rep.Status())
+			ts.Equal(Status.Sent, rep.Status())
 			name, id := rep.Name(), rep.ID()
 
 			// progress
 			rep = <-v
-			me.Equal(Status.Progress, rep.Status())
-			me.Equal(name, rep.Name())
-			me.Equal(id, rep.ID())
+			ts.Equal(Status.Progress, rep.Status())
+			ts.Equal(name, rep.Name())
+			ts.Equal(id, rep.ID())
 
 			// success
 			rep = <-v
-			me.Equal(Status.Success, rep.Status())
-			me.Equal(name, rep.Name())
-			me.Equal(id, rep.ID())
+			ts.Equal(Status.Success, rep.Status())
+			ts.Equal(name, rep.Name())
+			ts.Equal(id, rep.ID())
 
 			// check result
 			ret := rep.Return()
-			me.Len(ret, 2)
+			ts.Len(ret, 2)
 			if len(ret) == 2 {
 				// plus 1
-				me.Equal(k+1, ret[0].(int))
+				ts.Equal(k+1, ret[0].(int))
 				// plus 'b'
-				me.Equal(fmt.Sprintf("%d.%db", k, i), ret[1].(string))
+				ts.Equal(fmt.Sprintf("%d.%db", k, i), ret[1].(string))
 			}
 		}
 	}

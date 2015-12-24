@@ -19,7 +19,7 @@ type GenericInvoker struct{}
 
 func (vk *GenericInvoker) convert2slice(v, r reflect.Value, rt reflect.Type) (err error) {
 	if v.Kind() != reflect.Slice {
-		err = errors.New(fmt.Sprintf("Only Slice not %v convertible to slice", v.Kind().String()))
+		err = fmt.Errorf("Only Slice not %v convertible to slice", v.Kind().String())
 		return
 	}
 
@@ -39,7 +39,7 @@ func (vk *GenericInvoker) convert2slice(v, r reflect.Value, rt reflect.Type) (er
 
 func (vk *GenericInvoker) convert2map(v, r reflect.Value, rt reflect.Type) (err error) {
 	if v.Kind() != reflect.Map {
-		err = errors.New(fmt.Sprintf("Only Map not %v convertible to map", v.Kind().String()))
+		err = fmt.Errorf("Only Map not %v convertible to map", v.Kind().String())
 		return
 	}
 
@@ -65,7 +65,7 @@ func (vk *GenericInvoker) convert2struct(v, r reflect.Value, rt reflect.Type) (e
 	kind := v.Kind()
 
 	if !(kind == reflect.Map || kind == reflect.Struct) {
-		err = errors.New(fmt.Sprintf("Only Map/Struct not %v convertible to struct", v.Kind().String()))
+		err = fmt.Errorf("Only Map/Struct not %v convertible to struct", v.Kind().String())
 		return
 	}
 	for i := 0; i < r.NumField(); i++ {
@@ -98,7 +98,7 @@ func (vk *GenericInvoker) convert2struct(v, r reflect.Value, rt reflect.Type) (e
 			}
 			mv := v.MapIndex(reflect.ValueOf(key))
 			if !mv.IsValid() {
-				err = errors.New(fmt.Sprintf("Invalid value returned from map by key: %v", ft))
+				err = fmt.Errorf("Invalid value returned from map by key: %v", ft)
 				break
 			}
 
@@ -167,7 +167,7 @@ func (vk *GenericInvoker) convert(v reflect.Value, t reflect.Type) (reflect.Valu
 			// the underlying type of those parameter with 'Ptr' type would be deduced here.
 			elm.Set(v.Convert(t))
 		} else {
-			err = errors.New(fmt.Sprintf("Unsupported Element Type: %v", elm.Kind().String()))
+			err = fmt.Errorf("Unsupported Element Type: %v", elm.Kind().String())
 		}
 	}
 
@@ -209,7 +209,7 @@ func (vk *GenericInvoker) Call(f interface{}, param []interface{}) ([]interface{
 
 	// make sure parameter matched
 	if len(param) != funcT.NumIn() {
-		return nil, errors.New(fmt.Sprintf("Parameter Count mismatch: %v %v", len(param), funcT.NumIn()))
+		return nil, fmt.Errorf("Parameter Count mismatch: %v %v", len(param), funcT.NumIn())
 	}
 
 	// convert param into []reflect.Value
@@ -232,7 +232,7 @@ func (vk *GenericInvoker) Call(f interface{}, param []interface{}) ([]interface{
 		if ret[i].CanInterface() {
 			out[i] = ret[i].Interface()
 		} else {
-			return nil, errors.New(fmt.Sprintf("Unable to convert to interface{} for %d", i))
+			return nil, fmt.Errorf("Unable to convert to interface{} for %d", i)
 		}
 	}
 
@@ -244,7 +244,7 @@ func (vk *GenericInvoker) Return(f interface{}, returns []interface{}) ([]interf
 
 	// make sure parameter matched
 	if len(returns) != funcT.NumOut() {
-		return nil, errors.New(fmt.Sprintf("Parameter Count mismatch: %v %v", len(returns), funcT.NumOut()))
+		return nil, fmt.Errorf("Parameter Count mismatch: %v %v", len(returns), funcT.NumOut())
 	}
 
 	var (
@@ -261,7 +261,7 @@ func (vk *GenericInvoker) Return(f interface{}, returns []interface{}) ([]interf
 		if ret.CanInterface() {
 			out[i] = ret.Interface()
 		} else {
-			return nil, errors.New(fmt.Sprintf("Unable to convert to interface{} for %d", i))
+			return nil, fmt.Errorf("Unable to convert to interface{} for %d", i)
 		}
 	}
 

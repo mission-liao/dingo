@@ -15,13 +15,13 @@ type TestStruct struct {
 //
 // embed struct
 //
-type _test_embed struct {
+type testEmbed struct {
 	TestStruct
 	Age  int
 	Addr string
 }
 
-type _test_embed_with_collision struct {
+type testEmbedWithCollision struct {
 	TestStruct
 	Age  int
 	Addr string
@@ -233,9 +233,9 @@ func (s *InvokerTestSuite) TestStruct() {
 			return v, nil
 		}
 		{
-			v_ := &TestStruct{Name: "Bob", Count: 10}
+			vP := &TestStruct{Name: "Bob", Count: 10}
 			// pointer-2-pointer
-			v := &v_
+			v := &vP
 			param, err := s.convert(chk, v)
 			s.Nil(err)
 			s.NotNil(param)
@@ -281,11 +281,11 @@ func (s *InvokerTestSuite) TestStruct() {
 }
 
 func (s *InvokerTestSuite) TestEmbed() {
-	// *_test_embed
+	// *testEmbed
 	{
-		called := (*_test_embed)(nil)
+		called := (*testEmbed)(nil)
 		age, count, name, address := 0, 0, "", ""
-		chk := func(v *_test_embed) (*_test_embed, error) {
+		chk := func(v *testEmbed) (*testEmbed, error) {
 			called = v
 			if v != nil {
 				name = v.Name
@@ -295,7 +295,7 @@ func (s *InvokerTestSuite) TestEmbed() {
 			}
 			return v, nil
 		}
-		v := &_test_embed{TestStruct: TestStruct{Name: "Bob", Count: 10}, Age: 100, Addr: "heaven"}
+		v := &testEmbed{TestStruct: TestStruct{Name: "Bob", Count: 10}, Age: 100, Addr: "heaven"}
 		param, err := s.convert(chk, v)
 		s.Nil(err)
 		s.NotNil(param)
@@ -304,7 +304,7 @@ func (s *InvokerTestSuite) TestEmbed() {
 			s.Nil(err)
 			s.Len(ret, 2)
 			if ret != nil && len(ret) > 0 {
-				f, ok := ret[0].(*_test_embed)
+				f, ok := ret[0].(*testEmbed)
 				s.True(ok)
 				if ok {
 					s.Equal(v, f)
@@ -321,11 +321,11 @@ func (s *InvokerTestSuite) TestEmbed() {
 }
 
 func (s *InvokerTestSuite) TestEmbedWithCollision() {
-	// *_test_embed_with_collision
+	// *testEmbedWithCollision
 	{
-		called := (*_test_embed_with_collision)(nil)
+		called := (*testEmbedWithCollision)(nil)
 		age, count, name, address, count_, name_, count_s, name_s := 0, 0, "", "", 0, "", 0, ""
-		chk := func(v *_test_embed_with_collision) (*_test_embed_with_collision, error) {
+		chk := func(v *testEmbedWithCollision) (*testEmbedWithCollision, error) {
 			called = v
 			if v != nil {
 				name = v.Name
@@ -339,7 +339,7 @@ func (s *InvokerTestSuite) TestEmbedWithCollision() {
 			}
 			return v, nil
 		}
-		v := &_test_embed_with_collision{
+		v := &testEmbedWithCollision{
 			TestStruct: TestStruct{Name: "Bob", Count: 10},
 			Age:        100,
 			Addr:       "heaven",
@@ -355,7 +355,7 @@ func (s *InvokerTestSuite) TestEmbedWithCollision() {
 			s.Nil(err)
 			s.Len(ret, 2)
 			if ret != nil && len(ret) > 0 {
-				f, ok := ret[0].(*_test_embed_with_collision)
+				f, ok := ret[0].(*testEmbedWithCollision)
 				s.True(ok)
 				if ok {
 					s.Equal(v, f)

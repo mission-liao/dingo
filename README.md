@@ -107,7 +107,7 @@ Many core behaviors can be customized:
 Most APIs in this library are executed asynchronously in separated go-routines. Therefore, we can't report a failure by returning an error. Instead, an event channel could be subscribed for failure events.
 ```go
 // subscribe a event channel
-_, events, err := app.Listen(dingo.ObjT.ALL, dingo.EventLvl.DEBUG, 0)
+_, events, err := app.Listen(dingo.ObjT.All, dingo.EventLvl.Debug, 0)
 // initiate a go routine to log events
 go func () {
   for {

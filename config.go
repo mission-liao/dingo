@@ -4,9 +4,9 @@ type Config struct {
 	Mappers_ int `json:"Mappers"`
 }
 
-func (me *Config) Mappers(count int) *Config {
-	me.Mappers_ = count
-	return me
+func (cfg *Config) Mappers(count int) *Config {
+	cfg.Mappers_ = count
+	return cfg
 }
 
 func DefaultConfig() *Config {

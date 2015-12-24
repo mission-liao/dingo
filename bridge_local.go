@@ -29,47 +29,47 @@ func newLocalBridge(args ...interface{}) (b bridge) {
 		reporters: NewRoutines(),
 		broker:    make(chan *Task, 10),
 		pollers:   make(chan *localStorePoller, 10),
-		supported: ObjT.REPORTER | ObjT.STORE | ObjT.PRODUCER | ObjT.CONSUMER,
+		supported: ObjT.Reporter | ObjT.Store | ObjT.Producer | ObjT.Consumer,
 	}
 	b = v
 
 	return
 }
 
-func (me *localBridge) Events() ([]<-chan *Event, error) {
+func (bdg *localBridge) Events() ([]<-chan *Event, error) {
 	return []<-chan *Event{
-		me.events,
+		bdg.events,
 	}, nil
 }
 
-func (me *localBridge) Close() (err error) {
-	me.objLock.Lock()
-	defer me.objLock.Unlock()
+func (bdg *localBridge) Close() (err error) {
+	bdg.objLock.Lock()
+	defer bdg.objLock.Unlock()
 
-	me.listeners.Close()
-	me.reporters.Close()
+	bdg.listeners.Close()
+	bdg.reporters.Close()
 
-	close(me.broker)
-	me.broker = make(chan *Task, 10)
+	close(bdg.broker)
+	bdg.broker = make(chan *Task, 10)
 	return
 }
 
-func (me *localBridge) SendTask(t *Task) (err error) {
-	me.objLock.RLock()
-	defer me.objLock.RUnlock()
+func (bdg *localBridge) SendTask(t *Task) (err error) {
+	bdg.objLock.RLock()
+	defer bdg.objLock.RUnlock()
 
-	me.broker <- t
+	bdg.broker <- t
 	return
 }
 
-func (me *localBridge) AddNamedListener(name string, rcpt <-chan *TaskReceipt) (tasks <-chan *Task, err error) {
+func (bdg *localBridge) AddNamedListener(name string, rcpt <-chan *TaskReceipt) (tasks <-chan *Task, err error) {
 	err = errors.New("named consumer is not supported by local-bridge")
 	return
 }
 
-func (me *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *Task, err error) {
-	me.objLock.RLock()
-	defer me.objLock.RUnlock()
+func (bdg *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *Task, err error) {
+	bdg.objLock.RLock()
+	defer bdg.objLock.RUnlock()
 
 	tasks2 := make(chan *Task, 10)
 	tasks = tasks2
@@ -92,15 +92,15 @@ func (me *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *Task
 			}
 			if reply.ID != t.ID() {
 				events <- NewEventFromError(
-					ObjT.CONSUMER,
-					errors.New(fmt.Sprintf("expect receipt from %v, but %v", t, reply)),
+					ObjT.Consumer,
+					fmt.Errorf("expect receipt from %v, but %v", t, reply),
 				)
 				return
 			}
-			if reply.Status == ReceiptStatus.WORKER_NOT_FOUND {
+			if reply.Status == ReceiptStatus.WorkerNotFound {
 				events <- NewEventFromError(
-					ObjT.CONSUMER,
-					errors.New(fmt.Sprintf("workers not found: %v", t)),
+					ObjT.Consumer,
+					fmt.Errorf("workers not found: %v", t),
 				)
 				return
 			}
@@ -140,22 +140,22 @@ func (me *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *Task
 			}
 		}
 		close(output)
-	}(me.listeners.New(), me.listeners.Wait(), me.listeners.Events(), me.broker, tasks2, rcpt)
+	}(bdg.listeners.New(), bdg.listeners.Wait(), bdg.listeners.Events(), bdg.broker, tasks2, rcpt)
 
 	return
 }
 
-func (me *localBridge) StopAllListeners() (err error) {
-	me.objLock.Lock()
-	defer me.objLock.Unlock()
+func (bdg *localBridge) StopAllListeners() (err error) {
+	bdg.objLock.Lock()
+	defer bdg.objLock.Unlock()
 
-	me.listeners.Close()
+	bdg.listeners.Close()
 	return
 }
 
-func (me *localBridge) Report(reports <-chan *Report) (err error) {
-	me.objLock.RLock()
-	defer me.objLock.RUnlock()
+func (bdg *localBridge) Report(reports <-chan *Report) (err error) {
+	bdg.objLock.RLock()
+	defer bdg.objLock.RUnlock()
 
 	go func(
 		quit <-chan int,
@@ -168,10 +168,10 @@ func (me *localBridge) Report(reports <-chan *Report) (err error) {
 		// they are natually thread-safe (used in one go routine only)
 		var (
 			// map (name, id) to poller
-			watched map[string]map[string]*localStorePoller = make(map[string]map[string]*localStorePoller)
+			watched = make(map[string]map[string]*localStorePoller)
 
 			// map (name, id) to slice of unsent reports.
-			unSent map[string]map[string][]*Report = make(map[string]map[string][]*Report)
+			unSent = make(map[string]map[string][]*Report)
 
 			id, name string
 			poller   *localStorePoller
@@ -206,8 +206,8 @@ func (me *localBridge) Report(reports <-chan *Report) (err error) {
 				if ids, ok := watched[name]; ok {
 					if _, ok := ids[id]; ok {
 						events <- NewEventFromError(
-							ObjT.STORE,
-							errors.New(fmt.Sprintf("duplicated polling found: %v", id)),
+							ObjT.Store,
+							fmt.Errorf("duplicated polling found: %v", id),
 						)
 						break
 					}
@@ -271,8 +271,8 @@ func (me *localBridge) Report(reports <-chan *Report) (err error) {
 
 				if !outF(v) {
 					events <- NewEventFromError(
-						ObjT.STORE,
-						errors.New(fmt.Sprintf("droping report: %v", v)),
+						ObjT.Store,
+						fmt.Errorf("droping report: %v", v),
 					)
 				}
 			default:
@@ -287,14 +287,14 @@ func (me *localBridge) Report(reports <-chan *Report) (err error) {
 		for k, v := range watched {
 			for kk, vv := range v {
 				events <- NewEventFromError(
-					ObjT.STORE,
-					errors.New(fmt.Sprintf("unclosed reports channel: %v:%v", k, kk)),
+					ObjT.Store,
+					fmt.Errorf("unclosed reports channel: %v:%v", k, kk),
 				)
 
 				// send a 'Shutdown' report
 				r, err := vv.task.composeReport(Status.Fail, nil, NewErr(ErrCode.Shutdown, errors.New("dingo is shutdown")))
 				if err != nil {
-					events <- NewEventFromError(ObjT.STORE, err)
+					events <- NewEventFromError(ObjT.Store, err)
 				} else {
 					vv.reports <- r
 				}
@@ -307,20 +307,20 @@ func (me *localBridge) Report(reports <-chan *Report) (err error) {
 			for _, vv := range v {
 				for _, r := range vv {
 					events <- NewEventFromError(
-						ObjT.STORE,
-						errors.New(fmt.Sprintf("unsent report: %v", r)),
+						ObjT.Store,
+						fmt.Errorf("unsent report: %v", r),
 					)
 				}
 			}
 		}
-	}(me.reporters.New(), me.reporters.Wait(), me.reporters.Events(), reports, me.pollers)
+	}(bdg.reporters.New(), bdg.reporters.Wait(), bdg.reporters.Events(), reports, bdg.pollers)
 
 	return
 }
 
-func (me *localBridge) Poll(t *Task) (reports <-chan *Report, err error) {
+func (bdg *localBridge) Poll(t *Task) (reports <-chan *Report, err error) {
 	reports2 := make(chan *Report, Status.Count)
-	me.pollers <- &localStorePoller{
+	bdg.pollers <- &localStorePoller{
 		task:    t,
 		reports: reports2,
 	}
@@ -329,54 +329,54 @@ func (me *localBridge) Poll(t *Task) (reports <-chan *Report, err error) {
 	return
 }
 
-func (me *localBridge) AttachReporter(r Reporter) (err error) {
+func (bdg *localBridge) AttachReporter(r Reporter) (err error) {
 	return
 }
 
-func (me *localBridge) AttachStore(s Store) (err error) {
+func (bdg *localBridge) AttachStore(s Store) (err error) {
 	return
 }
 
-func (me *localBridge) AttachProducer(p Producer) (err error) {
+func (bdg *localBridge) AttachProducer(p Producer) (err error) {
 	return
 }
 
-func (me *localBridge) AttachConsumer(c Consumer, nc NamedConsumer) (err error) {
+func (bdg *localBridge) AttachConsumer(c Consumer, nc NamedConsumer) (err error) {
 	return
 }
 
-func (me *localBridge) Exists(it int) bool {
+func (bdg *localBridge) Exists(it int) bool {
 	// make sure only one component is selected
 	switch it {
-	case ObjT.PRODUCER:
-		return me.supported&it == it
-	case ObjT.CONSUMER:
-		return me.supported&it == it
-	case ObjT.REPORTER:
-		return me.supported&it == it
-	case ObjT.STORE:
-		return me.supported&it == it
+	case ObjT.Producer:
+		return bdg.supported&it == it
+	case ObjT.Consumer:
+		return bdg.supported&it == it
+	case ObjT.Reporter:
+		return bdg.supported&it == it
+	case ObjT.Store:
+		return bdg.supported&it == it
 	}
 
 	return false
 }
 
-func (me *localBridge) ReporterHook(eventID int, payload interface{}) (err error) {
+func (bdg *localBridge) ReporterHook(eventID int, payload interface{}) (err error) {
 	// there is no external object 'really' attached.
 	return
 }
 
-func (me *localBridge) StoreHook(eventID int, payload interface{}) (err error) {
+func (bdg *localBridge) StoreHook(eventID int, payload interface{}) (err error) {
 	// there is no external object 'really' attached.
 	return
 }
 
-func (me *localBridge) ProducerHook(eventID int, payload interface{}) (err error) {
+func (bdg *localBridge) ProducerHook(eventID int, payload interface{}) (err error) {
 	// there is no external object 'really' attached.
 	return
 }
 
-func (me *localBridge) ConsumerHook(eventID int, payload interface{}) (err error) {
+func (bdg *localBridge) ConsumerHook(eventID int, payload interface{}) (err error) {
 	// there is no external object 'really' attached.
 	return
 }

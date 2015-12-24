@@ -32,7 +32,7 @@ func (me *localSingleAppTestSuite) SetupTest() {
 		if err != nil {
 			return
 		}
-		_, _, err = app.Use(brk, dingo.ObjT.DEFAULT)
+		_, _, err = app.Use(brk, dingo.ObjT.Default)
 		if err != nil {
 			return
 		}
@@ -41,7 +41,7 @@ func (me *localSingleAppTestSuite) SetupTest() {
 		if err != nil {
 			return
 		}
-		_, _, err = app.Use(bkd, dingo.ObjT.DEFAULT)
+		_, _, err = app.Use(bkd, dingo.ObjT.Default)
 		if err != nil {
 			return
 		}
@@ -402,7 +402,7 @@ func (me *localMultiAppTestSuite) SetupTest() {
 		if err != nil {
 			return
 		}
-		_, _, err = app.Use(brk, dingo.ObjT.PRODUCER)
+		_, _, err = app.Use(brk, dingo.ObjT.Producer)
 		me.Nil(err)
 		if err != nil {
 			return
@@ -413,7 +413,7 @@ func (me *localMultiAppTestSuite) SetupTest() {
 		if err != nil {
 			return
 		}
-		_, _, err = app.Use(bkd, dingo.ObjT.STORE)
+		_, _, err = app.Use(bkd, dingo.ObjT.Store)
 		me.Nil(err)
 		if err != nil {
 			return
@@ -434,7 +434,7 @@ func (me *localMultiAppTestSuite) SetupTest() {
 		if err != nil {
 			return
 		}
-		_, _, err = app.Use(brk, dingo.ObjT.CONSUMER)
+		_, _, err = app.Use(brk, dingo.ObjT.Consumer)
 		me.Nil(err)
 		if err != nil {
 			return
@@ -445,7 +445,7 @@ func (me *localMultiAppTestSuite) SetupTest() {
 		if err != nil {
 			return
 		}
-		_, _, err = app.Use(bkd, dingo.ObjT.REPORTER)
+		_, _, err = app.Use(bkd, dingo.ObjT.Reporter)
 		me.Nil(err)
 		if err != nil {
 			return

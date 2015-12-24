@@ -81,7 +81,7 @@ func NewBroker(cfg *AmqpConfig) (v *broker, err error) {
 //
 
 func (me *broker) Expect(types int) (err error) {
-	if types&^(dingo.ObjT.PRODUCER|dingo.ObjT.NAMED_CONSUMER) != 0 {
+	if types&^(dingo.ObjT.Producer|dingo.ObjT.NamedConsumer) != 0 {
 		err = errors.New(fmt.Sprintf("unsupported types: %v", types))
 		return
 	}
@@ -302,7 +302,7 @@ func (me *broker) _consumer_routine_(
 		nil,   // args
 	)
 	if err != nil {
-		events <- dingo.NewEventFromError(dingo.ObjT.CONSUMER, err)
+		events <- dingo.NewEventFromError(dingo.ObjT.Consumer, err)
 		return
 	}
 
@@ -321,7 +321,7 @@ func (me *broker) _consumer_routine_(
 				defer func() {
 					if err != nil || !ok {
 						d.Nack(false, false)
-						events <- dingo.NewEventFromError(dingo.ObjT.CONSUMER, err)
+						events <- dingo.NewEventFromError(dingo.ObjT.Consumer, err)
 					} else {
 						d.Ack(false)
 					}
@@ -341,7 +341,7 @@ func (me *broker) _consumer_routine_(
 					err = errors.New(fmt.Sprintf("expected: %v, received: %v", h, reply))
 					return
 				}
-				if reply.Status == dingo.ReceiptStatus.WORKER_NOT_FOUND {
+				if reply.Status == dingo.ReceiptStatus.WorkerNotFound {
 					err = errors.New(fmt.Sprintf("worker not found: %v", h))
 					return
 				}
@@ -358,7 +358,7 @@ func (me *broker) _consumer_routine_(
 clean:
 	err_ := ci.Channel.Cancel(tag, false)
 	if err_ != nil {
-		events <- dingo.NewEventFromError(dingo.ObjT.CONSUMER, err_)
+		events <- dingo.NewEventFromError(dingo.ObjT.Consumer, err_)
 		// should we return here?,
 		// we still need to clean the delivery channel...
 	}

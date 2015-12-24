@@ -1,15 +1,22 @@
 package dingo
 
+/*Backend interface is composed of Reporter/Store
+ */
 type Backend interface {
 	Reporter
 	Store
 }
 
+/*ReportEvenlope is the standard package sent through the channel to Reporter. The main requirement to fit
+is to allow Reporter can know the meta info of the byte stream to send.
+*/
 type ReportEnvelope struct {
 	ID   Meta
 	Body []byte
 }
 
+/*ReportEvent are those IDs of events that might be sent to ReporterHook
+ */
 var ReporterEvent = struct {
 	// a sequence of reports from this task is about to fire.
 	BeforeReport int
@@ -17,9 +24,8 @@ var ReporterEvent = struct {
 	1,
 }
 
-/*
- Reporter(s) is responsible for sending reports to backend(s). The interaction between
- Reporter(s) and dingo are asynchronous by channels.
+/*Reporter is responsible for sending reports to backend(s). The interaction between
+Reporter(s) and dingo are asynchronous by channels.
 */
 type Reporter interface {
 	// hook for listening events from dingo
@@ -39,12 +45,13 @@ type Reporter interface {
 	Report(reports <-chan *ReportEnvelope) (id int, err error)
 }
 
+/*StoreEvent are those IDs of events that might be sent to StoreHook
+ */
 var StoreEvent = struct {
 }{}
 
-/*
- Store(s) is responsible for receiving reports from backend(s)
-*/
+/*Store is responsible for receiving reports from backend(s)
+ */
 type Store interface {
 	// hook for listening events from dingo
 	// parameter:

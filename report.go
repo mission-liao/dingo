@@ -11,19 +11,18 @@ type ReportPayload struct {
 	R []interface{}
 }
 
-/*
- Reports for task execution.
+/*Report is the reports for task execution.
 
- When Report.Done() is true, it means no more reports would be sent.
- And either Report.OK() or Report.Fail() would be true.
+When Report.Done() is true, it means no more reports would be sent.
+And either Report.OK() or Report.Fail() would be true.
 
- If Report.OK() is true, the task execution is succeeded, and
- you can grab the return value from Report.Returns(). Report.Returns()
- would give you an []interface{}, and the type of every elements in
- that slice would be type-corrected according to the work function.
+If Report.OK() is true, the task execution is succeeded, and
+you can grab the return value from Report.Returns(). Report.Returns()
+would give you an []interface{}, and the type of every elements in
+that slice would be type-corrected according to the work function.
 
- If Report.Fail() is true, the task execution is failed, and
- you can grab the reason from Report.Error().
+If Report.Fail() is true, the task execution is failed, and
+you can grab the reason from Report.Error().
 */
 type Report struct {
 	H *Header

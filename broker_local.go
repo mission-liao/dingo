@@ -1,7 +1,6 @@
 package dingo
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 )
@@ -17,12 +16,11 @@ type localBroker struct {
 	listeners *Routines
 }
 
-/*
- A Broker implementation based on 'channel'. Users can provide a channel and
- share it between multiple Producer(s) and Consumer(s) to connect them.
+/*NewLocalBroker would allocate a Broker implementation based on 'channel'. Users can provide a channel and
+share it between multiple Producer(s) and Consumer(s) to connect them.
 
- This one only implements Consumer interface, not the NamedConsumer one. So
- the dispatching of tasks relies on dingo.mapper
+This one only implements Consumer interface, not the NamedConsumer one. So
+the dispatching of tasks relies on dingo.mapper
 */
 func NewLocalBroker(cfg *Config, to chan []byte) (v *localBroker, err error) {
 	v = &localBroker{
@@ -39,7 +37,7 @@ func NewLocalBroker(cfg *Config, to chan []byte) (v *localBroker, err error) {
 	return
 }
 
-func (me *localBroker) _consumer_routine_(quit <-chan int, wait *sync.WaitGroup, events chan<- *Event, input <-chan []byte, output chan<- []byte, receipts <-chan *TaskReceipt) {
+func (brk *localBroker) consumerRoutine(quit <-chan int, wait *sync.WaitGroup, events chan<- *Event, input <-chan []byte, output chan<- []byte, receipts <-chan *TaskReceipt) {
 	defer wait.Done()
 
 	for {
@@ -53,7 +51,7 @@ func (me *localBroker) _consumer_routine_(quit <-chan int, wait *sync.WaitGroup,
 
 			h, err := DecodeHeader(v)
 			if err != nil {
-				events <- NewEventFromError(ObjT.CONSUMER, err)
+				events <- NewEventFromError(ObjT.Consumer, err)
 				break
 			}
 
@@ -65,8 +63,8 @@ func (me *localBroker) _consumer_routine_(quit <-chan int, wait *sync.WaitGroup,
 
 			if reply.ID != h.ID() {
 				events <- NewEventFromError(
-					ObjT.CONSUMER,
-					errors.New(fmt.Sprintf("expected: %v, received: %v", h, reply)),
+					ObjT.Consumer,
+					fmt.Errorf("expected: %v, received: %v", h, reply),
 				)
 				break
 			}
@@ -79,30 +77,30 @@ clean:
 // Object interface
 //
 
-func (me *localBroker) Expect(types int) (err error) {
-	if types&^(ObjT.PRODUCER|ObjT.CONSUMER) != 0 {
-		err = errors.New(fmt.Sprintf("unsupported types: %v", types))
+func (brk *localBroker) Expect(types int) (err error) {
+	if types&^(ObjT.Producer|ObjT.Consumer) != 0 {
+		err = fmt.Errorf("unsupported types: %v", types)
 		return
 	}
 
 	return
 }
 
-func (me *localBroker) Events() ([]<-chan *Event, error) {
+func (brk *localBroker) Events() ([]<-chan *Event, error) {
 	return []<-chan *Event{
-		me.listeners.Events(),
+		brk.listeners.Events(),
 	}, nil
 }
 
-func (me *localBroker) Close() (err error) {
-	me.listeners.Close()
-	if me.fromUser == nil {
+func (brk *localBroker) Close() (err error) {
+	brk.listeners.Close()
+	if brk.fromUser == nil {
 		// close it only when it's not provided by callers.
-		close(me.to)
+		close(brk.to)
 	}
-	me.to = me.fromUser
-	if me.to == nil {
-		me.to = make(chan []byte, 10)
+	brk.to = brk.fromUser
+	if brk.to == nil {
+		brk.to = make(chan []byte, 10)
 	}
 	return
 }
@@ -111,12 +109,12 @@ func (me *localBroker) Close() (err error) {
 // Producer
 //
 
-func (me *localBroker) ProducerHook(eventID int, payload interface{}) (err error) {
+func (brk *localBroker) ProducerHook(eventID int, payload interface{}) (err error) {
 	return
 }
 
-func (me *localBroker) Send(id Meta, body []byte) (err error) {
-	me.to <- body
+func (brk *localBroker) Send(id Meta, body []byte) (err error) {
+	brk.to <- body
 	return
 }
 
@@ -124,16 +122,16 @@ func (me *localBroker) Send(id Meta, body []byte) (err error) {
 // Consumer
 //
 
-func (me *localBroker) ConsumerHook(eventID int, payload interface{}) (err error) { return }
-func (me *localBroker) AddListener(receipts <-chan *TaskReceipt) (tasks <-chan []byte, err error) {
+func (brk *localBroker) ConsumerHook(eventID int, payload interface{}) (err error) { return }
+func (brk *localBroker) AddListener(receipts <-chan *TaskReceipt) (tasks <-chan []byte, err error) {
 	t := make(chan []byte, 10)
-	go me._consumer_routine_(me.listeners.New(), me.listeners.Wait(), me.listeners.Events(), me.to, t, receipts)
+	go brk.consumerRoutine(brk.listeners.New(), brk.listeners.Wait(), brk.listeners.Events(), brk.to, t, receipts)
 
 	tasks = t
 	return
 }
 
-func (me *localBroker) StopAllListeners() (err error) {
-	me.listeners.Close()
+func (brk *localBroker) StopAllListeners() (err error) {
+	brk.listeners.Close()
 	return
 }

@@ -79,7 +79,7 @@ func NewBackend(cfg *AmqpConfig) (v *backend, err error) {
 //
 
 func (me *backend) Expect(types int) (err error) {
-	if types&^(dingo.ObjT.REPORTER|dingo.ObjT.STORE) != 0 {
+	if types&^(dingo.ObjT.Reporter|dingo.ObjT.Store) != 0 {
 		err = errors.New(fmt.Sprintf("unsupported types: %v", types))
 		return
 	}
@@ -283,7 +283,7 @@ func (me *backend) _reporter_routine_(quit <-chan int, done chan<- int, events c
 		// report an error event when leaving
 		defer func() {
 			if err != nil {
-				events <- dingo.NewEventFromError(dingo.ObjT.REPORTER, err)
+				events <- dingo.NewEventFromError(dingo.ObjT.Reporter, err)
 			}
 		}()
 
@@ -410,7 +410,7 @@ done:
 	// cancel consuming
 	err = ci.Channel.Cancel(getConsumerTag(id), false)
 	if err != nil {
-		events <- dingo.NewEventFromError(dingo.ObjT.STORE, err)
+		events <- dingo.NewEventFromError(dingo.ObjT.Store, err)
 		isChannelError = true
 		return
 	}
@@ -424,7 +424,7 @@ done:
 		nil,              // args
 	)
 	if err != nil {
-		events <- dingo.NewEventFromError(dingo.ObjT.STORE, err)
+		events <- dingo.NewEventFromError(dingo.ObjT.Store, err)
 		isChannelError = true
 		return
 	}
@@ -437,7 +437,7 @@ done:
 		false, // noWait
 	)
 	if err != nil {
-		events <- dingo.NewEventFromError(dingo.ObjT.STORE, err)
+		events <- dingo.NewEventFromError(dingo.ObjT.Store, err)
 		isChannelError = true
 		return
 	}

@@ -18,8 +18,8 @@ type invokerLazyGobTestSuite struct {
 
 func TestInvokerLazyGobSuite(t *testing.T) {
 	gob.Register(map[string]int{})
-	gob.Register(_test_embed{})
-	gob.Register(_test_embed_with_collision{})
+	gob.Register(testEmbed{})
+	gob.Register(testEmbedWithCollision{})
 	gob.Register(TestStruct{})
 	gob.Register(map[string]*TestStruct{})
 	gob.Register([]*TestStruct{})
@@ -57,9 +57,9 @@ func (s *invokerLazyGobTestSuite) TestSliceOfStruct() {
 func (s *invokerLazyGobTestSuite) TestReturn() {
 	// struct & *struct would be marshalled to the same
 	// stuff by god, we need to take care of that.
-	fn := func() (a *TestStruct, b *_test_embed) { return }
+	fn := func() (a *TestStruct, b *testEmbed) { return }
 
-	v, err := s.convert(fn, &TestStruct{}, &_test_embed{})
+	v, err := s.convert(fn, &TestStruct{}, &testEmbed{})
 	s.Nil(err)
 	v, err = s.ivk.Return(fn, v)
 	s.Nil(err)
@@ -67,7 +67,7 @@ func (s *invokerLazyGobTestSuite) TestReturn() {
 	// check each type
 	_, ok := v[0].(*TestStruct)
 	s.True(ok)
-	_, ok = v[1].(*_test_embed)
+	_, ok = v[1].(*testEmbed)
 	s.True(ok)
 }
 
@@ -75,8 +75,8 @@ func (s *invokerLazyGobTestSuite) TestReturn() {
 // json-safe
 //
 
-func ioJsonSafe() func(f interface{}, args ...interface{}) (v []interface{}, err error) {
-	m := &JsonSafeCodec{}
+func ioJSONSafe() func(f interface{}, args ...interface{}) (v []interface{}, err error) {
+	m := &JSONSafeCodec{}
 	return func(f interface{}, args ...interface{}) (v []interface{}, err error) {
 		// encode
 		bs, err := m.encode(args)
@@ -103,7 +103,7 @@ func TestInvokerLazyJsonSafeSuite(t *testing.T) {
 	suite.Run(t, &invokerLazyJsonSafeTestSuite{
 		InvokerTestSuite{
 			ivk:     &LazyInvoker{},
-			convert: ioJsonSafe(),
+			convert: ioJSONSafe(),
 		},
 	})
 }

@@ -9,18 +9,17 @@ type TaskPayload struct {
 	A []interface{}
 }
 
-/*
- This struct records all infomation required for task execution, including:
-  - name(type) of task
-  - identifier of this task, which should be unique among all tasks of the same name.
-  - arguments to be passed into worker function
-  - execution option
+/*Task is the struct records all infomation required for task execution, including:
+ - name(type) of task
+ - identifier of this task, which should be unique among all tasks of the same name.
+ - arguments to be passed into worker function
+ - execution option
 
- You don't have to know what it is unless you try to implement:
-  - dingo.Marshaller
-  - dingo.Invoker
- You don't have to create it by yourself, every time you call
- dingo.App.Call, one is generated automatically.
+You don't have to know what it is unless you try to implement:
+ - dingo.Marshaller
+ - dingo.Invoker
+You don't have to create it by yourself, every time you call
+dingo.App.Call, one is generated automatically.
 */
 type Task struct {
 	H *Header

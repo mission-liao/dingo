@@ -118,8 +118,8 @@ type invokerGenericGobTestSuite struct {
 
 func TestInvokerGenericGobSuite(t *testing.T) {
 	gob.Register(map[string]int{})
-	gob.Register(_test_embed{})
-	gob.Register(_test_embed_with_collision{})
+	gob.Register(testEmbed{})
+	gob.Register(testEmbedWithCollision{})
 	gob.Register(TestStruct{})
 	gob.Register(map[string]*TestStruct{})
 	gob.Register([]*TestStruct{})
@@ -165,7 +165,7 @@ func TestInvokerGenericJsonSafeSuite(t *testing.T) {
 		InvokerGenericTestSuite{
 			InvokerTestSuite{
 				ivk:     &GenericInvoker{},
-				convert: ioJsonSafe(),
+				convert: ioJSONSafe(),
 			},
 		},
 	})

@@ -23,21 +23,21 @@ func TestWorkerSuite(t *testing.T) {
 	})
 }
 
-func (me *workerTestSuite) SetupSuite() {
+func (ts *workerTestSuite) SetupSuite() {
 	var err error
-	me._ws, err = newWorkers(me._trans, me._hooks)
-	me.Nil(err)
+	ts._ws, err = newWorkers(ts._trans, ts._hooks)
+	ts.Nil(err)
 }
 
-func (me *workerTestSuite) TearDownSuite() {
-	me.Nil(me._ws.Close())
+func (ts *workerTestSuite) TearDownSuite() {
+	ts.Nil(ts._ws.Close())
 }
 
 //
 // test cases
 //
 
-func (me *workerTestSuite) TestParellelRun() {
+func (ts *workerTestSuite) TestParellelRun() {
 	// make sure other workers would be called
 	// when one is blocked.
 
@@ -49,17 +49,17 @@ func (me *workerTestSuite) TestParellelRun() {
 		// workers would be blocked here
 		<-stepOut
 	}
-	me.Nil(me._trans.Register(
+	ts.Nil(ts._trans.Register(
 		"TestParellelRun", fn,
 	))
-	reports, remain, err := me._ws.allocate("TestParellelRun", tasks, nil, 3, 0)
-	me.Nil(err)
-	me.Equal(0, remain)
-	me.Len(reports, 1)
+	reports, remain, err := ts._ws.allocate("TestParellelRun", tasks, nil, 3, 0)
+	ts.Nil(err)
+	ts.Equal(0, remain)
+	ts.Len(reports, 1)
 
 	for i := 0; i < 3; i++ {
-		t, err := me._trans.ComposeTask("TestParellelRun", nil, []interface{}{i})
-		me.Nil(err)
+		t, err := ts._trans.ComposeTask("TestParellelRun", nil, []interface{}{i})
+		ts.Nil(err)
 		if err == nil {
 			tasks <- t
 		}
@@ -70,7 +70,7 @@ func (me *workerTestSuite) TestParellelRun() {
 		rets = append(rets, <-stepIn)
 	}
 	sort.Ints(rets)
-	me.Equal([]int{0, 1, 2}, rets)
+	ts.Equal([]int{0, 1, 2}, rets)
 
 	stepOut <- 1
 	stepOut <- 1
@@ -79,74 +79,74 @@ func (me *workerTestSuite) TestParellelRun() {
 	close(stepOut)
 }
 
-func (me *workerTestSuite) TestPanic() {
+func (ts *workerTestSuite) TestPanic() {
 	// allocate workers
 	tasks := make(chan *Task)
-	me.Nil(me._trans.Register("TestPanic", func() { panic("QQ") }))
-	reports, remain, err := me._ws.allocate("TestPanic", tasks, nil, 1, 0)
-	me.Nil(err)
-	me.Equal(0, remain)
-	me.Len(reports, 1)
+	ts.Nil(ts._trans.Register("TestPanic", func() { panic("QQ") }))
+	reports, remain, err := ts._ws.allocate("TestPanic", tasks, nil, 1, 0)
+	ts.Nil(err)
+	ts.Equal(0, remain)
+	ts.Len(reports, 1)
 
 	// an option with MonitorProgress == false
-	task, err := me._trans.ComposeTask("TestPanic", NewOption(), nil)
-	me.NotNil(task)
-	me.Nil(err)
+	task, err := ts._trans.ComposeTask("TestPanic", NewOption(), nil)
+	ts.NotNil(task)
+	ts.Nil(err)
 	if task != nil {
 		// sending a task
 		tasks <- task
 		// await for reports
 		r := <-reports[0]
 		// should be a failed one
-		me.True(r.Fail())
-		me.Equal(ErrCode.Panic, r.Error().Code())
+		ts.True(r.Fail())
+		ts.Equal(ErrCode.Panic, r.Error().Code())
 	}
 }
 
-func (me *workerTestSuite) TestIgnoreReport() {
+func (ts *workerTestSuite) TestIgnoreReport() {
 	// allocate workers
 	tasks := make(chan *Task)
-	me.Nil(me._trans.Register("TestIgnoreReport", func() {}))
-	reports, remain, err := me._ws.allocate("TestIgnoreReport", tasks, nil, 1, 0)
-	me.Nil(err)
-	me.Equal(0, remain)
-	me.Len(reports, 1)
+	ts.Nil(ts._trans.Register("TestIgnoreReport", func() {}))
+	reports, remain, err := ts._ws.allocate("TestIgnoreReport", tasks, nil, 1, 0)
+	ts.Nil(err)
+	ts.Equal(0, remain)
+	ts.Len(reports, 1)
 
 	// an option with IgnoreReport == true
-	task, err := me._trans.ComposeTask("TestIgnoreReport", NewOption().SetIgnoreReport(true), nil)
-	me.NotNil(task)
-	me.Nil(err)
+	task, err := ts._trans.ComposeTask("TestIgnoreReport", NewOption().SetIgnoreReport(true), nil)
+	ts.NotNil(task)
+	ts.Nil(err)
 
 	// send task, and shouldn't get any report
 	if task != nil {
 		tasks <- task
 		select {
 		case <-reports[0]:
-			me.Fail("shouldn't receive any reports")
+			ts.Fail("shouldn't receive any reports")
 		case <-time.After(500 * time.Millisecond):
 			// wait for 0.5 second
 		}
 	}
 }
 
-func (me *workerTestSuite) TestMonitorProgress() {
+func (ts *workerTestSuite) TestMonitorProgress() {
 	// allocate workers
 	tasks := make(chan *Task)
-	me.Nil(me._trans.Register("TestOnlyResult", func() {}))
-	reports, remain, err := me._ws.allocate("TestOnlyResult", tasks, nil, 1, 0)
-	me.Nil(err)
-	me.Equal(0, remain)
-	me.Len(reports, 1)
+	ts.Nil(ts._trans.Register("TestOnlyResult", func() {}))
+	reports, remain, err := ts._ws.allocate("TestOnlyResult", tasks, nil, 1, 0)
+	ts.Nil(err)
+	ts.Equal(0, remain)
+	ts.Len(reports, 1)
 
 	// an option with MonitorProgress == false
-	task, err := me._trans.ComposeTask("TestOnlyResult", NewOption(), nil)
-	me.NotNil(task)
-	me.Nil(err)
+	task, err := ts._trans.ComposeTask("TestOnlyResult", NewOption(), nil)
+	ts.NotNil(task)
+	ts.Nil(err)
 
 	// send task, only the last report should be sent
 	if task != nil {
 		tasks <- task
 		r := <-reports[0]
-		me.True(r.Done())
+		ts.True(r.Done())
 	}
 }

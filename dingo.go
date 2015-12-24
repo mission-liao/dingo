@@ -1,14 +1,14 @@
 /*
- A task/job <=> worker framework for #golang.
+Package dingo is a task/job <=> worker framework for #golang.
 
- Goal
+Goal
 
  This library tries to make tasks invoking / monitoring as easy as possible.
   - any function can be a worker function, as long as types of its parameters are supported.
   - return values of worker functions are also accessible.
   - could be used locally as a queue for background jobs, or remotely as a distributed task queue when connected with AMQP or Redis.
 
- Design
+Design
 
  The design is inspired by
   https://github.com/RichardKnop/machinery
@@ -40,7 +40,7 @@
  customization are task specific, thus users may choose the default marsahller/invoker for
  most tasks, and provide customized marshaller/invoker to those tasks that are performance-critical.
 
- Customization
+Customization
 
  These concept are virtualized for extensibility and customization, please refer to
  corresponding reference for details:
@@ -50,7 +50,7 @@
   - Task Publishing/Consuming: dingo.Producer/dingo.Consumer/dingo.NamedConsumer
   - Report Publishing/Consuming: dingo.Reporter/dingo.Store
 
- Parameter Types
+Parameter Types
 
  Many parmeter types are supported by this library, except:
   - interface: no way to know the underlying type of an interface.
@@ -59,7 +59,7 @@
     you need to provide a customized marshaller and invoker that can recognize those
 	private fields.
 
- TroubleShooting
+TroubleShooting
 
  It's relative hard to debug a multi-routine library. To know what's wrong inside, users
  can subscribe to receive failure events.(App.Listen)
@@ -85,9 +85,8 @@ type _object struct {
 	obj  interface{}
 }
 
-/*
- Core component of dingo.
-*/
+/*App is the core component of dingo.
+ */
 type App struct {
 	cfg          Config
 	objsLock     sync.RWMutex
@@ -101,8 +100,7 @@ type App struct {
 	workers      *_workers
 }
 
-/*
- "nameOfBridge" refers to different modes of dingo:
+/*NewApp whose "nameOfBridge" refers to different modes of dingo:
   - "local": an App works in local mode, which is similar to other background worker framework.
   - "remote": an App works in remote(distributed) mode, brokers(ex. AMQP...) and backends(ex. redis..., if required) would be needed to work.
 */
@@ -141,7 +139,7 @@ func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 
 	remain, err := v.eventMux.More(1)
 	if err != nil || remain != 0 {
-		err = errors.New(fmt.Sprintf("Unable to allocate mux routine: %v", remain))
+		err = fmt.Errorf("Unable to allocate mux routine: %v", remain)
 	}
 
 	// init mappers
@@ -149,7 +147,7 @@ func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 	if err != nil {
 		return
 	}
-	err = v.attachObject(v.mappers, ObjT.MAPPER)
+	err = v.attachObject(v.mappers, ObjT.Mapper)
 	if err != nil {
 		return
 	}
@@ -164,7 +162,7 @@ func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 	if err != nil {
 		return
 	}
-	err = v.attachObject(v.workers, ObjT.WORKER)
+	err = v.attachObject(v.workers, ObjT.Worker)
 	if err != nil {
 		return
 	}
@@ -173,7 +171,7 @@ func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 	return
 }
 
-func (me *App) attachObject(obj Object, types int) (err error) {
+func (dg *App) attachObject(obj Object, types int) (err error) {
 	if obj == nil {
 		return
 	}
@@ -190,7 +188,7 @@ func (me *App) attachObject(obj Object, types int) (err error) {
 		}
 
 		for _, id := range eids {
-			_, err_ := me.eventMux.Unregister(id)
+			_, err_ := dg.eventMux.Unregister(id)
 			if err_ != nil {
 				// TODO: log it
 			}
@@ -203,7 +201,7 @@ func (me *App) attachObject(obj Object, types int) (err error) {
 	}
 
 	for _, e := range events {
-		id, err_ := me.eventMux.Register(e, 0)
+		id, err_ := dg.eventMux.Register(e, 0)
 		if err_ != nil {
 			err = err_
 			break
@@ -213,32 +211,32 @@ func (me *App) attachObject(obj Object, types int) (err error) {
 	return
 }
 
-func (me *App) allocateMappers() (err error) {
-	if me.b.Exists(ObjT.CONSUMER) {
+func (dg *App) allocateMappers() (err error) {
+	if dg.b.Exists(ObjT.Consumer) {
 		var (
 			remain int
 			tasks  <-chan *Task
 		)
-		for remain = me.cfg.Mappers_; remain > 0; remain-- {
+		for remain = dg.cfg.Mappers_; remain > 0; remain-- {
 			receipts := make(chan *TaskReceipt, 10)
-			tasks, err = me.b.AddListener(receipts)
+			tasks, err = dg.b.AddListener(receipts)
 			if err != nil {
 				return
 			}
 
-			me.mappers.more(tasks, receipts)
+			dg.mappers.more(tasks, receipts)
 		}
 	}
 
 	return
 }
 
-/*
- Release this instance. All reporting channels are closed after returning. However, those sent tasks/reports wouldn't be reclaimed.
+/*Close is used to release this instance. All reporting channels are closed after returning.
+However, those sent tasks/reports wouldn't be reclaimed.
 */
-func (me *App) Close() (err error) {
-	me.objsLock.Lock()
-	defer me.objsLock.Unlock()
+func (dg *App) Close() (err error) {
+	dg.objsLock.Lock()
+	defer dg.objsLock.Unlock()
 
 	chk := func(err_ error) {
 		if err == nil {
@@ -247,19 +245,19 @@ func (me *App) Close() (err error) {
 	}
 
 	// stop consuming more request first
-	chk(me.b.StopAllListeners())
+	chk(dg.b.StopAllListeners())
 
 	// further reporter(s) should be reported to Reporter(s)
 	// after workers/mappers shutdown
 
 	// shutdown mappers
-	chk(me.mappers.Close())
+	chk(dg.mappers.Close())
 
 	// shutdown workers
-	chk(me.workers.Close())
+	chk(dg.workers.Close())
 
 	// stop reporter/store
-	for _, v := range me.objs {
+	for _, v := range dg.objs {
 		s, ok := v.obj.(Object)
 		if ok {
 			chk(s.Close())
@@ -267,73 +265,70 @@ func (me *App) Close() (err error) {
 	}
 
 	// shutdown mux
-	me.eventMux.Close()
+	dg.eventMux.Close()
 
 	// shutdown the monitor of error channels
 	func() {
-		me.eventOutLock.Lock()
-		defer me.eventOutLock.Unlock()
+		dg.eventOutLock.Lock()
+		defer dg.eventOutLock.Unlock()
 
-		m := me.eventOut.Load().(map[int]*_eventListener)
+		m := dg.eventOut.Load().(map[int]*_eventListener)
 		for _, v := range m {
 			// send channel-close event
 			close(v.events)
 		}
-		me.eventOut.Store(make(map[int]*_eventListener))
+		dg.eventOut.Store(make(map[int]*_eventListener))
 	}()
 
 	return
 }
 
-/*
- Register a customized Marshaller, input should be an object implements both
- Marshaller and Invoker.
+/*AddMarshaller registers a customized Marshaller, input should be an object implements both
+Marshaller and Invoker.
 
- You can pick any builtin Invoker(s)/Marshaller(s) combined with your customized one:
+You can pick any builtin Invoker(s)/Marshaller(s) combined with your customized one:
 
-   app.AddMarshaller(3, &struct{JsonSafeMarshaller, __your_customized_invoker__})
+  app.AddMarshaller(3, &struct{JsonSafeMarshaller, __your_customized_invoker__})
 
- "expectedId" is the expected identifier of this Marshaller, which could be useful when you
- need to sync the Marshaller-ID between producers and consumers. 0~3 are occupied by builtin
- Marshaller(s). Suggested "expectedId" should begin from 100.
+"expectedID" is the expected identifier of this Marshaller, which could be useful when you
+need to sync the Marshaller-ID between producers and consumers. 0~3 are occupied by builtin
+Marshaller(s). Suggested "expectedID" should begin from 100.
 */
-func (me *App) AddMarshaller(expectedId int, m Marshaller) error {
-	return me.trans.AddMarshaller(expectedId, m)
+func (dg *App) AddMarshaller(expectedID int, m Marshaller) error {
+	return dg.trans.AddMarshaller(expectedID, m)
 }
 
-/*
- Register a customized IDMaker, input should be an object implements IDMaker.
+/*AddIDMaker registers a customized IDMaker, input should be an object implements IDMaker.
 
- You can register different id-makers to different tasks, internally, dingo would take both
- (name, id) as identity of a task.
+You can register different id-makers to different tasks, internally, dingo would take both
+(name, id) as identity of a task.
 
- The requirement of IDMaker:
-  - uniqueness of generated string among all generated tasks.
-  - routine(thread) safe.
+The requirement of IDMaker:
+ - uniqueness of generated string among all generated tasks.
+ - routine(thread) safe.
 
- The default IDMaker used by dingo is implemented by uuid4.
+The default IDMaker used by dingo is implemented by uuid4.
 */
-func (me *App) AddIdMaker(expectedId int, m IDMaker) error {
-	return me.trans.AddIdMaker(expectedId, m)
+func (dg *App) AddIDMaker(expectedID int, m IDMaker) error {
+	return dg.trans.AddIDMaker(expectedID, m)
 }
 
-/*
- register a worker function
+/*Register would register a worker function
 
- parameters:
-  - name: name of tasks
-  - fn: the function that actually perform the task.
+parameters:
+ - name: name of tasks
+ - fn: the function that actually perform the task.
 
- returns:
-  - err: any error produced
+returns:
+ - err: any error produced
 */
-func (me *App) Register(name string, fn interface{}) (err error) {
-	err = me.trans.Register(name, fn)
+func (dg *App) Register(name string, fn interface{}) (err error) {
+	err = dg.trans.Register(name, fn)
 	if err != nil {
 		return
 	}
 
-	err = me.b.ProducerHook(ProducerEvent.DeclareTask, name)
+	err = dg.b.ProducerHook(ProducerEvent.DeclareTask, name)
 	if err != nil {
 		return
 	}
@@ -341,50 +336,49 @@ func (me *App) Register(name string, fn interface{}) (err error) {
 	return
 }
 
-/*
- allocate more workers. When your Consumer(s) implement NamedConsumer, a new listener (to brokers)
- would be allocated each time you call this function. All allocated workers would serve
- that listener.
+/*Allocate would allocate more workers. When your Consumer(s) implement NamedConsumer, a new listener (to brokers)
+would be allocated each time you call this function. All allocated workers would serve
+that listener.
 
- If you want to open more channels to consume from brokers, just call this function multiple
- times.
+If you want to open more channels to consume from brokers, just call this function multiple
+times.
 
- parameters:
-  - name: the name of tasks.
-  - count: count of workers to be initialized.
-  - share: the count of workers sharing one report channel.
+parameters:
+ - name: the name of tasks.
+ - count: count of workers to be initialized.
+ - share: the count of workers sharing one report channel.
 
- returns:
-  - remain: remaining count of workers that failed to initialize.
-  - err: any error produced
+returns:
+ - remain: remaining count of workers that failed to initialize.
+ - err: any error produced
 */
-func (me *App) Allocate(name string, count, share int) (remain int, err error) {
+func (dg *App) Allocate(name string, count, share int) (remain int, err error) {
 	// check if this name register
-	_, err = me.trans.GetOption(name)
+	_, err = dg.trans.GetOption(name)
 	if err != nil {
 		return
 	}
 
-	me.objsLock.RLock()
-	defer me.objsLock.RUnlock()
+	dg.objsLock.RLock()
+	defer dg.objsLock.RUnlock()
 
 	var (
 		tasks   <-chan *Task
 		reports []<-chan *Report
 	)
 
-	if me.b.Exists(ObjT.NAMED_CONSUMER) {
+	if dg.b.Exists(ObjT.NamedConsumer) {
 		receipts := make(chan *TaskReceipt, 10)
-		tasks, err = me.b.AddNamedListener(name, receipts)
+		tasks, err = dg.b.AddNamedListener(name, receipts)
 		if err != nil {
 			return
 		}
-		reports, remain, err = me.workers.allocate(name, tasks, receipts, count, share)
+		reports, remain, err = dg.workers.allocate(name, tasks, receipts, count, share)
 		if err != nil {
 			return
 		}
-	} else if me.b.Exists(ObjT.CONSUMER) {
-		reports, remain, err = me.mappers.allocateWorkers(name, count, share)
+	} else if dg.b.Exists(ObjT.Consumer) {
+		reports, remain, err = dg.mappers.allocateWorkers(name, count, share)
 		if err != nil {
 			return
 		}
@@ -395,7 +389,7 @@ func (me *App) Allocate(name string, count, share int) (remain int, err error) {
 
 	for _, v := range reports {
 		// id of report channel is ignored
-		err = me.b.Report(v)
+		err = dg.b.Report(v)
 		if err != nil {
 			return
 		}
@@ -404,57 +398,53 @@ func (me *App) Allocate(name string, count, share int) (remain int, err error) {
 	return
 }
 
-/*
- Set default option used for a worker function.
-*/
-func (me *App) SetOption(name string, opt *Option) error {
-	return me.trans.SetOption(name, opt)
+/*SetOption would set default option used for a worker function.
+ */
+func (dg *App) SetOption(name string, opt *Option) error {
+	return dg.trans.SetOption(name, opt)
 }
 
-/*
- Set marshallers used for marshalling tasks and reports
+/*SetMarshaller would set marshallers used for marshalling tasks and reports
 
- parameters:
-  - name: name of tasks
-  - taskMash, reportMash: id of Marshaller for 'Task' and 'Report'
+parameters:
+ - name: name of tasks
+ - taskMash, reportMash: id of Marshaller for 'Task' and 'Report'
 */
-func (me *App) SetMarshaller(name string, taskMash, reportMash int) error {
-	return me.trans.SetMarshaller(name, taskMash, reportMash)
+func (dg *App) SetMarshaller(name string, taskMash, reportMash int) error {
+	return dg.trans.SetMarshaller(name, taskMash, reportMash)
 }
 
-/*
- Set IDMaker used for a specific kind of tasks
+/*SetIDMaker would set IDMaker used for a specific kind of tasks
 
- parameters:
-  - name: name of tasks
-  - idmaker: id of IDMaker you would like to use when generating tasks.
+parameters:
+ - name: name of tasks
+ - idmaker: id of IDMaker you would like to use when generating tasks.
 */
-func (me *App) SetIDMaker(name string, id int) error {
-	return me.trans.SetIDMaker(name, id)
+func (dg *App) SetIDMaker(name string, id int) error {
+	return dg.trans.SetIDMaker(name, id)
 }
 
-/*
- Attach an instance, instance could be any instance implementing
- Reporter, Backend, Producer, Consumer.
+/*Use is used to attach an instance, instance could be any instance implementing
+Reporter, Backend, Producer, Consumer.
 
- parameters:
-  - obj: object to be attached
-  - types: interfaces contained in 'obj', refer to dingo.ObjT
- returns:
-  - id: identifier assigned to this object, 0 is invalid value
-  - err: errors
+parameters:
+ - obj: object to be attached
+ - types: interfaces contained in 'obj', refer to dingo.ObjT
+returns:
+ - id: identifier assigned to this object, 0 is invalid value
+ - err: errors
 
- For a producer, the right combination of "types" is
- ObjT.PRODUCER|ObjT.STORE, if reporting is not required,
- then only ObjT.PRODUCER is used.
+For a producer, the right combination of "types" is
+ObjT.Producer|ObjT.Store, if reporting is not required,
+then only ObjT.Producer is used.
 
- For a consumer, the right combination of "types" is
- ObjT.CONSUMER|ObjT.REPORTER, if reporting is not reuqired(make sure there is no producer await),
- then only ObjT.CONSUMER is used.
+For a consumer, the right combination of "types" is
+ObjT.Consumer|ObjT.Reporter, if reporting is not reuqired(make sure there is no producer await),
+then only ObjT.Consumer is used.
 */
-func (me *App) Use(obj Object, types int) (id int, used int, err error) {
-	me.objsLock.Lock()
-	defer me.objsLock.Unlock()
+func (dg *App) Use(obj Object, types int) (id int, used int, err error) {
+	dg.objsLock.Lock()
+	defer dg.objsLock.Unlock()
 
 	var (
 		producer      Producer
@@ -467,38 +457,38 @@ func (me *App) Use(obj Object, types int) (id int, used int, err error) {
 
 	for {
 		id = rand.Int()
-		if _, ok := me.objs[id]; !ok {
+		if _, ok := dg.objs[id]; !ok {
 			break
 		}
 	}
 
 	defer func() {
-		err_ := me.attachObject(obj.(Object), used)
+		err_ := dg.attachObject(obj.(Object), used)
 		if err == nil {
 			err = err_
 		}
 
-		me.objs[id] = &_object{
+		dg.objs[id] = &_object{
 			used: used,
 			obj:  obj,
 		}
 	}()
 
-	if types == ObjT.DEFAULT {
+	if types == ObjT.Default {
 		producer, _ = obj.(Producer)
 		consumer, _ = obj.(Consumer)
 		namedConsumer, _ = obj.(NamedConsumer)
 		store, _ = obj.(Store)
 		reporter, _ = obj.(Reporter)
 	} else {
-		if types&ObjT.PRODUCER == ObjT.PRODUCER {
+		if types&ObjT.Producer == ObjT.Producer {
 			producer, ok = obj.(Producer)
 			if !ok {
 				err = errors.New("producer is not found")
 				return
 			}
 		}
-		if types&ObjT.CONSUMER == ObjT.CONSUMER {
+		if types&ObjT.Consumer == ObjT.Consumer {
 			namedConsumer, ok = obj.(NamedConsumer)
 			if !ok {
 				consumer, ok = obj.(Consumer)
@@ -508,19 +498,19 @@ func (me *App) Use(obj Object, types int) (id int, used int, err error) {
 				}
 			}
 		}
-		if types&ObjT.NAMED_CONSUMER == ObjT.NAMED_CONSUMER {
+		if types&ObjT.NamedConsumer == ObjT.NamedConsumer {
 			namedConsumer, ok = obj.(NamedConsumer)
 			if !ok {
 			}
 		}
-		if types&ObjT.STORE == ObjT.STORE {
+		if types&ObjT.Store == ObjT.Store {
 			store, ok = obj.(Store)
 			if !ok {
 				err = errors.New("store is not found")
 				return
 			}
 		}
-		if types&ObjT.REPORTER == ObjT.REPORTER {
+		if types&ObjT.Reporter == ObjT.Reporter {
 			reporter, ok = obj.(Reporter)
 			if !ok {
 				err = errors.New("reporter is not found")
@@ -530,23 +520,23 @@ func (me *App) Use(obj Object, types int) (id int, used int, err error) {
 	}
 
 	if producer != nil {
-		err = me.b.AttachProducer(producer)
-		if err != nil && types != ObjT.DEFAULT {
+		err = dg.b.AttachProducer(producer)
+		if err != nil && types != ObjT.Default {
 			return
 		}
-		used |= ObjT.PRODUCER
+		used |= ObjT.Producer
 	}
 	if consumer != nil || namedConsumer != nil {
-		err = me.b.AttachConsumer(consumer, namedConsumer)
-		if err != nil && types != ObjT.DEFAULT {
+		err = dg.b.AttachConsumer(consumer, namedConsumer)
+		if err != nil && types != ObjT.Default {
 			return
 		}
 
 		if err == nil {
-			if me.b.Exists(ObjT.CONSUMER) {
-				used |= ObjT.CONSUMER
-			} else if me.b.Exists(ObjT.NAMED_CONSUMER) {
-				used |= ObjT.NAMED_CONSUMER
+			if dg.b.Exists(ObjT.Consumer) {
+				used |= ObjT.Consumer
+			} else if dg.b.Exists(ObjT.NamedConsumer) {
+				used |= ObjT.NamedConsumer
 			} else {
 				err = errors.New("there is no consumer exists in bridge")
 				return
@@ -554,82 +544,81 @@ func (me *App) Use(obj Object, types int) (id int, used int, err error) {
 		}
 
 		if err == nil {
-			err = me.allocateMappers()
+			err = dg.allocateMappers()
 			if err != nil {
 				return
 			}
 		}
 	}
 	if reporter != nil {
-		err = me.b.AttachReporter(reporter)
-		if err != nil && types != ObjT.DEFAULT {
+		err = dg.b.AttachReporter(reporter)
+		if err != nil && types != ObjT.Default {
 			return
 		}
-		used |= ObjT.REPORTER
+		used |= ObjT.Reporter
 	}
 	if store != nil {
-		err = me.b.AttachStore(store)
-		if err != nil && types != ObjT.DEFAULT {
+		err = dg.b.AttachStore(store)
+		if err != nil && types != ObjT.Default {
 			return
 		}
-		used |= ObjT.STORE
+		used |= ObjT.Store
 	}
 
 	return
 }
 
-/*
- Initiate a task by providing:
-  - "name" of tasks
-  - execution-"option" of tasks, could be nil
-  - argument of corresponding worker function.
+/*Call would initiate a task by providing:
+ - "name" of tasks
+ - execution-"option" of tasks, could be nil
+ - argument of corresponding worker function.
 
- A reporting channel would be returned for callers to monitor the status of tasks,
- and access its result. A suggested procedure to monitor reporting channels is
-  finished:
-    for {
-      select {
-        case r, ok := <-report:
-        if !ok {
-          // dingo.App is closed somewhere else
-          break finished
-        }
+A reporting channel would be returned for callers to monitor the status of tasks,
+and access its result. A suggested procedure to monitor reporting channels is
+ finished:
+   for {
+     select {
+       case r, ok := <-report:
+       if !ok {
+         // dingo.App is closed somewhere else
+         break finished
+       }
 
-        if r.OK() {
-          // the result is ready
-          returns := r.Returns()
-        }
-        if r.Fail() {
-          // get error
-          err := r.Error()
-        }
+       if r.OK() {
+         // the result is ready
+         returns := r.Returns()
+       }
+       if r.Fail() {
+         // get error
+         err := r.Error()
+       }
 
-        if r.Done() {
-          break finished
-        }
-      }
-    }
+       if r.Done() {
+         break finished
+       }
+     }
+   }
 
- Multiple reports would be sent for each task:
-  - Sent: the task is already sent to brokers.
-  - Progress: the consumer received this task, and about to execute it
-  - Success: this task is finished without error.
-  - Fail: this task failed for some reason.
- Noted: the 'Fail' here doesn't mean your worker function is failed,
- it means "dingo" doesn't execute your worker function properly.
+Multiple reports would be sent for each task:
+ - Sent: the task is already sent to brokers.
+ - Progress: the consumer received this task, and about to execute it
+ - Success: this task is finished without error.
+ - Fail: this task failed for some reason.
+Noted: the 'Fail' here doesn't mean your worker function is failed,
+it means "dingo" doesn't execute your worker function properly.
 */
-func (me *App) Call(name string, opt *Option, args ...interface{}) (reports <-chan *Report, err error) {
-	me.objsLock.RLock()
-	defer me.objsLock.RUnlock()
+func (dg *App) Call(name string, opt *Option, args ...interface{}) (reports <-chan *Report, err error) {
+	dg.objsLock.RLock()
+	defer dg.objsLock.RUnlock()
 
 	if opt == nil {
-		opt, err = me.trans.GetOption(name)
+		opt, err = dg.trans.GetOption(name)
 		if err != nil {
 			return
 		}
 	}
 
-	t, err := me.trans.ComposeTask(name, opt, args)
+	t, err := dg.trans.ComposeTask(name, opt, args)
 	if err != nil {
 		return
 	}
@@ -639,14 +628,14 @@ func (me *App) Call(name string, opt *Option, args ...interface{}) (reports <-ch
 	// if we poll after calling, we may lose some report if
 	// the task finished very quickly.
 	if !opt.IgnoreReport() {
-		reports, err = me.b.Poll(t)
+		reports, err = dg.b.Poll(t)
 		if err != nil {
 			return
 		}
 	}
 
 	// a blocking call to broker component
-	err = me.b.SendTask(t)
+	err = dg.b.SendTask(t)
 	if err != nil {
 		return
 	}
@@ -654,52 +643,51 @@ func (me *App) Call(name string, opt *Option, args ...interface{}) (reports <-ch
 	return
 }
 
-/*
- Get the channel to receive events from 'dingo'.
+/*Listen would subscribe the channel to receive events from 'dingo'.
 
- "targets" are instances you want to monitor, they include:
-  - dingo.ObjT.REPORTER: the Reporter instance attached to this App.
-  - dingo.ObjT.STORE: the Store instance attached to this App.
-  - dingo.ObjT.PRODUCER: the Producer instance attached to this App.
-  - dingo.ObjT.CONSUMER: the Consumer/NamedConsumer instance attached to this App.
-  - dingo.ObjT.MAPPER: the internal component, turn if on when debug.
-  - dingo.ObjT.WORKER: the internal component, turn it on when debug.
-  - dingo.ObjT.BRIDGE: the internal component, turn it on when debug.
-  - dingo.ObjT.ALL: every instance.
- They are bit flags and can be combined as "targets", like:
-  ObjT.BRIDGE | ObjT.WORKER | ...
+"targets" are instances you want to monitor, they include:
+ - dingo.ObjT.Reporter: the Reporter instance attached to this App.
+ - dingo.ObjT.Store: the Store instance attached to this App.
+ - dingo.ObjT.Producer: the Producer instance attached to this App.
+ - dingo.ObjT.Consumer: the Consumer/NamedConsumer instance attached to this App.
+ - dingo.ObjT.Mapper: the internal component, turn if on when debug.
+ - dingo.ObjT.Worker: the internal component, turn it on when debug.
+ - dingo.ObjT.Bridge: the internal component, turn it on when debug.
+ - dingo.ObjT.All: every instance.
+They are bit flags and can be combined as "targets", like:
+ ObjT.Bridge | ObjT.Worker | ...
 
- "level" are minimal severity level expected, include:
-  - dingo.EventLvl.DEBUG
-  - dingo.EventLvl.INFO
-  - dingo.EventLvl.WARNING
-  - dingo.EventLvl.Error
+"level" are minimal severity level expected, include:
+ - dingo.EventLvl.Debug
+ - dingo.EventLvl.Info
+ - dingo.EventLvl.Warning
+ - dingo.EventLvl.Error
 
- "id" is the identity of this event channel, which could be used to stop
- monitoring by calling dingo.App.StopListen.
+"id" is the identity of this event channel, which could be used to stop
+monitoring by calling dingo.App.StopListen.
 
- In general, a dedicated go routine would be initiated for this channel,
- with an infinite for loop, like this:
-   for {
-     select {
-       case e, ok := <-events:
-         if !ok {
-           // after App.Close(), all reporting channels would be closed,
-           // except those channels abandoned by App.StopListen.
-           return
-         }
-         fmt.Printf("%v\n", e)
-       case <-quit:
-         return
-     }
-   }
+In general, a dedicated go routine would be initiated for this channel,
+with an infinite for loop, like this:
+  for {
+    select {
+      case e, ok := <-events:
+        if !ok {
+          // after App.Close(), all reporting channels would be closed,
+          // except those channels abandoned by App.StopListen.
+          return
+        }
+        fmt.Printf("%v\n", e)
+      case <-quit:
+        return
+    }
+  }
 */
-func (me *App) Listen(targets, level, expectedId int) (id int, events <-chan *Event, err error) {
+func (dg *App) Listen(targets, level, expectedID int) (id int, events <-chan *Event, err error) {
 	// the implementation below
 	// refers to 'ReadMostly' example in sync/atomic
 
-	me.eventOutLock.Lock()
-	defer me.eventOutLock.Unlock()
+	dg.eventOutLock.Lock()
+	defer dg.eventOutLock.Unlock()
 
 	listener := &_eventListener{
 		targets: targets,
@@ -707,9 +695,9 @@ func (me *App) Listen(targets, level, expectedId int) (id int, events <-chan *Ev
 		events:  make(chan *Event, 10),
 	}
 
-	m := me.eventOut.Load().(map[int]*_eventListener)
+	m := dg.eventOut.Load().(map[int]*_eventListener)
 	// get an identifier
-	id = expectedId
+	id = expectedID
 	for {
 		_, ok := m[id]
 		if !ok {
@@ -719,45 +707,44 @@ func (me *App) Listen(targets, level, expectedId int) (id int, events <-chan *Ev
 	}
 
 	// copy a new map
-	m_ := make(map[int]*_eventListener)
-	for k, _ := range m {
-		m_[k] = m[k]
+	nm := make(map[int]*_eventListener)
+	for k := range m {
+		nm[k] = m[k]
 	}
-	m_[id] = listener
-	me.eventOut.Store(m_)
+	nm[id] = listener
+	dg.eventOut.Store(nm)
 	events = listener.events
 	return
 }
 
-/*
- Stop listening events.
+/*StopListen would stop listening events.
 
- Note: those channels stopped by App.StopListen wouldn't be closed but only
- be reclaimed by GC.
+Note: those channels stopped by App.StopListen wouldn't be closed but only
+be reclaimed by GC.
 */
-func (me *App) StopListen(id int) (err error) {
+func (dg *App) StopListen(id int) (err error) {
 	// the implementation below
 	// refers to 'ReadMostly' example in sync/atomic
 
-	me.eventOutLock.Lock()
-	defer me.eventOutLock.Unlock()
+	dg.eventOutLock.Lock()
+	defer dg.eventOutLock.Unlock()
 
-	m := me.eventOut.Load().(map[int]*_eventListener)
+	m := dg.eventOut.Load().(map[int]*_eventListener)
 	_, ok := m[id]
 	if !ok {
-		err = errors.New(fmt.Sprintf("ID not found:%v", id))
+		err = fmt.Errorf("ID not found:%v", id)
 		return
 	}
 
 	// we don't close this channel,
 	// or we might send to a closed channel
-	m_ := make(map[int]*_eventListener)
-	for k, _ := range m {
-		m_[k] = m[k]
+	nm := make(map[int]*_eventListener)
+	for k := range m {
+		nm[k] = m[k]
 	}
 
-	delete(m_, id)
-	me.eventOut.Store(m_)
+	delete(nm, id)
+	dg.eventOut.Store(nm)
 	return
 }
 

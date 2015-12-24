@@ -21,39 +21,38 @@ var ResultError = struct {
 	errors.New("no handler registered"),
 }
 
-/*
- Result is a wrapper of chan *dingo.Report returned from dingo.App.Call,
- taking care of the logic to handle asynchronous result from 'dingo'.
+/*Result is a wrapper of chan *dingo.Report returned from dingo.App.Call,
+taking care of the logic to handle asynchronous result from 'dingo'.
 
- Example usage:
-  r := dingo.NewResult(app.Call(...))
+Example usage:
+ r := dingo.NewResult(app.Call(...))
 
-  // blocking until done
-  err := r.Wait(0)
-  if err == nil {
-    r.Last // the last Report
-  }
+ // blocking until done
+ err := r.Wait(0)
+ if err == nil {
+   r.Last // the last Report
+ }
 
-  // polling for every 1 second
-  for dingo.ResultError.Timeout == r.Wait(1*time.Second) {
-    // logging or ...
-  }
+ // polling for every 1 second
+ for dingo.ResultError.Timeout == r.Wait(1*time.Second) {
+   // logging or ...
+ }
 
- When the task is done, you could register a handler function, whose fingerprint
- is identical to the return part of worker functions. For example, if
- the worker function is:
-  func ComposeWords(words []string) (count int, composed string)
+When the task is done, you could register a handler function, whose fingerprint
+is identical to the return part of worker functions. For example, if
+the worker function is:
+ func ComposeWords(words []string) (count int, composed string)
 
- Its corresponding 'OnOK' handler is:
-  func (count int, composed string) {...}
+Its corresponding 'OnOK' handler is:
+ func (count int, composed string) {...}
 
- When anything goes wrong, you could register a handler function via 'OnNOK', whose fingerprint is
-  func (*Error, error)
- Both failure reports or errors generated in 'Result' object would be passed to this handler,
- at least one of them would not be nil.
+When anything goes wrong, you could register a handler function via 'OnNOK', whose fingerprint is
+ func (*Error, error)
+Both failure reports or errors generated in 'Result' object would be passed to this handler,
+at least one of them would not be nil.
 
- You can register handlers before calling 'Wait', or call 'Wait' before registering handlers. The ordering
- doesn't matter. Those handlers would be called exactly once.
+You can register handlers before calling 'Wait', or call 'Wait' before registering handlers. The ordering
+doesn't matter. Those handlers would be called exactly once.
 */
 type Result struct {
 	Last    *Report
@@ -64,8 +63,7 @@ type Result struct {
 	ivok    Invoker
 }
 
-/*
- Simply wrap this factory function with the calling to dingo.Call.
+/*NewResult simply wrap this factory function with the calling to dingo.Call.
   NewResult(app.Call("test", ...))
 */
 func NewResult(reports <-chan *Report, err error) (r *Result) {
@@ -81,44 +79,43 @@ func NewResult(reports <-chan *Report, err error) (r *Result) {
 	return
 }
 
-/*
- Wait forever or for a period of time. Here is the meaning of return:
-  - timeout: wait again later
-  - other errors: something wrong.
-  - nil: done, you can access the result via 'Last' member.
- When anything other than 'timeout' is returned, the result of subsequent 'Wait'
- would remain the same.
+/*Wait is used to wait forever or for a period of time. Here is the meaning of return:
+ - timeout: wait again later
+ - other errors: something wrong.
+ - nil: done, you can access the result via 'Last' member.
+When anything other than 'timeout' is returned, the result of subsequent 'Wait'
+would remain the same.
 
- Registered callback would be triggered when possible.
+Registered callback would be triggered when possible.
 */
-func (me *Result) Wait(timeout time.Duration) (err error) {
+func (rt *Result) Wait(timeout time.Duration) (err error) {
 	// call cached handlers
 	defer func() {
-		if me.fn != nil {
-			me.OnOK(me.fn)
+		if rt.fn != nil {
+			rt.OnOK(rt.fn)
 		}
-		if me.efn != nil {
-			me.OnNOK(me.efn)
+		if rt.efn != nil {
+			rt.OnNOK(rt.efn)
 		}
 	}()
 
 	// check if finished
-	if me.err != nil {
-		err = me.err
+	if rt.err != nil {
+		err = rt.err
 		return
 	}
-	if me.Last != nil && me.Last.Done() {
+	if rt.Last != nil && rt.Last.Done() {
 		return
 	}
 
 	out := func(r *Report, ok bool) bool {
 		if !ok {
 			err = ResultError.ChannelClosed
-			me.err = err
+			rt.err = err
 			return true
 		}
 
-		me.Last = r
+		rt.Last = r
 		return r.Done()
 	}
 
@@ -127,7 +124,7 @@ func (me *Result) Wait(timeout time.Duration) (err error) {
 		for {
 			// blocking
 			select {
-			case r, ok := <-me.reports:
+			case r, ok := <-rt.reports:
 				if out(r, ok) {
 					break done
 				}
@@ -139,7 +136,7 @@ func (me *Result) Wait(timeout time.Duration) (err error) {
 		for {
 			// until timeout
 			select {
-			case r, ok := <-me.reports:
+			case r, ok := <-rt.reports:
 				if out(r, ok) {
 					break notime
 				}
@@ -153,74 +150,70 @@ func (me *Result) Wait(timeout time.Duration) (err error) {
 	return
 }
 
-/*
- Asynchronous version of 'Result.Wait'
-*/
-func (me *Result) Then() (err error) {
-	if me.fn == nil && me.efn == nil {
+/*Then is the asynchronous version of 'Result.Wait'
+ */
+func (rt *Result) Then() (err error) {
+	if rt.fn == nil && rt.efn == nil {
 		err = ResultError.NoHandler
 		return
 	}
 
 	go func() {
-		me.Wait(0)
+		rt.Wait(0)
 	}()
 
 	return
 }
 
-/*
- Assign Invoker for Result.OnOK
-*/
-func (me *Result) SetInvoker(ivok Invoker) {
-	me.ivok = ivok
+/*SetInvoker could assign Invoker for Result.OnOK
+ */
+func (rt *Result) SetInvoker(ivok Invoker) {
+	rt.ivok = ivok
 }
 
-/*
- Set the handler for the successful case.
-*/
-func (me *Result) OnOK(fn interface{}) {
+/*OnOK is used to set the handler for the successful case.
+ */
+func (rt *Result) OnOK(fn interface{}) {
 	if fn == nil {
 		panic("nil return handler in dingo.result.OnOK")
 	}
 
-	if me.Last != nil && me.Last.OK() {
-		if me.ivok == nil {
-			me.ivok = &LazyInvoker{}
+	if rt.Last != nil && rt.Last.OK() {
+		if rt.ivok == nil {
+			rt.ivok = &LazyInvoker{}
 		}
-		_, err := me.ivok.Call(fn, me.Last.Return())
+		_, err := rt.ivok.Call(fn, rt.Last.Return())
 		// reset cached handler
-		me.fn = nil
+		rt.fn = nil
 
 		if err != nil {
 			panic(err)
 		}
 	} else {
-		me.fn = fn
+		rt.fn = fn
 	}
 
 	return
 }
 
-/*
- Set the handler for the failure case.
-*/
-func (me *Result) OnNOK(efn func(*Error, error)) {
+/*OnNOK is used to set the handler for the failure case.
+ */
+func (rt *Result) OnNOK(efn func(*Error, error)) {
 	if efn == nil {
 		panic("nil error handler in dingo.result.OnNOK")
 	}
 
-	if me.Last != nil {
-		if me.Last.Fail() {
-			efn(me.Last.Error(), me.err)
+	if rt.Last != nil {
+		if rt.Last.Fail() {
+			efn(rt.Last.Error(), rt.err)
 			// reset cached
-			me.efn = nil
+			rt.efn = nil
 		}
-	} else if me.err != nil {
-		efn(nil, me.err)
+	} else if rt.err != nil {
+		efn(nil, rt.err)
 		// reset cached
-		me.efn = nil
+		rt.efn = nil
 	} else {
-		me.efn = efn
+		rt.efn = efn
 	}
 }

@@ -101,7 +101,7 @@ func ExampleApp_Use_caller() {
 	if err != nil {
 		return
 	}
-	_, _, err = app.Use(broker, dingo.ObjT.PRODUCER)
+	_, _, err = app.Use(broker, dingo.ObjT.Producer)
 	if err != nil {
 		return
 	}
@@ -111,7 +111,7 @@ func ExampleApp_Use_caller() {
 	if err != nil {
 		return
 	}
-	_, _, err = app.Use(backend, dingo.ObjT.STORE)
+	_, _, err = app.Use(backend, dingo.ObjT.Store)
 	if err != nil {
 		return
 	}
@@ -212,7 +212,7 @@ func ExampleApp_Use_worker() {
 	if err != nil {
 		return
 	}
-	_, _, err = app.Use(broker, dingo.ObjT.NAMED_CONSUMER)
+	_, _, err = app.Use(broker, dingo.ObjT.NamedConsumer)
 	if err != nil {
 		return
 	}
@@ -222,7 +222,7 @@ func ExampleApp_Use_worker() {
 	if err != nil {
 		return
 	}
-	_, _, err = app.Use(backend, dingo.ObjT.REPORTER)
+	_, _, err = app.Use(backend, dingo.ObjT.Reporter)
 	if err != nil {
 		return
 	}
@@ -357,13 +357,13 @@ func ExampleCustomMarshaller() {
 	if err != nil {
 		return
 	}
-	_, _, err = app.Use(broker, dingo.ObjT.DEFAULT)
+	_, _, err = app.Use(broker, dingo.ObjT.Default)
 	// attach a local backend
 	backend, err := dingo.NewLocalBackend(dingo.DefaultConfig(), nil)
 	if err != nil {
 		return
 	}
-	_, _, err = app.Use(backend, dingo.ObjT.DEFAULT)
+	_, _, err = app.Use(backend, dingo.ObjT.Default)
 	if err != nil {
 		return
 	}

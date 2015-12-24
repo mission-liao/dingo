@@ -1,7 +1,6 @@
 package dingo
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 )
@@ -17,7 +16,7 @@ func (vk *LazyInvoker) Call(f interface{}, param []interface{}) ([]interface{}, 
 
 	// make sure parameter matched
 	if len(param) != funcT.NumIn() {
-		return nil, errors.New(fmt.Sprintf("Parameter Count mismatch: %v %v", len(param), funcT.NumIn()))
+		return nil, fmt.Errorf("Parameter Count mismatch: %v %v", len(param), funcT.NumIn())
 	}
 
 	// compose input parameter
@@ -42,7 +41,7 @@ func (vk *LazyInvoker) Call(f interface{}, param []interface{}) ([]interface{}, 
 		if v.CanInterface() {
 			out = append(out, v.Interface())
 		} else {
-			return nil, errors.New(fmt.Sprintf("Unable to convert to interface{} for %d, %v", k, v))
+			return nil, fmt.Errorf("Unable to convert to interface{} for %d, %v", k, v)
 		}
 	}
 
@@ -52,7 +51,7 @@ func (vk *LazyInvoker) Call(f interface{}, param []interface{}) ([]interface{}, 
 func (vk *LazyInvoker) Return(f interface{}, returns []interface{}) ([]interface{}, error) {
 	funcT := reflect.TypeOf(f)
 	if len(returns) != funcT.NumOut() {
-		return nil, errors.New(fmt.Sprintf("Parameter Count mismatch: %v %v", len(returns), funcT.NumOut()))
+		return nil, fmt.Errorf("Parameter Count mismatch: %v %v", len(returns), funcT.NumOut())
 	}
 
 	for k, v := range returns {
@@ -63,7 +62,7 @@ func (vk *LazyInvoker) Return(f interface{}, returns []interface{}) ([]interface
 			if r.CanInterface() {
 				returns[k] = r.Interface()
 			} else {
-				return nil, errors.New(fmt.Sprintf("can't interface of %v from %d:%v", r, k, v))
+				return nil, fmt.Errorf("can't interface of %v from %d:%v", r, k, v)
 			}
 		}
 	}
@@ -76,18 +75,18 @@ func (vk *LazyInvoker) toPointer(t reflect.Type, v reflect.Value) *reflect.Value
 		return &v
 	}
 
-	v_ := reflect.New(t)
-	r_ := v_.Elem()
+	vO := reflect.New(t)
+	rO := vO.Elem()
 	if v.IsValid() {
 		for t.Kind() == reflect.Ptr {
 			t = t.Elem()
 			if t.Kind() == reflect.Ptr {
-				v_.Elem().Set(reflect.New(t))
-				v_ = v_.Elem()
+				vO.Elem().Set(reflect.New(t))
+				vO = vO.Elem()
 			} else {
 				if v.Kind() != reflect.Ptr {
-					v_.Elem().Set(reflect.New(t))
-					v_ = v_.Elem()
+					vO.Elem().Set(reflect.New(t))
+					vO = vO.Elem()
 				}
 			}
 		}
@@ -98,8 +97,8 @@ func (vk *LazyInvoker) toPointer(t reflect.Type, v reflect.Value) *reflect.Value
 				break
 			}
 		}
-		v_.Elem().Set(v)
+		vO.Elem().Set(v)
 	}
 
-	return &r_
+	return &rO
 }

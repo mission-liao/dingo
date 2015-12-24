@@ -7,9 +7,8 @@ import (
 	"fmt"
 )
 
-/*
- slice of byte arrays could be composed into one byte stream, along with header section.
-*/
+/*ComposeBytes composes slice of byte arrays could be composed into one byte stream, along with header section.
+ */
 func ComposeBytes(h *Header, bs [][]byte) (b []byte, err error) {
 	h.Reset()
 
@@ -34,10 +33,8 @@ func ComposeBytes(h *Header, bs [][]byte) (b []byte, err error) {
 	return
 }
 
-/*
- Byte streams composed by "ComposeByte" could be decomposed into [][]byte by
- this function.
-*/
+/*DecomposeBytes can be used to decompose byte streams composed by "ComposeByte" into [][]byte
+ */
 func DecomposeBytes(h *Header, b []byte) (bs [][]byte, err error) {
 	ps := h.Registry()
 	bs = make([][]byte, 0, len(ps))
@@ -46,7 +43,7 @@ func DecomposeBytes(h *Header, b []byte) (bs [][]byte, err error) {
 	c := uint64(0)
 	for k, p := range ps {
 		if c+p > uint64(len(b)) {
-			err = errors.New(fmt.Sprintf("buffer overrun: %d, %d, %d, %d", k, c, p, len(b)))
+			err = fmt.Errorf("buffer overrun: %d, %d, %d, %d", k, c, p, len(b))
 			return
 		}
 
@@ -57,9 +54,8 @@ func DecomposeBytes(h *Header, b []byte) (bs [][]byte, err error) {
 	return
 }
 
-/*
- A marshaller developed to help users to provide a customized marshaller by providing a
- "codec" to encode/decode arguments/returns.
+/*CustomMarshallerCodec is used by a marshaller developed to help users to
+provide a customized marshaller by providing a "codec" to encode/decode arguments/returns.
 */
 type CustomMarshallerCodec interface {
 
@@ -103,8 +99,7 @@ type CustomMarshallerCodec interface {
 	DecodeReturn(fn interface{}, bs [][]byte) ([]interface{}, error)
 }
 
-/*
- A helper Marshaller for users to create customized Marshaller(s) by providing
+/*CustomMarshaller is a helper Marshaller for users to create customized Marshaller(s) by providing
  several hooks. Users just need to take care of things they know:
   - input arguments
   - outpu return values
@@ -160,15 +155,15 @@ type CustomMarshaller struct {
 	Codec CustomMarshallerCodec
 }
 
-func (me *CustomMarshaller) Prepare(name string, fn interface{}) (err error) {
-	if me.Codec != nil {
-		err = me.Codec.Prepare(name, fn)
+func (ms *CustomMarshaller) Prepare(name string, fn interface{}) (err error) {
+	if ms.Codec != nil {
+		err = ms.Codec.Prepare(name, fn)
 	}
 
 	return
 }
 
-func (me *CustomMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, err error) {
+func (ms *CustomMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, err error) {
 	if task == nil {
 		err = errors.New("Task(nil) is not acceptable")
 		return
@@ -176,12 +171,12 @@ func (me *CustomMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, er
 
 	bs, args := [][]byte{}, task.Args()
 	if len(args) > 0 {
-		if me.Codec == nil {
+		if ms.Codec == nil {
 			err = errors.New("Encode hook is not available")
 			return
 		}
 
-		bs, err = me.Codec.EncodeArgument(fn, args)
+		bs, err = ms.Codec.EncodeArgument(fn, args)
 		if err != nil {
 			return
 		}
@@ -196,7 +191,7 @@ func (me *CustomMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, er
 	return
 }
 
-func (me *CustomMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *Task, err error) {
+func (ms *CustomMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *Task, err error) {
 	// decode header
 	if h == nil {
 		h, err = DecodeHeader(b)
@@ -217,15 +212,15 @@ func (me *CustomMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (tas
 		return
 	}
 
-	var args []interface{} = []interface{}{}
+	var args = []interface{}{}
 	// option would only occupy 1 slot
 	if len(bs) > 1 {
-		if me.Codec == nil {
+		if ms.Codec == nil {
 			err = errors.New("Decode hook is not available")
 			return
 		}
 
-		args, err = me.Codec.DecodeArgument(fn, bs[:len(bs)-1])
+		args, err = ms.Codec.DecodeArgument(fn, bs[:len(bs)-1])
 		if err != nil {
 			return
 		}
@@ -244,7 +239,7 @@ func (me *CustomMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (tas
 	return
 }
 
-func (me *CustomMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte, err error) {
+func (ms *CustomMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte, err error) {
 	if report == nil {
 		err = errors.New("Report(nil) is not acceptable")
 		return
@@ -255,12 +250,12 @@ func (me *CustomMarshaller) EncodeReport(fn interface{}, report *Report) (b []by
 
 	bs, returns := [][]byte{}, report.Return()
 	if len(returns) > 0 {
-		if me.Codec == nil {
+		if ms.Codec == nil {
 			err = errors.New("Encode hook is not available")
 			return
 		}
 
-		bs, err = me.Codec.EncodeReturn(fn, returns)
+		bs, err = ms.Codec.EncodeReturn(fn, returns)
 		if err != nil {
 			return
 		}
@@ -285,7 +280,7 @@ func (me *CustomMarshaller) EncodeReport(fn interface{}, report *Report) (b []by
 	return
 }
 
-func (me *CustomMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (report *Report, err error) {
+func (ms *CustomMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (report *Report, err error) {
 	// decode header
 	if h == nil {
 		h, err = DecodeHeader(b)
@@ -306,14 +301,14 @@ func (me *CustomMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (r
 		return
 	}
 
-	var returns []interface{} = []interface{}{}
+	var returns = []interface{}{}
 	if len(bs) > 3 {
-		if me.Codec == nil {
+		if ms.Codec == nil {
 			err = errors.New("Decode hook is not available")
 			return
 		}
 
-		returns, err = me.Codec.DecodeReturn(fn, bs[:len(bs)-3])
+		returns, err = ms.Codec.DecodeReturn(fn, bs[:len(bs)-3])
 		if err != nil {
 			return
 		}

@@ -41,7 +41,7 @@ func TestLocalBackendSuite(t *testing.T) {
 			Gen: func() (b dingo.Backend, err error) {
 				b, err = dingo.NewLocalBackend(dingo.DefaultConfig(), nil)
 				if err == nil {
-					err = b.(dingo.Object).Expect(dingo.ObjT.REPORTER | dingo.ObjT.STORE)
+					err = b.(dingo.Object).Expect(dingo.ObjT.Reporter | dingo.ObjT.Store)
 				}
 				return
 			},

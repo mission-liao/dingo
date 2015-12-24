@@ -13,9 +13,8 @@ var ID = struct {
 	0, 1,
 }
 
-/*
- An object that can generate a series of identiy, typed as string.
- Each idenity should be unique.
+/*IDMaker is an object that can generate a series of identiy, typed as string.
+Each idenity should be unique.
 */
 type IDMaker interface {
 	// routine(thread) safe is required.

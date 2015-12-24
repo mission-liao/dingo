@@ -38,6 +38,6 @@ func NewErr(code int32, err error) *Error {
 	}
 }
 
-func (me *Error) Code() int32   { return me.C }
-func (me *Error) Msg() string   { return me.M }
-func (me *Error) Error() string { return fmt.Sprintf("[%d] %v", me.C, me.M) }
+func (err *Error) Code() int32   { return err.C }
+func (err *Error) Msg() string   { return err.M }
+func (err *Error) Error() string { return fmt.Sprintf("[%d] %v", err.C, err.M) }

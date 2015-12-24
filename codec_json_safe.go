@@ -2,85 +2,84 @@ package dingo
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
 )
 
 /*
  Different from JsonMarshaller, which marshal []interface{} to a single byte stream.
- JsonSafeCodec would marshal each element in []interface{} to separated byte steam,
+ JSONSafeCodec would marshal each element in []interface{} to separated byte steam,
  and unmarshall them to variable with "more accurated" type.
 
  Note: this Codec can be used with GenericInvoker and LazyInvoker
 */
 
-type JsonSafeCodec struct{}
+type JSONSafeCodec struct{}
 
-func (me *JsonSafeCodec) Prepare(name string, fn interface{}) (err error) {
+func (codec *JSONSafeCodec) Prepare(name string, fn interface{}) (err error) {
 	return
 }
 
-func (me *JsonSafeCodec) EncodeArgument(fn interface{}, val []interface{}) ([][]byte, error) {
+func (codec *JSONSafeCodec) EncodeArgument(fn interface{}, val []interface{}) ([][]byte, error) {
 	if len(val) != reflect.TypeOf(fn).NumIn() {
-		return nil, errors.New(fmt.Sprintf("Unable to encode %v, because its count of args is wrong", fn))
+		return nil, fmt.Errorf("Unable to encode %v, because its count of args is wrong", fn)
 	}
 
-	return me.encode(val)
+	return codec.encode(val)
 }
 
-func (me *JsonSafeCodec) DecodeArgument(fn interface{}, bs [][]byte) ([]interface{}, error) {
+func (codec *JSONSafeCodec) DecodeArgument(fn interface{}, bs [][]byte) ([]interface{}, error) {
 	funcT := reflect.TypeOf(fn)
 	if len(bs) != funcT.NumIn() {
-		return nil, errors.New(fmt.Sprintf("Unable to decode %v, because its count of args is wrong", fn))
+		return nil, fmt.Errorf("Unable to decode %v, because its count of args is wrong", fn)
 	}
 
-	return me.decode(bs, func(i int) reflect.Type {
+	return codec.decode(bs, func(i int) reflect.Type {
 		return funcT.In(i)
 	})
 }
 
-func (me *JsonSafeCodec) EncodeReturn(fn interface{}, val []interface{}) ([][]byte, error) {
+func (codec *JSONSafeCodec) EncodeReturn(fn interface{}, val []interface{}) ([][]byte, error) {
 	if len(val) != reflect.TypeOf(fn).NumOut() {
-		return nil, errors.New(fmt.Sprintf("Unable to encode %v, because its count of args is wrong", fn))
+		return nil, fmt.Errorf("Unable to encode %v, because its count of args is wrong", fn)
 	}
 
-	return me.encode(val)
+	return codec.encode(val)
 }
 
-func (me *JsonSafeCodec) DecodeReturn(fn interface{}, bs [][]byte) ([]interface{}, error) {
+func (codec *JSONSafeCodec) DecodeReturn(fn interface{}, bs [][]byte) ([]interface{}, error) {
 	funcT := reflect.TypeOf(fn)
 	if len(bs) != funcT.NumOut() {
-		return nil, errors.New(fmt.Sprintf("Unable to decode %v, because its count of args is wrong", fn))
+		return nil, fmt.Errorf("Unable to decode %v, because its count of args is wrong", fn)
 	}
 
-	return me.decode(bs, func(i int) reflect.Type {
+	return codec.decode(bs, func(i int) reflect.Type {
 		return funcT.Out(i)
 	})
 }
 
-func (me *JsonSafeCodec) encode(vs []interface{}) (bs [][]byte, err error) {
+func (codec *JSONSafeCodec) encode(vs []interface{}) (bs [][]byte, err error) {
 	bs = make([][]byte, 0, len(vs))
 	for _, v := range vs {
-		var b_ []byte
-		b_, err = json.Marshal(v)
+		var b []byte
+		b, err = json.Marshal(v)
 		if err != nil {
 			return
 		}
-		bs = append(bs, b_)
+		bs = append(bs, b)
 	}
 
 	return
 }
 
-func (me *JsonSafeCodec) decode(bs [][]byte, tfn func(i int) reflect.Type) ([]interface{}, error) {
+func (codec *JSONSafeCodec) decode(bs [][]byte, tfn func(i int) reflect.Type) ([]interface{}, error) {
 	vs := make([]interface{}, 0, len(bs))
 	for k, b := range bs {
 		t := tfn(k)
 		v := reflect.New(t)
 		r := v.Elem() // cache the value for the right type
 		if r.CanInterface() == false {
-			return nil, errors.New(fmt.Sprintf("can't interface of r %d:%v", k, t))
+			return nil, fmt.Errorf("can't interface of r %d:%v", k, t)
 		}
 
 		if t.Kind() != reflect.Ptr {

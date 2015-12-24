@@ -1,7 +1,6 @@
 package dingo
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -23,8 +22,8 @@ type _mappers struct {
 // parameters:
 // - tasks: input channel for Task
 // - receipts: output channel for TaskReceipt
-func (me *_mappers) more(tasks <-chan *Task, receipts chan<- *TaskReceipt) {
-	go me._mapper_routine_(me.mappers.New(), me.mappers.Wait(), me.mappers.Events(), tasks, receipts)
+func (mp *_mappers) more(tasks <-chan *Task, receipts chan<- *TaskReceipt) {
+	go mp.mapperRoutine(mp.mappers.New(), mp.mappers.Wait(), mp.mappers.Events(), tasks, receipts)
 }
 
 // dispatching a 'Task'
@@ -33,8 +32,8 @@ func (me *_mappers) more(tasks <-chan *Task, receipts chan<- *TaskReceipt) {
 // - t: the task
 // returns:
 // - err: any error
-func (me *_mappers) dispatch(t *Task) (err error) {
-	all := me.to.Load().(map[string]chan *Task)
+func (mp *_mappers) dispatch(t *Task) (err error) {
+	all := mp.to.Load().(map[string]chan *Task)
 	if out, ok := all[t.Name()]; ok {
 		out <- t
 	} else {
@@ -47,16 +46,16 @@ func (me *_mappers) dispatch(t *Task) (err error) {
 // proxy of _workers
 //
 
-func (me *_mappers) allocateWorkers(name string, count, share int) ([]<-chan *Report, int, error) {
-	me.toLock.Lock()
-	defer me.toLock.Unlock()
+func (mp *_mappers) allocateWorkers(name string, count, share int) ([]<-chan *Report, int, error) {
+	mp.toLock.Lock()
+	defer mp.toLock.Unlock()
 
-	all := me.to.Load().(map[string]chan *Task)
+	all := mp.to.Load().(map[string]chan *Task)
 	if _, ok := all[name]; ok {
-		return nil, count, errors.New(fmt.Sprintf("already registered: %v", name))
+		return nil, count, fmt.Errorf("already registered: %v", name)
 	}
 	t := make(chan *Task, 10)
-	r, n, err := me.workers.allocate(name, t, nil, count, share)
+	r, n, err := mp.workers.allocate(name, t, nil, count, share)
 	if err != nil {
 		return r, n, err
 	}
@@ -66,7 +65,7 @@ func (me *_mappers) allocateWorkers(name string, count, share int) ([]<-chan *Re
 		alln[k] = all[k]
 	}
 	alln[name] = t
-	me.to.Store(alln)
+	mp.to.Store(alln)
 	return r, n, err
 }
 
@@ -74,37 +73,37 @@ func (me *_mappers) allocateWorkers(name string, count, share int) ([]<-chan *Re
 // Object interface
 //
 
-func (me *_mappers) Expect(types int) (err error) {
-	if types != ObjT.MAPPER {
-		err = errors.New(fmt.Sprintf("Unsupported types: %v", types))
+func (mp *_mappers) Expect(types int) (err error) {
+	if types != ObjT.Mapper {
+		err = fmt.Errorf("Unsupported types: %v", types)
 		return
 	}
 
 	return
 }
 
-func (me *_mappers) Events() (ret []<-chan *Event, err error) {
-	ret, err = me.workers.Events()
+func (mp *_mappers) Events() (ret []<-chan *Event, err error) {
+	ret, err = mp.workers.Events()
 	if err != nil {
 		return
 	}
 
-	ret = append(ret, me.mappers.Events())
+	ret = append(ret, mp.mappers.Events())
 	return
 }
 
-func (m *_mappers) Close() (err error) {
-	m.mappers.Close()
-	err = m.workers.Close()
+func (mp *_mappers) Close() (err error) {
+	mp.mappers.Close()
+	err = mp.workers.Close()
 
-	m.toLock.Lock()
-	defer m.toLock.Unlock()
+	mp.toLock.Lock()
+	defer mp.toLock.Unlock()
 
-	all := m.to.Load().(map[string]chan *Task)
+	all := mp.to.Load().(map[string]chan *Task)
 	for _, v := range all {
 		close(v)
 	}
-	m.to.Store(make(map[string]chan *Task))
+	mp.to.Store(make(map[string]chan *Task))
 
 	return
 }
@@ -133,7 +132,7 @@ func newMappers(trans *fnMgr, hooks exHooks) (m *_mappers, err error) {
 // mapper routine
 //
 
-func (m *_mappers) _mapper_routine_(
+func (mp *_mappers) mapperRoutine(
 	quit <-chan int,
 	wait *sync.WaitGroup,
 	events chan<- *Event,
@@ -145,18 +144,18 @@ func (m *_mappers) _mapper_routine_(
 
 	receive := func(t *Task) {
 		// find registered worker
-		err := m.dispatch(t)
+		err := mp.dispatch(t)
 
 		// compose a receipt
 		var rpt TaskReceipt
 		if err != nil {
 			// send an error event
-			events <- NewEventFromError(ObjT.MAPPER, err)
+			events <- NewEventFromError(ObjT.Mapper, err)
 
 			if err == errWorkerNotFound {
 				rpt = TaskReceipt{
 					ID:     t.ID(),
-					Status: ReceiptStatus.WORKER_NOT_FOUND,
+					Status: ReceiptStatus.WorkerNotFound,
 				}
 			} else {
 				rpt = TaskReceipt{

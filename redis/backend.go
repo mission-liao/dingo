@@ -44,7 +44,7 @@ func NewBackend(cfg *RedisConfig) (v *backend, err error) {
 //
 
 func (me *backend) Expect(types int) (err error) {
-	if types&^(dingo.ObjT.REPORTER|dingo.ObjT.STORE) != 0 {
+	if types&^(dingo.ObjT.Reporter|dingo.ObjT.Store) != 0 {
 		err = errors.New(fmt.Sprintf("unsupported types: %v", types))
 		return
 	}
@@ -157,7 +157,7 @@ func (me *backend) _reporter_routine_(quit <-chan int, done chan<- int, events c
 
 			_, err = conn.Do("LPUSH", getKey(e.ID), e.Body)
 			if err != nil {
-				events <- dingo.NewEventFromError(dingo.ObjT.REPORTER, err)
+				events <- dingo.NewEventFromError(dingo.ObjT.Reporter, err)
 				break
 			}
 		}
@@ -173,12 +173,12 @@ func (me *backend) _store_routine_(quit <-chan int, done chan<- int, events chan
 		// delete key in redis
 		_, err := conn.Do("DEL", getKey(id))
 		if err != nil {
-			events <- dingo.NewEventFromError(dingo.ObjT.STORE, err)
+			events <- dingo.NewEventFromError(dingo.ObjT.Store, err)
 		}
 
 		err = conn.Close()
 		if err != nil {
-			events <- dingo.NewEventFromError(dingo.ObjT.STORE, err)
+			events <- dingo.NewEventFromError(dingo.ObjT.Store, err)
 		}
 	}()
 
@@ -191,7 +191,7 @@ finished:
 			// blocking call to redis
 			reply, err := conn.Do("BRPOP", getKey(id), me.cfg.GetPollTimeout())
 			if err != nil {
-				events <- dingo.NewEventFromError(dingo.ObjT.STORE, err)
+				events <- dingo.NewEventFromError(dingo.ObjT.Store, err)
 				break
 			}
 			if reply == nil {
@@ -202,14 +202,14 @@ finished:
 			v, ok := reply.([]interface{})
 			if !ok {
 				events <- dingo.NewEventFromError(
-					dingo.ObjT.STORE,
+					dingo.ObjT.Store,
 					errors.New(fmt.Sprintf("Unable to get array of interface{} from %v", reply)),
 				)
 				break
 			}
 			if len(v) != 2 {
 				events <- dingo.NewEventFromError(
-					dingo.ObjT.STORE,
+					dingo.ObjT.Store,
 					errors.New(fmt.Sprintf("length of reply is not 2, but %v", v)),
 				)
 				break
@@ -218,7 +218,7 @@ finished:
 			b, ok := v[1].([]byte)
 			if !ok {
 				events <- dingo.NewEventFromError(
-					dingo.ObjT.STORE,
+					dingo.ObjT.Store,
 					errors.New(fmt.Sprintf("the first object of reply is not byte-array, but %v", v)),
 				)
 				break

@@ -24,52 +24,52 @@ func TestResultSuite(t *testing.T) {
 // test case
 //
 
-func (me *resultTestSuite) TestNew() {
+func (ts *resultTestSuite) TestNew() {
 	// nil channel
 	{
 		r := NewResult(nil, nil)
-		me.NotNil(r)
+		ts.NotNil(r)
 		// no matter how many times, same error
-		me.Equal(ResultError.NoChannel, r.Wait(0))
-		me.Equal(ResultError.NoChannel, r.Wait(0))
-		me.Equal(ResultError.NoChannel, r.Wait(0))
+		ts.Equal(ResultError.NoChannel, r.Wait(0))
+		ts.Equal(ResultError.NoChannel, r.Wait(0))
+		ts.Equal(ResultError.NoChannel, r.Wait(0))
 	}
 
 	// some error
 	{
 		r := NewResult(nil, errors.New("test error"))
-		me.NotNil(r)
-		me.Equal("test error", r.Wait(0).Error())
-		me.Equal("test error", r.Wait(0).Error())
-		me.Equal("test error", r.Wait(0).Error())
-		me.Equal("test error", r.Wait(0).Error())
+		ts.NotNil(r)
+		ts.Equal("test error", r.Wait(0).Error())
+		ts.Equal("test error", r.Wait(0).Error())
+		ts.Equal("test error", r.Wait(0).Error())
+		ts.Equal("test error", r.Wait(0).Error())
 	}
 
 	// ok
 	{
 		r := NewResult(make(chan *Report, 1), nil)
-		me.NotNil(r)
-		me.Equal(ResultError.Timeout, r.Wait(100*time.Millisecond))
+		ts.NotNil(r)
+		ts.Equal(ResultError.Timeout, r.Wait(100*time.Millisecond))
 	}
 
 	// channel and error, original error is returned
 	{
 		r := NewResult(make(chan *Report, 1), errors.New("test error"))
-		me.NotNil(r)
-		me.Equal("test error", r.Wait(0).Error())
-		me.Equal("test error", r.Wait(0).Error())
-		me.Equal("test error", r.Wait(0).Error())
+		ts.NotNil(r)
+		ts.Equal("test error", r.Wait(0).Error())
+		ts.Equal("test error", r.Wait(0).Error())
+		ts.Equal("test error", r.Wait(0).Error())
 	}
 }
 
-func (me *resultTestSuite) TestWait() {
-	me.Nil(me.trans.Register(
+func (ts *resultTestSuite) TestWait() {
+	ts.Nil(ts.trans.Register(
 		"TestWait", func() {},
 	))
 
 	// compose a task
-	task, err := me.trans.ComposeTask("TestWait", nil, nil)
-	me.Nil(err)
+	task, err := ts.trans.ComposeTask("TestWait", nil, nil)
+	ts.Nil(err)
 	if err != nil {
 		return
 	}
@@ -77,33 +77,33 @@ func (me *resultTestSuite) TestWait() {
 	chk := func(s int16, v []interface{}, e error, t time.Duration) {
 		reports := make(chan *Report, 10)
 		r := NewResult(reports, nil)
-		me.NotNil(r)
+		ts.NotNil(r)
 		if r == nil {
 			return
 		}
 		// wait with timeout
-		me.Equal(ResultError.Timeout, r.Wait(100*time.Millisecond))
+		ts.Equal(ResultError.Timeout, r.Wait(100*time.Millisecond))
 
 		// a report
 		report, err := task.composeReport(s, v, e)
-		me.Nil(err)
+		ts.Nil(err)
 		if err != nil {
 			return
 		}
 
 		reports <- report
 		if t != 0 {
-			me.Equal(ResultError.Timeout, r.Wait(t))
+			ts.Equal(ResultError.Timeout, r.Wait(t))
 		} else {
 			err = r.Wait(0)
-			me.Nil(err)
+			ts.Nil(err)
 			if err != nil {
 				return
 			}
 			if report.OK() {
-				me.Equal(v, r.Last.Return())
+				ts.Equal(v, r.Last.Return())
 			} else {
-				me.Equal(e.Error(), r.Last.Error().Msg())
+				ts.Equal(e.Error(), r.Last.Error().Msg())
 			}
 		}
 	}
@@ -113,21 +113,21 @@ func (me *resultTestSuite) TestWait() {
 	chk(Status.Success, []interface{}{1, "value"}, nil, 0)
 }
 
-func (me *resultTestSuite) TestChannelClose() {
+func (ts *resultTestSuite) TestChannelClose() {
 	reports := make(chan *Report, 10)
 	r := NewResult(reports, nil)
 	close(reports)
-	me.Equal(ResultError.ChannelClosed, r.Wait(0))
+	ts.Equal(ResultError.ChannelClosed, r.Wait(0))
 }
 
-func (me *resultTestSuite) TestHandlerWithWait() {
-	me.Nil(me.trans.Register(
+func (ts *resultTestSuite) TestHandlerWithWait() {
+	ts.Nil(ts.trans.Register(
 		"TestHandlerWithWait", func() {},
 	))
 
 	// compose a task
-	task, err := me.trans.ComposeTask("TestHandlerWithWait", nil, nil)
-	me.Nil(err)
+	task, err := ts.trans.ComposeTask("TestHandlerWithWait", nil, nil)
+	ts.Nil(err)
 	if err != nil {
 		return
 	}
@@ -138,7 +138,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		res := NewResult(reports, nil)
 
 		rep, err := task.composeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
-		me.Nil(err)
+		ts.Nil(err)
 		if err != nil {
 			return
 		}
@@ -147,14 +147,14 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		called := false
 		// OnOK
 		res.OnOK(func(n int, s string) {
-			me.Equal(int(1), n)
-			me.Equal("test string", s)
+			ts.Equal(int(1), n)
+			ts.Equal("test string", s)
 			called = true
 		})
 
 		// Wait
-		me.Nil(res.Wait(0))
-		me.True(called)
+		ts.Nil(res.Wait(0))
+		ts.True(called)
 	}
 
 	// success -> Wait -> OnOK
@@ -163,7 +163,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		res := NewResult(reports, nil)
 
 		rep, err := task.composeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
-		me.Nil(err)
+		ts.Nil(err)
 		if err != nil {
 			return
 		}
@@ -171,16 +171,16 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		reports <- rep
 		called := false
 		// Wait
-		me.Nil(res.Wait(0))
+		ts.Nil(res.Wait(0))
 
 		// OnOK
 		res.OnOK(func(n int, s string) {
-			me.Equal(int(1), n)
-			me.Equal("test string", s)
+			ts.Equal(int(1), n)
+			ts.Equal("test string", s)
 			called = true
 		})
 
-		me.True(called)
+		ts.True(called)
 	}
 
 	// fail -> OnNOK -> Wait
@@ -189,7 +189,7 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		res := NewResult(reports, nil)
 
 		rep, err := task.composeReport(Status.Fail, nil, errors.New("test string"))
-		me.Nil(err)
+		ts.Nil(err)
 		if err != nil {
 			return
 		}
@@ -198,14 +198,14 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		// OnNOK
 		called := false
 		res.OnNOK(func(te *Error, e error) {
-			me.Nil(e)
-			me.Equal("test string", te.Msg())
+			ts.Nil(e)
+			ts.Equal("test string", te.Msg())
 			called = true
 		})
 
 		// Wait
-		me.Nil(res.Wait(0))
-		me.True(called)
+		ts.Nil(res.Wait(0))
+		ts.True(called)
 	}
 
 	// fail -> Wait -> OnNOK
@@ -214,24 +214,24 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		res := NewResult(reports, nil)
 
 		rep, err := task.composeReport(Status.Fail, nil, errors.New("test string"))
-		me.Nil(err)
+		ts.Nil(err)
 		if err != nil {
 			return
 		}
 
 		reports <- rep
 		// Wait
-		me.Nil(res.Wait(0))
+		ts.Nil(res.Wait(0))
 
 		// OnNOK
 		called := false
 		res.OnNOK(func(te *Error, e error) {
-			me.Nil(e)
-			me.Equal("test string", te.Msg())
+			ts.Nil(e)
+			ts.Equal("test string", te.Msg())
 			called = true
 		})
 
-		me.True(called)
+		ts.True(called)
 	}
 
 	// err -> OnNOK -> Wait
@@ -243,14 +243,14 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		// OnNOK
 		called := false
 		res.OnNOK(func(te *Error, e error) {
-			me.Nil(te)
-			me.Equal(ResultError.ChannelClosed, e)
+			ts.Nil(te)
+			ts.Equal(ResultError.ChannelClosed, e)
 			called = true
 		})
 
 		// Wait
-		me.Equal(ResultError.ChannelClosed, res.Wait(0))
-		me.True(called)
+		ts.Equal(ResultError.ChannelClosed, res.Wait(0))
+		ts.True(called)
 	}
 
 	// err -> Wait -> OnNOK
@@ -260,28 +260,28 @@ func (me *resultTestSuite) TestHandlerWithWait() {
 		close(reports)
 
 		// Wait
-		me.Equal(ResultError.ChannelClosed, res.Wait(0))
+		ts.Equal(ResultError.ChannelClosed, res.Wait(0))
 
 		// OnNOK
 		called := false
 		res.OnNOK(func(te *Error, e error) {
-			me.Nil(te)
-			me.Equal(ResultError.ChannelClosed, e)
+			ts.Nil(te)
+			ts.Equal(ResultError.ChannelClosed, e)
 			called = true
 		})
 
-		me.True(called)
+		ts.True(called)
 	}
 }
 
-func (me *resultTestSuite) TestThen() {
-	me.Nil(me.trans.Register(
+func (ts *resultTestSuite) TestThen() {
+	ts.Nil(ts.trans.Register(
 		"TestThen", func() {},
 	))
 
 	// compose a task
-	task, err := me.trans.ComposeTask("TestThen", nil, nil)
-	me.Nil(err)
+	task, err := ts.trans.ComposeTask("TestThen", nil, nil)
+	ts.Nil(err)
 	if err != nil {
 		return
 	}
@@ -294,11 +294,11 @@ func (me *resultTestSuite) TestThen() {
 		res := NewResult(reports, nil)
 
 		// no handlers
-		me.Equal(ResultError.NoHandler, res.Then())
+		ts.Equal(ResultError.NoHandler, res.Then())
 
 		// success
 		rep, err := task.composeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
-		me.Nil(err)
+		ts.Nil(err)
 		if err != nil {
 			return
 		}
@@ -306,13 +306,13 @@ func (me *resultTestSuite) TestThen() {
 		reports <- rep
 		// OnOK
 		res.OnOK(func(n int, s string) {
-			me.Equal(int(1), n)
-			me.Equal("test string", s)
+			ts.Equal(int(1), n)
+			ts.Equal("test string", s)
 			wait.Done()
 		})
 
 		wait.Add(1)
-		me.Nil(res.Then())
+		ts.Nil(res.Then())
 		wait.Wait()
 	}
 
@@ -323,7 +323,7 @@ func (me *resultTestSuite) TestThen() {
 
 		// fail
 		rep, err := task.composeReport(Status.Fail, nil, errors.New("test string"))
-		me.Nil(err)
+		ts.Nil(err)
 		if err != nil {
 			return
 		}
@@ -331,13 +331,13 @@ func (me *resultTestSuite) TestThen() {
 		reports <- rep
 		// OnNOK
 		res.OnNOK(func(te *Error, e error) {
-			me.Nil(e)
-			me.Equal("test string", te.Msg())
+			ts.Nil(e)
+			ts.Equal("test string", te.Msg())
 			wait.Done()
 		})
 
 		wait.Add(1)
-		me.Nil(res.Then())
+		ts.Nil(res.Then())
 		wait.Wait()
 	}
 
@@ -349,37 +349,37 @@ func (me *resultTestSuite) TestThen() {
 
 		// OnNOK
 		res.OnNOK(func(te *Error, e error) {
-			me.Equal(ResultError.ChannelClosed, e)
+			ts.Equal(ResultError.ChannelClosed, e)
 			wait.Done()
 		})
 
 		wait.Add(1)
-		me.Nil(res.Then())
+		ts.Nil(res.Then())
 		wait.Wait()
 	}
 }
 
-func (me *resultTestSuite) TestOnOK() {
+func (ts *resultTestSuite) TestOnOK() {
 	// should be panic when fn is nil
-	me.Panics(func() {
+	ts.Panics(func() {
 		NewResult(nil, nil).OnOK(nil)
 	})
 
 	// should be panic when invoking is failed.
-	me.Nil(me.trans.Register(
+	ts.Nil(ts.trans.Register(
 		"TestOnOK", func() {},
 	))
 
 	// compose a task
-	task, err := me.trans.ComposeTask("TestOnOK", nil, nil)
-	me.Nil(err)
+	task, err := ts.trans.ComposeTask("TestOnOK", nil, nil)
+	ts.Nil(err)
 	if err != nil {
 		return
 	}
 
 	// compose a success report
 	rep, err := task.composeReport(Status.Success, []interface{}{int(1), "test string"}, nil)
-	me.Nil(err)
+	ts.Nil(err)
 	if err != nil {
 		return
 	}
@@ -390,7 +390,7 @@ func (me *resultTestSuite) TestOnOK() {
 	res.Wait(0)
 
 	// a totally wrong handler
-	me.Panics(func() {
+	ts.Panics(func() {
 		res.OnOK(func(name string, count int) {})
 	})
 }

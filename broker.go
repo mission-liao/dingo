@@ -1,18 +1,21 @@
 package dingo
 
+/*Broker interface is composed of Producer/Consumer
+ */
 type Broker interface {
 	Producer
 	Consumer
 }
 
+/*NamedBroker interface is composed of Producer/NamedConsumer
+ */
 type NamedBroker interface {
 	Producer
 	NamedConsumer
 }
 
-/*
- event IDs that might be passed to dingo.Producer.ProducerHook
-*/
+/*ProducerEvent, event IDs that might be passed to dingo.Producer.ProducerHook
+ */
 var ProducerEvent = struct {
 	// a new kind of task is declared.
 	DeclareTask int
@@ -20,9 +23,8 @@ var ProducerEvent = struct {
 	1,
 }
 
-/*
- Producer(s) is responsibe for sending tasks to broker(s).
-*/
+/*Producer is responsibe for sending tasks to broker(s).
+ */
 type Producer interface {
 	// hook for listening event from dingo
 	// parameter:
@@ -40,15 +42,16 @@ type Producer interface {
 	Send(meta Meta, b []byte) error
 }
 
+/*ConsumerEvent, IDs of events that might be sent to ConsumerHook
+ */
 var ConsumerEvent = struct {
 }{}
 
-/*
- Consumer(s) would consume tasks from broker(s). This kind of Consumer(s) is easier
- to implement, every task is sent to a single queue, and consumed from a single queue.
+/*Consumer would consume tasks from broker(s). This kind of Consumer(s) is easier
+to implement, every task is sent to a single queue, and consumed from a single queue.
 
- The interaction between Consumer(s) and dingo are asynchronous by the channel you provide
- in 'AddListener'.
+The interaction between Consumer(s) and dingo are asynchronous by the channel you provide
+in 'AddListener'.
 */
 type Consumer interface {
 	// hook for listening event from dingo
@@ -73,12 +76,11 @@ type Consumer interface {
 	StopAllListeners() (err error)
 }
 
-/*
- Named Consumer(s) would consume tasks from broker(s). Different kind of tasks should be
- sent to different queues, and consumed from different queues.
+/*NamedConsumer would consume tasks from broker(s). Different kind of tasks should be
+sent to different queues, and consumed from different queues.
 
- With this kind of Consumer(s), you can deploy different kinds of workers on machines,
- and each one of them handles different sets of worker functions.
+With this kind of Consumer(s), you can deploy different kinds of workers on machines,
+and each one of them handles different sets of worker functions.
 */
 type NamedConsumer interface {
 	// hook for listening event from dingo
@@ -104,20 +106,22 @@ type NamedConsumer interface {
 	StopAllListeners() (err error)
 }
 
+/*ReceiptStatus allows broker implementer to know if they have to
+reject the received packet or not.
+*/
 var ReceiptStatus = struct {
 	// this task is received successfully.
 	OK int
 	// something goes wrong
 	NOK int
 	// dingo can't find workers for this tasks
-	WORKER_NOT_FOUND int
+	WorkerNotFound int
 }{
 	1, 2, 3,
 }
 
-/*
- Receipt allows "dingo" to reject tasks for any reason, the way to handle
- rejected tasks are Broker(s) dependent.
+/*TaskReceipt is the receipt allows "dingo" to reject tasks for any reason, the way to handle
+rejected tasks are Broker(s) dependent.
 */
 type TaskReceipt struct {
 	ID      string

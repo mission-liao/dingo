@@ -17,13 +17,13 @@ type MarshallerTestSuite struct {
 	m Marshaller
 }
 
-func (me *MarshallerTestSuite) TestTask() {
+func (ts *MarshallerTestSuite) TestTask() {
 	task, err := composeTask(
 		"test", NewOption().SetIgnoreReport(true).SetMonitorProgress(true),
 		[]interface{}{float64(1.5), "user", "password"},
 	)
-	me.NotNil(task)
-	me.Nil(err)
+	ts.NotNil(task)
+	ts.Nil(err)
 	if err != nil {
 		return
 	}
@@ -32,33 +32,33 @@ func (me *MarshallerTestSuite) TestTask() {
 
 	{
 		// encode
-		b, err := me.m.EncodeTask(fn, task)
-		me.Nil(err)
-		me.NotNil(b)
+		b, err := ts.m.EncodeTask(fn, task)
+		ts.Nil(err)
+		ts.NotNil(b)
 
 		// decode
 		if err == nil {
 			// provide a fake function as a reference of fingerprint
-			t, err := me.m.DecodeTask(nil, fn, b)
-			me.Nil(err)
-			me.NotNil(t)
+			t, err := ts.m.DecodeTask(nil, fn, b)
+			ts.Nil(err)
+			ts.NotNil(t)
 			if t != nil {
-				me.True(t.almostEqual(task))
-				me.True(t.Option().IgnoreReport())
+				ts.True(t.almostEqual(task))
+				ts.True(t.Option().IgnoreReport())
 			}
 		}
 	}
 
 	// nil case
 	{
-		_, err := me.m.EncodeTask(fn, nil)
-		me.NotNil(err)
+		_, err := ts.m.EncodeTask(fn, nil)
+		ts.NotNil(err)
 	}
 }
 
-func (me *MarshallerTestSuite) TestReport() {
+func (ts *MarshallerTestSuite) TestReport() {
 	task, err := composeTask("test", NewOption().SetIgnoreReport(true).SetMonitorProgress(true), nil)
-	me.Nil(err)
+	ts.Nil(err)
 	if err != nil {
 		return
 	}
@@ -70,30 +70,30 @@ func (me *MarshallerTestSuite) TestReport() {
 			[]interface{}{float64(2.5), "user", "password"},
 			errors.New("test error"),
 		)
-		me.Nil(err)
+		ts.Nil(err)
 
 		// encode
-		b, err := me.m.EncodeReport(fn, report)
-		me.Nil(err)
-		me.NotNil(b)
+		b, err := ts.m.EncodeReport(fn, report)
+		ts.Nil(err)
+		ts.NotNil(b)
 
 		// decode
 		if err == nil {
 			// provide a fake function as a reference of fingerprint
-			r, err := me.m.DecodeReport(nil, fn, b)
-			me.Nil(err)
-			me.NotNil(r)
+			r, err := ts.m.DecodeReport(nil, fn, b)
+			ts.Nil(err)
+			ts.NotNil(r)
 			if r != nil {
-				me.Equal(report, r)
-				me.True(r.Option().IgnoreReport())
+				ts.Equal(report, r)
+				ts.True(r.Option().IgnoreReport())
 			}
 		}
 	}
 
 	// nil case
 	{
-		_, err := me.m.EncodeReport(fn, nil)
-		me.NotNil(err)
+		_, err := ts.m.EncodeReport(fn, nil)
+		ts.NotNil(err)
 	}
 }
 
@@ -140,7 +140,7 @@ type jsonSafeMarshallerTestSuite struct {
 func TestJsonSafeMarshallerSuite(t *testing.T) {
 	suite.Run(t, &jsonSafeMarshallerTestSuite{
 		MarshallerTestSuite{
-			m: &CustomMarshaller{Codec: &JsonSafeCodec{}},
+			m: &CustomMarshaller{Codec: &JSONSafeCodec{}},
 		},
 	})
 }

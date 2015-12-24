@@ -21,8 +21,8 @@ func (me *testFakeProducer) Close() (err error)                             { re
 func (me *testFakeProducer) ProducerHook(id int, p interface{}) (err error) { return }
 func (me *testFakeProducer) Send(id dingo.Meta, body []byte) (err error) {
 	me.events <- dingo.NewEvent(
-		dingo.ObjT.PRODUCER,
-		dingo.EventLvl.INFO,
+		dingo.ObjT.Producer,
+		dingo.EventLvl.Info,
 		dingo.EventCode.Generic,
 		"Send",
 	)
@@ -43,8 +43,8 @@ func (me *testFakeStore) Close() (err error)                          { return }
 func (me *testFakeStore) StoreHook(id int, p interface{}) (err error) { return }
 func (me *testFakeStore) Poll(meta dingo.Meta) (reports <-chan []byte, err error) {
 	me.events <- dingo.NewEvent(
-		dingo.ObjT.STORE,
-		dingo.EventLvl.INFO,
+		dingo.ObjT.Store,
+		dingo.EventLvl.Info,
 		dingo.EventCode.Generic,
 		"Poll",
 	)
@@ -62,12 +62,12 @@ func TestDingoEvent(t *testing.T) {
 	}
 
 	// prepare a caller
-	_, _, err = app.Use(&testFakeProducer{make(chan *dingo.Event, 10)}, dingo.ObjT.PRODUCER)
+	_, _, err = app.Use(&testFakeProducer{make(chan *dingo.Event, 10)}, dingo.ObjT.Producer)
 	ass.Nil(err)
 	if err != nil {
 		return
 	}
-	_, _, err = app.Use(&testFakeStore{make(chan *dingo.Event, 10)}, dingo.ObjT.STORE)
+	_, _, err = app.Use(&testFakeStore{make(chan *dingo.Event, 10)}, dingo.ObjT.Store)
 	ass.Nil(err)
 	if err != nil {
 		return
@@ -81,7 +81,7 @@ func TestDingoEvent(t *testing.T) {
 	}
 
 	// there should be 2 events
-	_, events, err := app.Listen(dingo.ObjT.ALL, dingo.EventLvl.INFO, 0)
+	_, events, err := app.Listen(dingo.ObjT.All, dingo.EventLvl.Info, 0)
 	ass.Nil(err)
 	if err != nil {
 		return
@@ -97,9 +97,9 @@ func TestDingoEvent(t *testing.T) {
 	// exactly two event should be received.
 	e1 := <-events
 	e2 := <-events
-	ass.True(e1.Origin|e2.Origin == dingo.ObjT.PRODUCER|dingo.ObjT.STORE)
-	ass.True(e1.Level == dingo.EventLvl.INFO)
-	ass.True(e2.Level == dingo.EventLvl.INFO)
+	ass.True(e1.Origin|e2.Origin == dingo.ObjT.Producer|dingo.ObjT.Store)
+	ass.True(e1.Level == dingo.EventLvl.Info)
+	ass.True(e2.Level == dingo.EventLvl.Info)
 	ass.True(e1.Payload.(string) == "Send" || e2.Payload.(string) == "Send")
 	ass.True(e1.Payload.(string) == "Poll" || e2.Payload.(string) == "Poll")
 

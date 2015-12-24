@@ -29,46 +29,46 @@ func TestMapperSuite(t *testing.T) {
 	})
 }
 
-func (me *mapperTestSuite) SetupSuite() {
+func (ts *mapperTestSuite) SetupSuite() {
 	var err error
-	me._mps, err = newMappers(me._trans, me._hooks)
-	me.Nil(err)
+	ts._mps, err = newMappers(ts._trans, ts._hooks)
+	ts.Nil(err)
 
 	// allocate 3 mapper routines
-	for remain := me._countOfMappers; remain > 0; remain-- {
+	for remain := ts._countOfMappers; remain > 0; remain-- {
 		receipts := make(chan *TaskReceipt, 10)
-		me._mps.more(me._tasks, receipts)
-		_, err := me._receiptsMux.Register(receipts, 0)
-		me.Nil(err)
+		ts._mps.more(ts._tasks, receipts)
+		_, err := ts._receiptsMux.Register(receipts, 0)
+		ts.Nil(err)
 	}
-	remain, err := me._receiptsMux.More(3)
-	me.Equal(0, remain)
-	me.Nil(err)
+	remain, err := ts._receiptsMux.More(3)
+	ts.Equal(0, remain)
+	ts.Nil(err)
 
-	me._receiptsMux.Handle(func(val interface{}, _ int) {
-		me._receipts <- val.(*TaskReceipt)
+	ts._receiptsMux.Handle(func(val interface{}, _ int) {
+		ts._receipts <- val.(*TaskReceipt)
 	})
 }
 
-func (me *mapperTestSuite) TearDownSuite() {
-	me.Nil(me._mps.Close())
-	close(me._tasks)
-	me._receiptsMux.Close()
-	close(me._receipts)
+func (ts *mapperTestSuite) TearDownSuite() {
+	ts.Nil(ts._mps.Close())
+	close(ts._tasks)
+	ts._receiptsMux.Close()
+	close(ts._receipts)
 }
 
 //
 // test cases
 //
 
-func (me *mapperTestSuite) TestParellelMapping() {
+func (ts *mapperTestSuite) TestParellelMapping() {
 	// make sure those mapper routines would be used
 	// when one is blocked.
 
 	// the bottleneck of mapper are:
 	// - length of receipt channel
 	// - count of mapper routines
-	count := me._countOfMappers + cap(me._tasks)
+	count := ts._countOfMappers + cap(ts._tasks)
 	stepIn := make(chan int, count)
 	stepOut := make(chan int, count)
 	fn := func(i int) {
@@ -76,27 +76,27 @@ func (me *mapperTestSuite) TestParellelMapping() {
 		// workers would be blocked here
 		<-stepOut
 	}
-	me.Nil(me._trans.Register(
+	ts.Nil(ts._trans.Register(
 		"ParellelMapping", fn,
 	))
 
-	reports, remain, err := me._mps.allocateWorkers("ParellelMapping", 1, 0)
-	me.Nil(err)
-	me.Equal(0, remain)
-	me.Len(reports, 1)
+	reports, remain, err := ts._mps.allocateWorkers("ParellelMapping", 1, 0)
+	ts.Nil(err)
+	ts.Equal(0, remain)
+	ts.Len(reports, 1)
 
 	// send enough tasks to fill mapper routines & tasks channel
 	for i := 0; i < count; i++ {
 		// compose corresponding task
-		t, err := me._trans.ComposeTask(
+		t, err := ts._trans.ComposeTask(
 			"ParellelMapping",
 			NewOption().SetMonitorProgress(true),
 			[]interface{}{i},
 		)
-		me.Nil(err)
+		ts.Nil(err)
 
 		// should not be blocked here
-		me._tasks <- t
+		ts._tasks <- t
 	}
 
 	// unless worked as expected, or we won't reach
@@ -104,7 +104,7 @@ func (me *mapperTestSuite) TestParellelMapping() {
 	rets := []int{}
 	for i := 0; i < count; i++ {
 		// consume 1 receipts
-		<-me._receipts
+		<-ts._receipts
 
 		// consume 2 report
 		<-reports[0]
@@ -119,5 +119,5 @@ func (me *mapperTestSuite) TestParellelMapping() {
 		rets = append(rets, <-stepIn)
 	}
 
-	me.Len(rets, count)
+	ts.Len(rets, count)
 }

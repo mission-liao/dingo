@@ -6,7 +6,6 @@ package dingo
 //
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -31,39 +30,40 @@ func NewRoutines() *Routines {
 	}
 }
 
-func (me *Routines) New() <-chan int {
-	me.wg.Add(1)
+func (rs *Routines) New() <-chan int {
+	rs.wg.Add(1)
 
-	me.qLock.Lock()
-	defer me.qLock.Unlock()
+	rs.qLock.Lock()
+	defer rs.qLock.Unlock()
 
-	me.quits = append(me.quits, make(chan int, 1))
-	return me.quits[len(me.quits)-1]
+	rs.quits = append(rs.quits, make(chan int, 1))
+	return rs.quits[len(rs.quits)-1]
 }
 
-func (me *Routines) Wait() *sync.WaitGroup {
-	return &me.wg
+func (rs *Routines) Wait() *sync.WaitGroup {
+	return &rs.wg
 }
 
-func (me *Routines) Events() chan *Event {
-	return me.events
+func (rs *Routines) Events() chan *Event {
+	return rs.events
 }
 
-// stop/release all allocated routines,
-// this function should be safe from multiple calls.
-func (me *Routines) Close() {
-	me.qLock.Lock()
-	defer me.qLock.Unlock()
+/*Close is used to stop/release all allocated routines,
+this function should be safe from multiple calls.
+*/
+func (rs *Routines) Close() {
+	rs.qLock.Lock()
+	defer rs.qLock.Unlock()
 
-	for _, v := range me.quits {
+	for _, v := range rs.quits {
 		v <- 1
 		close(v)
 	}
-	me.quits = make([]chan int, 0, 10)
-	me.wg.Wait()
+	rs.quits = make([]chan int, 0, 10)
+	rs.wg.Wait()
 
-	close(me.events)
-	me.events = make(chan *Event, 10)
+	close(rs.events)
+	rs.events = make(chan *Event, 10)
 }
 
 // Heterogeneous Routines
@@ -88,44 +88,44 @@ func NewHetroRoutines() *HetroRoutines {
 	}
 }
 
-func (me *HetroRoutines) New(want int) (quit <-chan int, done chan<- int, idx int) {
-	me.ctrlsLock.Lock()
-	defer me.ctrlsLock.Unlock()
+func (rs *HetroRoutines) New(want int) (quit <-chan int, done chan<- int, idx int) {
+	rs.ctrlsLock.Lock()
+	defer rs.ctrlsLock.Unlock()
 
 	// get an index
 	idx = want
 	for {
-		_, ok := me.ctrls[idx]
+		_, ok := rs.ctrls[idx]
 		if !ok {
 			break
 		}
 		idx = rand.Int()
 	}
 
-	me.ctrls[idx] = &_control{
+	rs.ctrls[idx] = &_control{
 		quit: make(chan int, 1),
 		done: make(chan int, 1),
 	}
 
-	quit = me.ctrls[idx].quit
-	done = me.ctrls[idx].done
+	quit = rs.ctrls[idx].quit
+	done = rs.ctrls[idx].done
 	return
 }
 
-func (me *HetroRoutines) Stop(idx int) (err error) {
+func (rs *HetroRoutines) Stop(idx int) (err error) {
 	var c *_control
 	err = func() (err error) {
-		me.ctrlsLock.Lock()
-		defer me.ctrlsLock.Unlock()
+		rs.ctrlsLock.Lock()
+		defer rs.ctrlsLock.Unlock()
 
 		var ok bool
-		c, ok = me.ctrls[idx]
+		c, ok = rs.ctrls[idx]
 		if !ok {
-			err = errors.New(fmt.Sprintf("Index not found: %v", idx))
+			err = fmt.Errorf("Index not found: %v", idx)
 			return
 		}
 
-		delete(me.ctrls, idx)
+		delete(rs.ctrls, idx)
 		return
 	}()
 
@@ -137,26 +137,26 @@ func (me *HetroRoutines) Stop(idx int) (err error) {
 	return
 }
 
-func (me *HetroRoutines) Events() chan *Event {
-	return me.events
+func (rs *HetroRoutines) Events() chan *Event {
+	return rs.events
 }
 
-func (me *HetroRoutines) Close() {
-	me.ctrlsLock.Lock()
-	defer me.ctrlsLock.Unlock()
+func (rs *HetroRoutines) Close() {
+	rs.ctrlsLock.Lock()
+	defer rs.ctrlsLock.Unlock()
 
 	// sending quit signal
-	for _, v := range me.ctrls {
+	for _, v := range rs.ctrls {
 		v.quit <- 1
 		close(v.quit)
 	}
 
 	// awaiting done signal
-	for _, v := range me.ctrls {
+	for _, v := range rs.ctrls {
 		_, _ = <-v.done
 	}
 
-	me.ctrls = make(map[int]*_control)
+	rs.ctrls = make(map[int]*_control)
 }
 
 func init() {

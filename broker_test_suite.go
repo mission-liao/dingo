@@ -35,50 +35,50 @@ type BrokerTestSuite struct {
 	ConsumerNames []string
 }
 
-func (me *BrokerTestSuite) SetupSuite() {
+func (ts *BrokerTestSuite) SetupSuite() {
 }
 
-func (me *BrokerTestSuite) TearDownSuite() {
+func (ts *BrokerTestSuite) TearDownSuite() {
 }
 
-func (me *BrokerTestSuite) SetupTest() {
+func (ts *BrokerTestSuite) SetupTest() {
 	var ok bool
-	v, err := me.Gen()
-	me.Nil(err)
+	v, err := ts.Gen()
+	ts.Nil(err)
 
 	// producer
-	me.Pdc = v.(Producer)
+	ts.Pdc = v.(Producer)
 
 	// named consumer
-	me.Ncsm, ok = v.(NamedConsumer)
+	ts.Ncsm, ok = v.(NamedConsumer)
 	if !ok {
 		// consumer
-		me.Csm = v.(Consumer)
+		ts.Csm = v.(Consumer)
 	}
 
-	me.ConsumerNames = []string{}
-	me.Trans = newFnMgr()
+	ts.ConsumerNames = []string{}
+	ts.Trans = newFnMgr()
 }
 
-func (me *BrokerTestSuite) TearDownTest() {
-	me.Nil(me.Pdc.(Object).Close())
+func (ts *BrokerTestSuite) TearDownTest() {
+	ts.Nil(ts.Pdc.(Object).Close())
 }
 
-func (me *BrokerTestSuite) addListener(name string, receipts <-chan *TaskReceipt) (tasks <-chan []byte, err error) {
-	if me.Csm != nil {
-		tasks, err = me.Csm.AddListener(receipts)
-	} else if me.Ncsm != nil {
-		tasks, err = me.Ncsm.AddListener("", receipts)
+func (ts *BrokerTestSuite) addListener(name string, receipts <-chan *TaskReceipt) (tasks <-chan []byte, err error) {
+	if ts.Csm != nil {
+		tasks, err = ts.Csm.AddListener(receipts)
+	} else if ts.Ncsm != nil {
+		tasks, err = ts.Ncsm.AddListener("", receipts)
 	}
 
 	return
 }
 
-func (me *BrokerTestSuite) stopAllListeners() (err error) {
-	if me.Csm != nil {
-		err = me.Csm.StopAllListeners()
-	} else if me.Ncsm != nil {
-		err = me.Ncsm.StopAllListeners()
+func (ts *BrokerTestSuite) stopAllListeners() (err error) {
+	if ts.Csm != nil {
+		err = ts.Csm.StopAllListeners()
+	} else if ts.Ncsm != nil {
+		err = ts.Ncsm.StopAllListeners()
 	}
 
 	return
@@ -88,45 +88,45 @@ func (me *BrokerTestSuite) stopAllListeners() (err error) {
 // test cases
 //
 
-func (me *BrokerTestSuite) TestBasic() {
+func (ts *BrokerTestSuite) TestBasic() {
 	var (
 		tasks <-chan []byte
 	)
-	me.Nil(me.Trans.Register("", func() {}))
+	ts.Nil(ts.Trans.Register("", func() {}))
 	// init one listener
 	receipts := make(chan *TaskReceipt, 10)
-	tasks, err := me.addListener("", receipts)
-	me.Nil(err)
-	me.NotNil(tasks)
+	tasks, err := ts.addListener("", receipts)
+	ts.Nil(err)
+	ts.NotNil(tasks)
 	if tasks == nil {
 		return
 	}
 
 	// compose a task
-	t, err := me.Trans.ComposeTask("", nil, []interface{}{})
-	me.Nil(err)
-	me.NotNil(t)
+	t, err := ts.Trans.ComposeTask("", nil, []interface{}{})
+	ts.Nil(err)
+	ts.NotNil(t)
 	if t == nil {
 		return
 	}
 
 	// generate a header byte stream
 	hb, err := NewHeader(t.ID(), t.Name()).Flush(0)
-	me.Nil(err)
+	ts.Nil(err)
 	if err != nil {
 		return
 	}
 
 	// declare this task to broker before sending
-	me.Nil(me.Pdc.ProducerHook(ProducerEvent.DeclareTask, ""))
+	ts.Nil(ts.Pdc.ProducerHook(ProducerEvent.DeclareTask, ""))
 
 	// send it
 	input := append(hb, []byte("test byte array")...)
-	me.Nil(me.Pdc.Send(t, input))
+	ts.Nil(ts.Pdc.Send(t, input))
 
 	// receive it
 	output := <-tasks
-	me.Equal(string(input), string(output))
+	ts.Equal(string(input), string(output))
 
 	// send a receipt
 	receipts <- &TaskReceipt{
@@ -135,10 +135,10 @@ func (me *BrokerTestSuite) TestBasic() {
 	}
 
 	// stop all listener
-	me.Nil(me.stopAllListeners())
+	ts.Nil(ts.stopAllListeners())
 }
 
-func (me *BrokerTestSuite) _simplified_mapper_(
+func (ts *BrokerTestSuite) simplifiedMapper(
 	quit <-chan int,
 	wait *sync.WaitGroup,
 	tasks <-chan []byte,
@@ -158,9 +158,9 @@ done:
 				break done
 			}
 			h, err := DecodeHeader(t)
-			me.Nil(err)
+			ts.Nil(err)
 			if len(name) > 0 {
-				me.Equal(name, h.Name())
+				ts.Equal(name, h.Name())
 			}
 
 			fn(h)
@@ -168,7 +168,7 @@ done:
 			if len(name) > 0 && h.Name() != name {
 				rcs <- &TaskReceipt{
 					ID:     h.ID(),
-					Status: ReceiptStatus.WORKER_NOT_FOUND,
+					Status: ReceiptStatus.WorkerNotFound,
 				}
 			} else {
 				rcs <- &TaskReceipt{
@@ -181,14 +181,14 @@ done:
 
 }
 
-func (me *BrokerTestSuite) TestNamed() {
+func (ts *BrokerTestSuite) TestNamed() {
 	// make sure named consumers won't receive
 	// un-registered tasks
 	countOfConsumers := 5
 	countOfTasks := 256
 
 	// this task is only for NamedConsumer
-	if me.Ncsm == nil {
+	if ts.Ncsm == nil {
 		return
 	}
 
@@ -197,31 +197,31 @@ func (me *BrokerTestSuite) TestNamed() {
 
 	var (
 		sentLock sync.Mutex
-		sent     map[string][]string = map[string][]string{}
+		sent     = map[string][]string{}
 		sented   sync.WaitGroup
 	)
 
 	// generate several consumers
 	for i := 0; i < countOfConsumers; i++ {
-		b, err := me.Gen()
-		me.Nil(err)
+		b, err := ts.Gen()
+		ts.Nil(err)
 		c := b.(NamedConsumer)
 		rc := make(chan *TaskReceipt, 10)
 		name := fmt.Sprintf("named.%d", i)
 		sent[name] = []string{}
 		tasks, err := c.AddListener(name, rc)
-		me.Nil(err)
+		ts.Nil(err)
 
 		// declare this task through Producer
-		me.Nil(me.Pdc.ProducerHook(ProducerEvent.DeclareTask, name))
+		ts.Nil(ts.Pdc.ProducerHook(ProducerEvent.DeclareTask, name))
 
 		// a simplified mapper routine
-		go me._simplified_mapper_(rs.New(), rs.Wait(), tasks, rc, name,
+		go ts.simplifiedMapper(rs.New(), rs.Wait(), tasks, rc, name,
 			func(h *Header) {
 				sentLock.Lock()
 				defer sentLock.Unlock()
 
-				me.Equal(sent[name][0], h.ID())
+				ts.Equal(sent[name][0], h.ID())
 				// remove this 'sent' record
 				for k, v := range sent[name] {
 					if v == h.ID() {
@@ -235,12 +235,12 @@ func (me *BrokerTestSuite) TestNamed() {
 			},
 		)
 		consumers = append(consumers, c)
-		me.ConsumerNames = append(me.ConsumerNames, name)
+		ts.ConsumerNames = append(ts.ConsumerNames, name)
 	}
 
 	// a producer sends a series of tasks
-	p, err := me.Gen()
-	me.Nil(err)
+	p, err := ts.Gen()
+	ts.Nil(err)
 	sender := p.(Producer)
 	// declare this task to broker
 	sented.Add(countOfTasks)
@@ -249,7 +249,7 @@ func (me *BrokerTestSuite) TestNamed() {
 		id, name := fmt.Sprintf("00000000-0000-0000-0000-000000000%03x", i), fmt.Sprintf("named.%d", i%countOfConsumers)
 		h := NewHeader(id, name)
 		b, err := h.Flush(0)
-		me.Nil(err)
+		ts.Nil(err)
 		func() {
 			sentLock.Lock()
 			defer sentLock.Unlock()
@@ -257,7 +257,7 @@ func (me *BrokerTestSuite) TestNamed() {
 			sent[name] = append(sent[name], id)
 		}()
 		err = sender.Send(h, b)
-		me.Nil(err)
+		ts.Nil(err)
 		if err != nil {
 			// one task is not successfully sent
 			sented.Done()
@@ -269,18 +269,18 @@ func (me *BrokerTestSuite) TestNamed() {
 
 	// make sure nothing left
 	for _, v := range sent {
-		me.Len(v, 0)
+		ts.Len(v, 0)
 	}
 
 	for _, v := range consumers {
-		me.Nil(v.StopAllListeners())
+		ts.Nil(v.StopAllListeners())
 	}
 
 	// close all checking routines
 	rs.Close()
 }
 
-func (me *BrokerTestSuite) TestDuplicated() {
+func (ts *BrokerTestSuite) TestDuplicated() {
 	// make sure one task won't be delievered to
 	// more than once.
 	countOfTasks := 256
@@ -288,41 +288,41 @@ func (me *BrokerTestSuite) TestDuplicated() {
 
 	var (
 		sentLock  sync.Mutex
-		sent      map[string]int = make(map[string]int)
+		sent      = make(map[string]int)
 		sented    sync.WaitGroup
-		rs        *Routines     = NewRoutines()
-		consumers []interface{} = make([]interface{}, 0, countOfConsumers)
+		rs        = NewRoutines()
+		consumers = make([]interface{}, 0, countOfConsumers)
 	)
 
 	for i := 0; i < countOfConsumers; i++ {
 		var (
 			err   error
 			tasks <-chan []byte
-			rc    chan *TaskReceipt = make(chan *TaskReceipt, 10)
+			rc    = make(chan *TaskReceipt, 10)
 			name  string
 		)
-		v, err := me.Gen()
-		me.Nil(err)
+		v, err := ts.Gen()
+		ts.Nil(err)
 
 		name = fmt.Sprintf("duplicated.%d", i)
-		me.Nil(me.Pdc.ProducerHook(ProducerEvent.DeclareTask, name))
+		ts.Nil(ts.Pdc.ProducerHook(ProducerEvent.DeclareTask, name))
 
 		if _, ok := v.(NamedConsumer); ok {
 			tasks, err = v.(NamedConsumer).AddListener(name, rc)
-			me.ConsumerNames = append(me.ConsumerNames, name)
+			ts.ConsumerNames = append(ts.ConsumerNames, name)
 		} else {
 			tasks, err = v.(Consumer).AddListener(rc)
 			name = ""
 		}
-		me.Nil(err)
+		ts.Nil(err)
 
-		go me._simplified_mapper_(rs.New(), rs.Wait(), tasks, rc, name,
+		go ts.simplifiedMapper(rs.New(), rs.Wait(), tasks, rc, name,
 			func(h *Header) {
 				sentLock.Lock()
 				defer sentLock.Unlock()
 
 				_, ok := sent[h.ID()]
-				me.True(ok)
+				ts.True(ok)
 				if ok {
 					sent[h.ID()]++
 					sented.Done()
@@ -336,8 +336,8 @@ func (me *BrokerTestSuite) TestDuplicated() {
 	}
 
 	// a producer sends a series of tasks
-	p, err := me.Gen()
-	me.Nil(err)
+	p, err := ts.Gen()
+	ts.Nil(err)
 	sender := p.(Producer)
 	sented.Add(countOfTasks)
 	for i := 0; i < countOfTasks; i++ {
@@ -345,7 +345,7 @@ func (me *BrokerTestSuite) TestDuplicated() {
 		id, name := fmt.Sprintf("00000000-0000-0000-0000-000000000%03x", i), fmt.Sprintf("duplicated.%d", i%countOfConsumers)
 		h := NewHeader(id, name)
 		b, err := h.Flush(0)
-		me.Nil(err)
+		ts.Nil(err)
 		func() {
 			sentLock.Lock()
 			defer sentLock.Unlock()
@@ -354,7 +354,7 @@ func (me *BrokerTestSuite) TestDuplicated() {
 			sent[id] = 0
 		}()
 		err = sender.Send(h, b)
-		me.Nil(err)
+		ts.Nil(err)
 	}
 
 	// wait until all task received
@@ -365,12 +365,12 @@ func (me *BrokerTestSuite) TestDuplicated() {
 
 	// verify that all slot in 'sent' should be 1
 	for _, v := range sent {
-		me.Equal(1, v)
+		ts.Equal(1, v)
 	}
 }
 
-func (me *BrokerTestSuite) TestExpect() {
-	me.NotNil(me.Pdc.(Object).Expect(ObjT.REPORTER))
-	me.NotNil(me.Pdc.(Object).Expect(ObjT.STORE))
-	me.NotNil(me.Pdc.(Object).Expect(ObjT.ALL))
+func (ts *BrokerTestSuite) TestExpect() {
+	ts.NotNil(ts.Pdc.(Object).Expect(ObjT.Reporter))
+	ts.NotNil(ts.Pdc.(Object).Expect(ObjT.Store))
+	ts.NotNil(ts.Pdc.(Object).Expect(ObjT.All))
 }

@@ -5,17 +5,16 @@ import (
 	"errors"
 )
 
-/*
- A marshaller implemented via json encoding.
- Note: this Marshaller can only work with GenericInvoker.
+/*JsonMarshaller is a marshaller implemented via json encoding.
+Note: this Marshaller can only work with GenericInvoker.
 */
 type JsonMarshaller struct{}
 
-func (me *JsonMarshaller) Prepare(string, interface{}) (err error) {
+func (ms *JsonMarshaller) Prepare(string, interface{}) (err error) {
 	return
 }
 
-func (me *JsonMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, err error) {
+func (ms *JsonMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, err error) {
 	if task == nil {
 		err = errors.New("nil is not acceptable")
 		return
@@ -40,7 +39,7 @@ func (me *JsonMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, err 
 	return
 }
 
-func (me *JsonMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *Task, err error) {
+func (ms *JsonMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *Task, err error) {
 	// decode header
 	if h == nil {
 		h, err = DecodeHeader(b)
@@ -68,7 +67,7 @@ func (me *JsonMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task 
 	return
 }
 
-func (me *JsonMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte, err error) {
+func (ms *JsonMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte, err error) {
 	if report == nil {
 		err = errors.New("nil is not acceptable")
 		return
@@ -93,7 +92,7 @@ func (me *JsonMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte
 	return
 }
 
-func (me *JsonMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (report *Report, err error) {
+func (ms *JsonMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (report *Report, err error) {
 	var payloads *ReportPayload
 
 	// decode header

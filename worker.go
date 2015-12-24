@@ -54,7 +54,7 @@ type _workers struct {
 // - remain: count of workers remain not initiated
 // - reports: array of channels of 'Report'
 // - err: any error
-func (me *_workers) allocate(
+func (wrk *_workers) allocate(
 	name string,
 	tasks <-chan *Task,
 	receipts chan<- *TaskReceipt,
@@ -66,12 +66,12 @@ func (me *_workers) allocate(
 	)
 	defer func() {
 		if err == nil {
-			remain, reports, err = me.more(name, count, share)
+			remain, reports, err = wrk.more(name, count, share)
 		}
 
 		if err != nil {
 			if eid != 0 {
-				_, err_ := me.eventMux.Unregister(eid)
+				_, err_ := wrk.eventMux.Unregister(eid)
 				if err_ != nil {
 					// TODO: log it
 				}
@@ -84,13 +84,13 @@ func (me *_workers) allocate(
 	}()
 
 	err = func() (err error) {
-		me.workersLock.Lock()
-		defer me.workersLock.Unlock()
+		wrk.workersLock.Lock()
+		defer wrk.workersLock.Unlock()
 
-		ws := me.workers.Load().(map[string]*worker)
+		ws := wrk.workers.Load().(map[string]*worker)
 
 		if _, ok := ws[name]; ok {
-			err = errors.New(fmt.Sprintf("name %v exists", name))
+			err = fmt.Errorf("name %v exists", name)
 			return
 		}
 
@@ -102,7 +102,7 @@ func (me *_workers) allocate(
 			reports:  make([]chan *Report, 0, 10),
 		}
 
-		eid, err = me.eventMux.Register(w.rs.Events(), 0)
+		eid, err = wrk.eventMux.Register(w.rs.Events(), 0)
 		if err != nil {
 			return
 		}
@@ -114,7 +114,7 @@ func (me *_workers) allocate(
 			nws[k] = ws[k]
 		}
 		nws[name] = w
-		me.workers.Store(nws)
+		wrk.workers.Store(nws)
 		return
 	}()
 
@@ -130,22 +130,22 @@ func (me *_workers) allocate(
 // returns:
 // - remain: count of workers remain not initiated
 // - err: any error
-func (me *_workers) more(name string, count, share int) (remain int, reports []<-chan *Report, err error) {
+func (wrk *_workers) more(name string, count, share int) (remain int, reports []<-chan *Report, err error) {
 	remain = count
 	if count <= 0 || share < 0 {
-		err = errors.New(fmt.Sprintf("invalid count/share is provided %v", count, share))
+		err = fmt.Errorf("invalid count/share is provided %v", count, share)
 		return
 	}
 
 	reports = make([]<-chan *Report, 0, remain)
 
 	// locking
-	ws := me.workers.Load().(map[string]*worker)
+	ws := wrk.workers.Load().(map[string]*worker)
 
 	// checking existence of Id
 	w, ok := ws[name]
 	if !ok {
-		err = errors.New(fmt.Sprintf("%d group of worker not found"))
+		err = fmt.Errorf("%d group of worker not found")
 		return
 	}
 
@@ -163,7 +163,7 @@ func (me *_workers) more(name string, count, share int) (remain int, reports []<
 		if share > 0 && remain != count && remain%share == 0 {
 			r = add()
 		}
-		go me._worker_routine_(
+		go wrk.workerRoutine(
 			w.rs.New(),
 			w.rs.Wait(),
 			w.rs.Events(),
@@ -180,27 +180,27 @@ func (me *_workers) more(name string, count, share int) (remain int, reports []<
 // Object interface
 //
 
-func (me *_workers) Expect(types int) (err error) {
-	if types != ObjT.WORKER {
-		err = errors.New(fmt.Sprintf("Unsupported types: %v", types))
+func (wrk *_workers) Expect(types int) (err error) {
+	if types != ObjT.Worker {
+		err = fmt.Errorf("Unsupported types: %v", types)
 		return
 	}
 
 	return
 }
 
-func (me *_workers) Events() ([]<-chan *Event, error) {
+func (wrk *_workers) Events() ([]<-chan *Event, error) {
 	return []<-chan *Event{
-		me.events,
+		wrk.events,
 	}, nil
 }
 
-func (me *_workers) Close() (err error) {
-	me.workersLock.Lock()
-	defer me.workersLock.Unlock()
+func (wrk *_workers) Close() (err error) {
+	wrk.workersLock.Lock()
+	defer wrk.workersLock.Unlock()
 
 	// stop all workers routine
-	ws := me.workers.Load().(map[string]*worker)
+	ws := wrk.workers.Load().(map[string]*worker)
 	for _, v := range ws {
 		v.rs.Close()
 		for _, r := range v.reports {
@@ -208,7 +208,7 @@ func (me *_workers) Close() (err error) {
 			close(r)
 		}
 	}
-	me.workers.Store(make(map[string]*worker))
+	wrk.workers.Store(make(map[string]*worker))
 
 	return
 }
@@ -226,7 +226,7 @@ func newWorkers(trans *fnMgr, hooks exHooks) (w *_workers, err error) {
 
 	remain, err := w.eventMux.More(1)
 	if err == nil && remain != 0 {
-		err = errors.New(fmt.Sprintf("Unable to allocate mux routine:%v"))
+		err = fmt.Errorf("Unable to allocate mux routine:%v")
 	}
 	w.eventMux.Handle(func(val interface{}, _ int) {
 		w.events <- val.(*Event)
@@ -239,7 +239,7 @@ func newWorkers(trans *fnMgr, hooks exHooks) (w *_workers, err error) {
 // worker routine
 //
 
-func (me *_workers) _worker_routine_(
+func (wrk *_workers) workerRoutine(
 	quit <-chan int,
 	wait *sync.WaitGroup,
 	events chan<- *Event,
@@ -262,7 +262,7 @@ func (me *_workers) _worker_routine_(
 		if err_ != nil {
 			r, err_ = task.composeReport(Status.Fail, nil, NewErr(0, err_))
 			if err_ != nil {
-				events <- NewEventFromError(ObjT.WORKER, err_)
+				events <- NewEventFromError(ObjT.Worker, err_)
 				return
 			}
 		}
@@ -270,7 +270,7 @@ func (me *_workers) _worker_routine_(
 		if r.Done() || r.Option().MonitorProgress() {
 			if !sent {
 				sent = true
-				me.hooks.ReporterHook(ReporterEvent.BeforeReport, task)
+				wrk.hooks.ReporterHook(ReporterEvent.BeforeReport, task)
 			}
 
 			reports <- r
@@ -282,7 +282,7 @@ func (me *_workers) _worker_routine_(
 		reported := false
 		defer func() {
 			if r := recover(); r != nil {
-				reported = rep(t, Status.Fail, nil, NewErr(ErrCode.Panic, errors.New(fmt.Sprintf("%v", r))), reported)
+				reported = rep(t, Status.Fail, nil, NewErr(ErrCode.Panic, fmt.Errorf("%v", r)), reported)
 			}
 		}()
 
@@ -299,12 +299,12 @@ func (me *_workers) _worker_routine_(
 		reported = rep(t, Status.Progress, nil, nil, reported)
 
 		// call the actuall function, where is the magic
-		ret, err = me.trans.Call(t)
+		ret, err = wrk.trans.Call(t)
 
 		// compose a report -- done / fail
 		if err != nil {
 			status = Status.Fail
-			events <- NewEventFromError(ObjT.WORKER, err_)
+			events <- NewEventFromError(ObjT.Worker, err_)
 		} else {
 			status = Status.Success
 		}

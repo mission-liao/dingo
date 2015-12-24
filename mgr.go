@@ -42,12 +42,12 @@ func newFnMgr() (c *fnMgr) {
 		GenericInvoker
 	}{}
 
-	// JsonSafeMarshaller is ok with LazyInvoker
+	// JSONSafeMarshaller is ok with LazyInvoker
 	ms[Encode.JSONSAFE] = &struct {
 		CustomMarshaller
 		LazyInvoker
 	}{
-		CustomMarshaller{Codec: &JsonSafeCodec{}},
+		CustomMarshaller{Codec: &JSONSafeCodec{}},
 		LazyInvoker{},
 	}
 
@@ -77,13 +77,13 @@ func newFnMgr() (c *fnMgr) {
 	return
 }
 
-func (me *fnMgr) AddIdMaker(id int, m IDMaker) (err error) {
-	me.imsLock.Lock()
-	defer me.imsLock.Unlock()
+func (mgr *fnMgr) AddIDMaker(id int, m IDMaker) (err error) {
+	mgr.imsLock.Lock()
+	defer mgr.imsLock.Unlock()
 
-	ims := me.ims.Load().(map[int]IDMaker)
+	ims := mgr.ims.Load().(map[int]IDMaker)
 	if v, ok := ims[id]; ok {
-		err = errors.New(fmt.Sprintf("marshaller id %v already exists %v", id, v))
+		err = fmt.Errorf("marshaller id %v already exists %v", id, v)
 		return
 	}
 
@@ -92,24 +92,24 @@ func (me *fnMgr) AddIdMaker(id int, m IDMaker) (err error) {
 		nims[k] = ims[k]
 	}
 	nims[id] = m
-	me.ims.Store(nims)
+	mgr.ims.Store(nims)
 	return
 }
 
-func (me *fnMgr) AddMarshaller(id int, m Marshaller) (err error) {
+func (mgr *fnMgr) AddMarshaller(id int, m Marshaller) (err error) {
 	// a Marshaller should depend on an Invoker
 	_, ok := m.(Invoker)
 	if !ok {
-		err = errors.New(fmt.Sprintf("should have Invoker interface, %v", m))
+		err = fmt.Errorf("should have Invoker interface, %v", m)
 		return
 	}
 
-	me.msLock.Lock()
-	defer me.msLock.Unlock()
+	mgr.msLock.Lock()
+	defer mgr.msLock.Unlock()
 
-	ms := me.ms.Load().(map[int]Marshaller)
+	ms := mgr.ms.Load().(map[int]Marshaller)
 	if v, ok := ms[id]; ok {
-		err = errors.New(fmt.Sprintf("marshaller id %v already exists %v", id, v))
+		err = fmt.Errorf("marshaller id %v already exists %v", id, v)
 		return
 	}
 
@@ -118,29 +118,29 @@ func (me *fnMgr) AddMarshaller(id int, m Marshaller) (err error) {
 		nms[k] = ms[k]
 	}
 	nms[id] = m
-	me.ms.Store(nms)
+	mgr.ms.Store(nms)
 	return
 }
 
-func (me *fnMgr) Register(name string, fn interface{}) (err error) {
+func (mgr *fnMgr) Register(name string, fn interface{}) (err error) {
 	if uint(len(name)) >= ^uint(0) {
-		err = errors.New(fmt.Sprintf("length of name exceeds maximum: %v", len(name)))
+		err = fmt.Errorf("length of name exceeds maximum: %v", len(name))
 		return
 	}
 
-	ms := me.ms.Load().(map[int]Marshaller)
+	ms := mgr.ms.Load().(map[int]Marshaller)
 	err = ms[Encode.Default].Prepare(name, fn)
 	if err != nil {
 		return
 	}
 
 	// insert the newly created record
-	me.fn2optLock.Lock()
-	defer me.fn2optLock.Unlock()
+	mgr.fn2optLock.Lock()
+	defer mgr.fn2optLock.Unlock()
 
-	fns := me.fn2opt.Load().(map[string]*fnOpt)
+	fns := mgr.fn2opt.Load().(map[string]*fnOpt)
 	if _, ok := fns[name]; ok {
-		err = errors.New(fmt.Sprintf("name %v already exists", name))
+		err = fmt.Errorf("name %v already exists", name)
 		return
 	}
 	nfns := make(map[string]*fnOpt)
@@ -155,23 +155,23 @@ func (me *fnMgr) Register(name string, fn interface{}) (err error) {
 		}{Encode.Default, Encode.Default},
 		idMaker: ID.Default,
 	}
-	me.fn2opt.Store(nfns)
+	mgr.fn2opt.Store(nfns)
 	return
 }
 
-func (me *fnMgr) SetMarshaller(name string, msTask, msReport int) (err error) {
-	me.fn2optLock.Lock()
-	defer me.fn2optLock.Unlock()
+func (mgr *fnMgr) SetMarshaller(name string, msTask, msReport int) (err error) {
+	mgr.fn2optLock.Lock()
+	defer mgr.fn2optLock.Unlock()
 
-	fns := me.fn2opt.Load().(map[string]*fnOpt)
+	fns := mgr.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fns[name]
 	if !ok {
-		err = errors.New(fmt.Sprintf("name %v doesn't exists", name))
+		err = fmt.Errorf("name %v doesn't exists", name)
 		return
 	}
 
 	// check existence of marshaller IDs
-	ms := me.ms.Load().(map[int]Marshaller)
+	ms := mgr.ms.Load().(map[int]Marshaller)
 	chk := func(id int) (err error) {
 		if v, ok := ms[id]; ok {
 			err = v.Prepare(name, opt.fn)
@@ -179,7 +179,7 @@ func (me *fnMgr) SetMarshaller(name string, msTask, msReport int) (err error) {
 				return
 			}
 		} else {
-			err = errors.New(fmt.Sprintf("marshaller id:%v is not registered", id))
+			err = fmt.Errorf("marshaller id:%v is not registered", id)
 			return
 		}
 		return
@@ -199,23 +199,23 @@ func (me *fnMgr) SetMarshaller(name string, msTask, msReport int) (err error) {
 	}
 	nfns[name].mash.task = msTask
 	nfns[name].mash.report = msReport
-	me.fn2opt.Store(nfns)
+	mgr.fn2opt.Store(nfns)
 
 	return
 }
 
-func (me *fnMgr) SetOption(name string, opt *Option) (err error) {
+func (mgr *fnMgr) SetOption(name string, opt *Option) (err error) {
 	if opt == nil {
 		err = errors.New("nil Option is not acceptable")
 		return
 	}
 
-	me.fn2optLock.Lock()
-	defer me.fn2optLock.Unlock()
+	mgr.fn2optLock.Lock()
+	defer mgr.fn2optLock.Unlock()
 
-	fns := me.fn2opt.Load().(map[string]*fnOpt)
+	fns := mgr.fn2opt.Load().(map[string]*fnOpt)
 	if _, ok := fns[name]; !ok {
-		err = errors.New(fmt.Sprintf("name %v doesn't exists", name))
+		err = fmt.Errorf("name %v doesn't exists", name)
 		return
 	}
 	nfns := make(map[string]*fnOpt)
@@ -223,26 +223,26 @@ func (me *fnMgr) SetOption(name string, opt *Option) (err error) {
 		nfns[k] = fns[k]
 	}
 	nfns[name].opt = opt
-	me.fn2opt.Store(nfns)
+	mgr.fn2opt.Store(nfns)
 
 	return
 }
 
-func (me *fnMgr) SetIDMaker(name string, id int) (err error) {
+func (mgr *fnMgr) SetIDMaker(name string, id int) (err error) {
 	// check existence of id
-	ims := me.ims.Load().(map[int]IDMaker)
+	ims := mgr.ims.Load().(map[int]IDMaker)
 	_, ok := ims[id]
 	if !ok {
-		err = errors.New(fmt.Sprintf("idMaker not found: %v %v", name, id))
+		err = fmt.Errorf("idMaker not found: %v %v", name, id)
 		return
 	}
 
-	me.fn2optLock.Lock()
-	defer me.fn2optLock.Unlock()
+	mgr.fn2optLock.Lock()
+	defer mgr.fn2optLock.Unlock()
 
-	fns := me.fn2opt.Load().(map[string]*fnOpt)
+	fns := mgr.fn2opt.Load().(map[string]*fnOpt)
 	if _, ok := fns[name]; !ok {
-		err = errors.New(fmt.Sprintf("name %v doesn't exists", name))
+		err = fmt.Errorf("name %v doesn't exists", name)
 		return
 	}
 	nfns := make(map[string]*fnOpt)
@@ -250,34 +250,34 @@ func (me *fnMgr) SetIDMaker(name string, id int) (err error) {
 		nfns[k] = fns[k]
 	}
 	nfns[name].idMaker = id
-	me.fn2opt.Store(nfns)
+	mgr.fn2opt.Store(nfns)
 
 	return
 }
 
-func (me *fnMgr) GetOption(name string) (opt *Option, err error) {
-	fns := me.fn2opt.Load().(map[string]*fnOpt)
+func (mgr *fnMgr) GetOption(name string) (opt *Option, err error) {
+	fns := mgr.fn2opt.Load().(map[string]*fnOpt)
 	if fn, ok := fns[name]; ok {
 		opt = fn.opt
 	} else {
-		err = errors.New(fmt.Sprintf("name %v doesn't exists", name))
+		err = fmt.Errorf("name %v doesn't exists", name)
 	}
 
 	return
 }
 
-func (me *fnMgr) ComposeTask(name string, o *Option, args []interface{}) (t *Task, err error) {
-	fn := me.fn2opt.Load().(map[string]*fnOpt)
+func (mgr *fnMgr) ComposeTask(name string, o *Option, args []interface{}) (t *Task, err error) {
+	fn := mgr.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[name]
 	if !ok {
-		err = errors.New(fmt.Sprintf("idMaker option not found: %v %v", name, opt))
+		err = fmt.Errorf("idMaker option not found: %v %v", name, opt)
 		return
 	}
 
-	ims := me.ims.Load().(map[int]IDMaker)
+	ims := mgr.ims.Load().(map[int]IDMaker)
 	m, ok := ims[opt.idMaker]
 	if !ok {
-		err = errors.New(fmt.Sprintf("idMaker not found: %v %v", name, opt))
+		err = fmt.Errorf("idMaker not found: %v %v", name, opt)
 		return
 	}
 
@@ -300,18 +300,18 @@ func (me *fnMgr) ComposeTask(name string, o *Option, args []interface{}) (t *Tas
 	return
 }
 
-func (me *fnMgr) EncodeTask(task *Task) (b []byte, err error) {
-	fn := me.fn2opt.Load().(map[string]*fnOpt)
+func (mgr *fnMgr) EncodeTask(task *Task) (b []byte, err error) {
+	fn := mgr.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[task.Name()]
 	if !ok {
-		err = errors.New(fmt.Sprintf("marshaller option not found: %v", task))
+		err = fmt.Errorf("marshaller option not found: %v", task)
 		return
 	}
 
-	ms := me.ms.Load().(map[int]Marshaller)
+	ms := mgr.ms.Load().(map[int]Marshaller)
 	m, ok := ms[opt.mash.task]
 	if !ok {
-		err = errors.New(fmt.Sprintf("marshaller not found: %v %v", task, opt))
+		err = fmt.Errorf("marshaller not found: %v %v", task, opt)
 		return
 	}
 
@@ -319,25 +319,25 @@ func (me *fnMgr) EncodeTask(task *Task) (b []byte, err error) {
 	return
 }
 
-func (me *fnMgr) DecodeTask(b []byte) (task *Task, err error) {
+func (mgr *fnMgr) DecodeTask(b []byte) (task *Task, err error) {
 	h, err := DecodeHeader(b)
 	if err != nil {
 		return
 	}
 
 	// looking for marshaller-option
-	fn := me.fn2opt.Load().(map[string]*fnOpt)
+	fn := mgr.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[h.Name()]
 	if !ok {
-		err = errors.New(fmt.Sprintf("marshaller option not found: %v", h))
+		err = fmt.Errorf("marshaller option not found: %v", h)
 		return
 	}
 
 	// looking for marshaller
-	ms := me.ms.Load().(map[int]Marshaller)
+	ms := mgr.ms.Load().(map[int]Marshaller)
 	m, ok := ms[opt.mash.task]
 	if !ok {
-		err = errors.New(fmt.Sprintf("marshaller not found: %v", h))
+		err = fmt.Errorf("marshaller not found: %v", h)
 		return
 	}
 
@@ -345,20 +345,20 @@ func (me *fnMgr) DecodeTask(b []byte) (task *Task, err error) {
 	return
 }
 
-func (me *fnMgr) EncodeReport(report *Report) (b []byte, err error) {
+func (mgr *fnMgr) EncodeReport(report *Report) (b []byte, err error) {
 	// looking for marshaller-option
-	fn := me.fn2opt.Load().(map[string]*fnOpt)
+	fn := mgr.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[report.Name()]
 	if !ok {
-		err = errors.New(fmt.Sprintf("marshaller option not found: %v", report))
+		err = fmt.Errorf("marshaller option not found: %v", report)
 		return
 	}
 
 	// looking for marshaller
-	ms := me.ms.Load().(map[int]Marshaller)
+	ms := mgr.ms.Load().(map[int]Marshaller)
 	m, ok := ms[opt.mash.report]
 	if !ok {
-		err = errors.New(fmt.Sprintf("marshaller not found: %v %v", report, opt))
+		err = fmt.Errorf("marshaller not found: %v %v", report, opt)
 		return
 	}
 
@@ -366,25 +366,25 @@ func (me *fnMgr) EncodeReport(report *Report) (b []byte, err error) {
 	return
 }
 
-func (me *fnMgr) DecodeReport(b []byte) (report *Report, err error) {
+func (mgr *fnMgr) DecodeReport(b []byte) (report *Report, err error) {
 	h, err := DecodeHeader(b)
 	if err != nil {
 		return
 	}
 
 	// looking for marshaller-option
-	fn := me.fn2opt.Load().(map[string]*fnOpt)
+	fn := mgr.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[h.Name()]
 	if !ok {
-		err = errors.New(fmt.Sprintf("marshaller option not found: %v", h))
+		err = fmt.Errorf("marshaller option not found: %v", h)
 		return
 	}
 
 	// looking for marshaller
-	ms := me.ms.Load().(map[int]Marshaller)
+	ms := mgr.ms.Load().(map[int]Marshaller)
 	m, ok := ms[opt.mash.report]
 	if !ok {
-		err = errors.New(fmt.Sprintf("marshaller not found: %v", h))
+		err = fmt.Errorf("marshaller not found: %v", h)
 		return
 	}
 
@@ -392,20 +392,20 @@ func (me *fnMgr) DecodeReport(b []byte) (report *Report, err error) {
 	return
 }
 
-func (me *fnMgr) Call(t *Task) (ret []interface{}, err error) {
+func (mgr *fnMgr) Call(t *Task) (ret []interface{}, err error) {
 	// looking for marshaller-option
-	fn := me.fn2opt.Load().(map[string]*fnOpt)
+	fn := mgr.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[t.Name()]
 	if !ok {
-		err = errors.New(fmt.Sprintf("marshaller option not found: %v", t))
+		err = fmt.Errorf("marshaller option not found: %v", t)
 		return
 	}
 
 	// looking for the marshaller
-	ms := me.ms.Load().(map[int]Marshaller)
+	ms := mgr.ms.Load().(map[int]Marshaller)
 	m, ok := ms[opt.mash.task]
 	if !ok {
-		err = errors.New(fmt.Sprintf("marshaller not found: %v %v", t, opt))
+		err = fmt.Errorf("marshaller not found: %v %v", t, opt)
 		return
 	}
 
@@ -413,20 +413,20 @@ func (me *fnMgr) Call(t *Task) (ret []interface{}, err error) {
 	return
 }
 
-func (me *fnMgr) Return(r *Report) (err error) {
+func (mgr *fnMgr) Return(r *Report) (err error) {
 	// looking for marshaller-option
-	fn := me.fn2opt.Load().(map[string]*fnOpt)
+	fn := mgr.fn2opt.Load().(map[string]*fnOpt)
 	opt, ok := fn[r.Name()]
 	if !ok {
-		err = errors.New(fmt.Sprintf("marshaller option not found: %v", r))
+		err = fmt.Errorf("marshaller option not found: %v", r)
 		return
 	}
 
 	// looking for marshaller
-	ms := me.ms.Load().(map[int]Marshaller)
+	ms := mgr.ms.Load().(map[int]Marshaller)
 	m, ok := ms[opt.mash.report]
 	if !ok {
-		err = errors.New(fmt.Sprintf("marshaller not found: %v %v", r, opt))
+		err = fmt.Errorf("marshaller not found: %v %v", r, opt)
 		return
 	}
 

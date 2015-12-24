@@ -10,12 +10,12 @@ type localBridgeTestSuite struct {
 	BridgeTestSuite
 }
 
-func (me *localBridgeTestSuite) SetupTest() {
-	me.BridgeTestSuite.SetupTest()
-	me.Nil(me.bg.AttachProducer(nil))
-	me.Nil(me.bg.AttachConsumer(nil, nil))
-	me.Nil(me.bg.AttachReporter(nil))
-	me.Nil(me.bg.AttachStore(nil))
+func (ts *localBridgeTestSuite) SetupTest() {
+	ts.BridgeTestSuite.SetupTest()
+	ts.Nil(ts.bg.AttachProducer(nil))
+	ts.Nil(ts.bg.AttachConsumer(nil, nil))
+	ts.Nil(ts.bg.AttachReporter(nil))
+	ts.Nil(ts.bg.AttachStore(nil))
 }
 
 func TestBridgeLocalSuite(t *testing.T) {
