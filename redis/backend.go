@@ -168,8 +168,6 @@ clean:
 func (me *backend) _store_routine_(quit <-chan int, done chan<- int, events chan<- *dingo.Event, reports chan<- []byte, id dingo.Meta) {
 	conn := me.pool.Get()
 	defer func() {
-		done <- 1
-
 		// delete key in redis
 		_, err := conn.Do("DEL", getKey(id))
 		if err != nil {
@@ -180,6 +178,8 @@ func (me *backend) _store_routine_(quit <-chan int, done chan<- int, events chan
 		if err != nil {
 			events <- dingo.NewEventFromError(dingo.ObjT.Store, err)
 		}
+
+		done <- 1
 	}()
 
 finished:

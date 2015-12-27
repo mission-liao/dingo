@@ -212,7 +212,7 @@ func (dg *App) allocateMappers() (err error) {
 			tasks  <-chan *Task
 		)
 		for remain = dg.cfg.Mappers_; remain > 0; remain-- {
-			receipts := make(chan *TaskReceipt, 10)
+			receipts := make(chan *TaskReceipt, 10) // TODO: config
 			if tasks, err = dg.b.AddListener(receipts); err != nil {
 				return
 			}
@@ -256,6 +256,8 @@ func (dg *App) Close() (err error) {
 			chk(s.Close())
 		}
 	}
+
+	chk(dg.b.Close())
 
 	// shutdown mux
 	dg.eventMux.Close()

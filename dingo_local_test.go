@@ -65,15 +65,15 @@ func TestDingoLocalSingleSuite(t *testing.T) {
 
 func (me *localSingleAppTestSuite) TestIgnoreReport() {
 	// initiate workers
-	me.Nil(me.App_.Register(
+	me.Nil(me.app.Register(
 		"TestIgnoreReport", func() {},
 	))
-	remain, err := me.App_.Allocate("TestIgnoreReport", 1, 1)
+	remain, err := me.app.Allocate("TestIgnoreReport", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
 	// initiate a task with an option(IgnoreReport == true)
-	reports, err := me.App_.Call(
+	reports, err := me.app.Call(
 		"TestIgnoreReport",
 		dingo.NewOption().SetIgnoreReport(true).SetMonitorProgress(true),
 	)
@@ -195,20 +195,20 @@ func (me *localSingleAppTestSuite) TestMyMarshaller() {
 
 	// register marshaller
 	mid := int(101)
-	err := me.App_.AddMarshaller(mid, &struct {
+	err := me.app.AddMarshaller(mid, &struct {
 		testMyInvoker
 		testMyMarshaller
 	}{})
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.App_.Register("TestMyMarshaller", fn))
-	me.Nil(me.App_.SetMarshaller("TestMyMarshaller", mid, mid))
-	remain, err := me.App_.Allocate("TestMyMarshaller", 1, 1)
+	me.Nil(me.app.Register("TestMyMarshaller", fn))
+	me.Nil(me.app.SetMarshaller("TestMyMarshaller", mid, mid))
+	remain, err := me.app.Allocate("TestMyMarshaller", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
-	reports, err := me.App_.Call(
+	reports, err := me.app.Call(
 		"TestMyMarshaller",
 		dingo.NewOption(),
 		12345, "mission",
@@ -260,7 +260,7 @@ func (me *localSingleAppTestSuite) TestCustomMarshaller() {
 
 	// register marshaller
 	mid := int(102)
-	err := me.App_.AddMarshaller(mid, &struct {
+	err := me.app.AddMarshaller(mid, &struct {
 		testMyInvoker
 		dingo.CustomMarshaller
 	}{
@@ -270,14 +270,14 @@ func (me *localSingleAppTestSuite) TestCustomMarshaller() {
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.App_.Register("TestCustomMarshaller", fn))
-	me.Nil(me.App_.SetMarshaller("TestCustomMarshaller", mid, mid))
-	remain, err := me.App_.Allocate("TestCustomMarshaller", 1, 1)
+	me.Nil(me.app.Register("TestCustomMarshaller", fn))
+	me.Nil(me.app.SetMarshaller("TestCustomMarshaller", mid, mid))
+	remain, err := me.app.Allocate("TestCustomMarshaller", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
 	// initiate a task with an option(IgnoreReport == true)
-	reports, err := me.App_.Call(
+	reports, err := me.app.Call(
 		"TestCustomMarshaller", dingo.NewOption().SetMonitorProgress(true), 12345, "mission",
 	)
 	me.Nil(err)
@@ -335,7 +335,7 @@ func (me *localSingleAppTestSuite) TestCustomMarshallerWithMinimalFunc() {
 
 	// register marshaller
 	mid := int(103)
-	err := me.App_.AddMarshaller(mid, &struct {
+	err := me.app.AddMarshaller(mid, &struct {
 		testMyInvoker2
 		dingo.CustomMarshaller
 	}{
@@ -345,14 +345,14 @@ func (me *localSingleAppTestSuite) TestCustomMarshallerWithMinimalFunc() {
 	me.Nil(err)
 
 	// allocate workers
-	me.Nil(me.App_.Register("TestCustomMarshallerWithMinimalFunc", fn))
-	me.Nil(me.App_.SetMarshaller("TestCustomMarshallerWithMinimalFunc", mid, mid))
-	remain, err := me.App_.Allocate("TestCustomMarshallerWithMinimalFunc", 1, 1)
+	me.Nil(me.app.Register("TestCustomMarshallerWithMinimalFunc", fn))
+	me.Nil(me.app.SetMarshaller("TestCustomMarshallerWithMinimalFunc", mid, mid))
+	remain, err := me.app.Allocate("TestCustomMarshallerWithMinimalFunc", 1, 1)
 	me.Equal(0, remain)
 	me.Nil(err)
 
 	// initiate a task with an option(IgnoreReport == true)
-	reports, err := me.App_.Call(
+	reports, err := me.app.Call(
 		"TestCustomMarshallerWithMinimalFunc", dingo.NewOption().SetMonitorProgress(true),
 	)
 	me.Nil(err)

@@ -148,7 +148,7 @@ func (wrk *_workers) more(name string, count, share int) (remain int, reports []
 	}
 
 	add := func() (r chan *Report) {
-		r = make(chan *Report, 10)
+		r = make(chan *Report, 10) // TODO: config
 		reports = append(reports, r)
 		w.reports = append(w.reports, r)
 		return

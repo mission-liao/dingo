@@ -10,137 +10,6 @@ import (
 
 /*
  */
-type DingoSingleAppTestSuite struct {
-	suite.Suite
-
-	GenApp        func() (*dingo.App, error)
-	App_          *dingo.App
-	eventRoutines *dingo.Routines
-}
-
-func (ts *DingoSingleAppTestSuite) SetupSuite() {
-	ts.eventRoutines = dingo.NewRoutines()
-}
-func (ts *DingoSingleAppTestSuite) TearDownSuite() {}
-func (ts *DingoSingleAppTestSuite) SetupTest() {
-	var err error
-	defer func() {
-		ts.Nil(err)
-	}()
-
-	ts.App_, err = ts.GenApp()
-	if err != nil {
-		return
-	}
-
-	_, events, err := ts.App_.Listen(dingo.ObjT.All, dingo.EventLvl.Debug, 0)
-	if err != nil {
-		return
-	}
-
-	go func(quit <-chan int, wait *sync.WaitGroup, events <-chan *dingo.Event) {
-		defer wait.Done()
-		chk := func(e *dingo.Event) {
-			if e.Level >= dingo.EventLvl.Warning {
-				ts.Nil(e)
-			}
-		}
-		for {
-			select {
-			case _, _ = <-quit:
-				goto clean
-			case e, ok := <-events:
-				if !ok {
-					goto clean
-				}
-				chk(e)
-			}
-		}
-	clean:
-		for {
-			select {
-			default:
-				break clean
-			case e, ok := <-events:
-				if !ok {
-					break clean
-				}
-				chk(e)
-			}
-		}
-	}(ts.eventRoutines.New(), ts.eventRoutines.Wait(), events)
-}
-
-func (ts *DingoSingleAppTestSuite) TearDownTest() {
-	ts.Nil(ts.App_.Close())
-	ts.eventRoutines.Close()
-}
-
-//
-// test cases
-//
-
-func (ts *DingoSingleAppTestSuite) TestBasic() {
-	// register a set of workers
-	called := 0
-	err := ts.App_.Register("TestBasic",
-		func(n int) int {
-			called = n
-			return n + 1
-		},
-	)
-	ts.Nil(err)
-	remain, err := ts.App_.Allocate("TestBasic", 1, 1)
-	ts.Nil(err)
-	ts.Equal(0, remain)
-
-	// call that function
-	reports, err := ts.App_.Call("TestBasic", dingo.NewOption().SetMonitorProgress(true), 5)
-	ts.Nil(err)
-	ts.NotNil(reports)
-
-	// await for reports
-	status := []int16{
-		dingo.Status.Sent,
-		dingo.Status.Progress,
-		dingo.Status.Success,
-	}
-	for {
-		done := false
-		select {
-		case v, ok := <-reports:
-			ts.True(ok)
-			if !ok {
-				break
-			}
-
-			// make sure the order of status is right
-			ts.True(len(status) > 0)
-			if len(status) > 0 {
-				ts.Equal(status[0], v.Status())
-				status = status[1:]
-			}
-
-			if v.Done() {
-				ts.Equal(5, called)
-				ts.Len(v.Return(), 1)
-				if len(v.Return()) > 0 {
-					ret, ok := v.Return()[0].(int)
-					ts.True(ok)
-					ts.Equal(called+1, ret)
-				}
-				done = true
-			}
-		}
-
-		if done {
-			break
-		}
-	}
-}
-
-/*
- */
 type DingoMultiAppTestSuite struct {
 	suite.Suite
 
@@ -207,6 +76,7 @@ func (ts *DingoMultiAppTestSuite) TearDownTest() {
 	}
 
 	ts.eventRoutines.Close()
+	ts.Callers, ts.Workers = []*dingo.App{}, []*dingo.App{}
 }
 
 func (ts *DingoMultiAppTestSuite) listenTo(events <-chan *dingo.Event) {
@@ -326,6 +196,65 @@ func (ts *DingoMultiAppTestSuite) TestOrder() {
 				// plus 'b'
 				ts.Equal(fmt.Sprintf("%d.%db", k, i), ret[1].(string))
 			}
+		}
+	}
+}
+
+func (ts *DingoMultiAppTestSuite) TestSameID() {
+	var (
+		err          error
+		countOfTasks = 5
+		reports      = make([][]*dingo.Result, 0, len(ts.Callers))
+		fn           = func(n int, msg string) (int, string) {
+			return n + 1000, "the msg: " + msg
+		}
+	)
+	defer func() {
+		ts.Nil(err)
+	}()
+
+	// prepare caller
+	for k, v := range ts.Callers {
+		name := fmt.Sprintf("TestSameID.%v", k)
+
+		ts.register(name, fn)
+		ts.allocate(name, 2, 2)
+
+		err = v.AddIDMaker(101, &testIDMaker{})
+		if err != nil {
+			return
+		}
+		err = v.SetIDMaker(name, 101)
+		if err != nil {
+			return
+		}
+
+		rs := []*dingo.Result{}
+		for i := 0; i < countOfTasks; i++ {
+			rs = append(rs, dingo.NewResult(
+				v.Call(
+					name, nil,
+					k*100+i, fmt.Sprintf("%d", k*100+i),
+				)))
+		}
+		reports = append(reports, rs)
+	}
+
+	// checking result
+	received := 0
+	defer func() {
+		ts.Equal(countOfTasks*len(ts.Callers), received)
+	}()
+	for k, rs := range reports {
+		for i, r := range rs {
+			err = r.Wait(0)
+			if err != nil {
+				return
+			}
+			ts.True(r.Last.OK())
+			ts.Equal(1000+k*100+i, r.Last.Return()[0].(int))
+			ts.Equal(fmt.Sprintf("the msg: %d", k*100+i), r.Last.Return()[1].(string))
+			received++
 		}
 	}
 }

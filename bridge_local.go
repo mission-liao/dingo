@@ -27,8 +27,8 @@ func newLocalBridge(args ...interface{}) (b bridge) {
 		events:    make(chan *Event, 10),
 		listeners: NewRoutines(),
 		reporters: NewRoutines(),
-		broker:    make(chan *Task, 10),
-		pollers:   make(chan *localStorePoller, 10),
+		broker:    make(chan *Task, 10),             // TODO: config
+		pollers:   make(chan *localStorePoller, 10), // TODO: config
 		supported: ObjT.Reporter | ObjT.Store | ObjT.Producer | ObjT.Consumer,
 	}
 	b = v
@@ -232,7 +232,7 @@ func (bdg *localBridge) Report(reports <-chan *Report) (err error) {
 				pollers <- p
 
 				// avoid busy looping
-				<-time.After(100 * time.Millisecond)
+				<-time.After(3 * time.Millisecond) // TODO: config it
 
 			case v, ok := <-inputs:
 				if !ok {
