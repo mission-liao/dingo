@@ -44,7 +44,7 @@ func TestMuxDifferentType(t *testing.T) {
 		return
 	}
 	defer func() {
-		_, err2 := me.Unregister(iInt)
+		_, err2 := m.Unregister(iInt)
 		ass.Nil(err2)
 	}()
 	ass.NotEqual(0, iInt)
