@@ -12,30 +12,41 @@ import (
 //
 
 func TestMuxDifferentType(t *testing.T) {
-	ass := assert.New(t)
+	var (
+		err error
+		ass = assert.New(t)
+	)
+	defer func() {
+		ass.Nil(err)
+	}()
 
 	m := newMux()
 	remain, err := m.More(3)
 	ass.Equal(0, remain)
-	ass.Nil(err)
 	defer m.Close()
 
 	// prepare for string channel
 	cStr := make(chan string, 1)
 	iStr, err := m.Register(cStr, 0)
-	ass.Nil(err)
 	if err != nil {
 		return
 	}
+	defer func() {
+		_, err2 := m.Unregister(iStr)
+		ass.Nil(err2)
+	}()
 	ass.Equal(0, iStr)
 
 	// prepare for integer channel
 	cInt := make(chan int, 1)
 	iInt, err := m.Register(cInt, 0)
-	ass.Nil(err)
 	if err != nil {
 		return
 	}
+	defer func() {
+		_, err2 := me.Unregister(iInt)
+		ass.Nil(err2)
+	}()
 	ass.NotEqual(0, iInt)
 
 	// add a handler
@@ -79,12 +90,17 @@ func TestMuxDifferentType(t *testing.T) {
 }
 
 func TestMuxChannelClose(t *testing.T) {
-	ass := assert.New(t)
+	var (
+		err error
+		ass = assert.New(t)
+	)
+	defer func() {
+		ass.Nil(err)
+	}()
 
 	m := newMux()
 	remain, err := m.More(1)
 	ass.Equal(0, remain)
-	ass.Nil(err)
 	defer m.Close()
 
 	ch := make(chan string, 2)
@@ -94,7 +110,6 @@ func TestMuxChannelClose(t *testing.T) {
 	close(ch)
 
 	id, err := m.Register(ch, 0)
-	ass.Nil(err)
 
 	seq := 0
 	m.Handle(func(val interface{}, idx int) {

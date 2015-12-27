@@ -183,8 +183,7 @@ func (dg *App) attachObject(obj Object, types int) (err error) {
 		}
 
 		for _, id := range eids {
-			_, err_ := dg.eventMux.Unregister(id)
-			if err_ != nil {
+			if _, err_ := dg.eventMux.Unregister(id); err_ != nil {
 				// TODO: log it
 			}
 		}
@@ -624,8 +623,7 @@ func (dg *App) Call(name string, opt *Option, args ...interface{}) (reports <-ch
 	}
 
 	// a blocking call to broker component
-	err = dg.b.SendTask(t)
-	if err != nil {
+	if err = dg.b.SendTask(t); err != nil {
 		return
 	}
 

@@ -7,7 +7,7 @@ import (
 )
 
 type remoteBridgeTestSuite struct {
-	BridgeTestSuite
+	bridgeTestSuite
 
 	brk Broker
 	bkd Backend
@@ -16,7 +16,7 @@ type remoteBridgeTestSuite struct {
 func (ts *remoteBridgeTestSuite) SetupTest() {
 	var err error
 
-	ts.BridgeTestSuite.SetupTest()
+	ts.bridgeTestSuite.SetupTest()
 
 	// broker
 	ts.brk, err = NewLocalBroker(DefaultConfig(), nil)
@@ -37,12 +37,12 @@ func (ts *remoteBridgeTestSuite) TearDownTest() {
 	ts.Nil(ts.brk.(Object).Close())
 	ts.Nil(ts.bkd.(Object).Close())
 
-	ts.BridgeTestSuite.TearDownTest()
+	ts.bridgeTestSuite.TearDownTest()
 }
 
 func TestBridgeRemoteSuite(t *testing.T) {
 	suite.Run(t, &remoteBridgeTestSuite{
-		BridgeTestSuite: BridgeTestSuite{
+		bridgeTestSuite: bridgeTestSuite{
 			name: "",
 		},
 	})
@@ -118,27 +118,6 @@ func (ts *remoteBridgeTestSuite) TestAddListener() {
 	tasks, err := bg.AddListener(make(chan *TaskReceipt, 10))
 	ts.Nil(tasks)
 	ts.NotNil(err)
-}
-
-func (ts *remoteBridgeTestSuite) TestAddNamedListener() {
-	var (
-		bg  = newRemoteBridge(ts.trans)
-		err error
-	)
-	defer func() {
-		ts.Nil(err)
-	}()
-
-	// register a task
-	err = ts.trans.Register("TestAddNamedListener", func() {})
-	if err != nil {
-		return
-	}
-
-	// add a named listener, should fail
-	tasks, err2 := bg.AddNamedListener("TestAddNamedListener", make(chan *TaskReceipt, 10))
-	ts.Nil(tasks)
-	ts.NotNil(err2)
 }
 
 func (ts *remoteBridgeTestSuite) TestReport() {

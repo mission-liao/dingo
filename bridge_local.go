@@ -138,7 +138,7 @@ func (bdg *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *Tas
 			}
 		}
 		close(output)
-	}(bdg.listeners.New(), bdg.listeners.Wait(), bdg.listeners.Events(), bdg.broker, tasks2, rcpt)
+	}(bdg.listeners.New(), bdg.listeners.Wait(), bdg.events, bdg.broker, tasks2, rcpt)
 
 	return
 }
@@ -200,12 +200,11 @@ func (bdg *localBridge) Report(reports <-chan *Report) (err error) {
 					goto clean
 				}
 				id, name = p.task.ID(), p.task.Name()
-
 				if ids, ok := watched[name]; ok {
 					if _, ok := ids[id]; ok {
 						events <- NewEventFromError(
 							ObjT.Store,
-							fmt.Errorf("duplicated polling found: %v", id),
+							fmt.Errorf("duplicated polling found: %v %v", name, id),
 						)
 						break
 					}
@@ -305,7 +304,7 @@ func (bdg *localBridge) Report(reports <-chan *Report) (err error) {
 				}
 			}
 		}
-	}(bdg.reporters.New(), bdg.reporters.Wait(), bdg.reporters.Events(), reports, bdg.pollers)
+	}(bdg.reporters.New(), bdg.reporters.Wait(), bdg.events, reports, bdg.pollers)
 
 	return
 }

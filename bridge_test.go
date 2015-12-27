@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type BridgeTestSuite struct {
+type bridgeTestSuite struct {
 	suite.Suite
 
 	name     string
@@ -17,15 +17,15 @@ type BridgeTestSuite struct {
 	eventMux *mux
 }
 
-func (ts *BridgeTestSuite) SetupSuite() {
+func (ts *bridgeTestSuite) SetupSuite() {
 	ts.eventMux = newMux()
 	ts.trans = newFnMgr()
 }
 
-func (ts *BridgeTestSuite) TearDownSuite() {
+func (ts *bridgeTestSuite) TearDownSuite() {
 }
 
-func (ts *BridgeTestSuite) SetupTest() {
+func (ts *bridgeTestSuite) SetupTest() {
 	// prepare Bridge
 	ts.bg = newBridge(ts.name, ts.trans)
 
@@ -44,7 +44,7 @@ func (ts *BridgeTestSuite) SetupTest() {
 	})
 }
 
-func (ts *BridgeTestSuite) TearDownTest() {
+func (ts *bridgeTestSuite) TearDownTest() {
 	ts.Nil(ts.bg.Close())
 
 	for _, v := range ts.events {
@@ -56,20 +56,20 @@ func (ts *BridgeTestSuite) TearDownTest() {
 	ts.eventMux.Close()
 }
 
-func (ts *BridgeTestSuite) send(reports chan<- *Report, task *Task, s int16) {
+func (ts *bridgeTestSuite) send(reports chan<- *Report, task *Task, s int16) {
 	r, err := task.composeReport(s, nil, nil)
 	ts.Nil(err)
 
 	reports <- r
 }
 
-func (ts *BridgeTestSuite) chk(expected *Task, got *Report, s int16) {
+func (ts *bridgeTestSuite) chk(expected *Task, got *Report, s int16) {
 	ts.Equal(expected.ID(), got.ID())
 	ts.Equal(expected.Name(), got.Name())
 	ts.Equal(s, got.Status())
 }
 
-func (ts *BridgeTestSuite) gen(reports chan<- *Report, task *Task, wait *sync.WaitGroup) {
+func (ts *bridgeTestSuite) gen(reports chan<- *Report, task *Task, wait *sync.WaitGroup) {
 	defer wait.Done()
 
 	ts.Nil(ts.bg.(exHooks).ReporterHook(ReporterEvent.BeforeReport, task))
@@ -79,7 +79,7 @@ func (ts *BridgeTestSuite) gen(reports chan<- *Report, task *Task, wait *sync.Wa
 	ts.send(reports, task, Status.Success)
 }
 
-func (ts *BridgeTestSuite) chks(task *Task, wait *sync.WaitGroup) {
+func (ts *bridgeTestSuite) chks(task *Task, wait *sync.WaitGroup) {
 	defer wait.Done()
 
 	r, err := ts.bg.Poll(task)
@@ -94,7 +94,7 @@ func (ts *BridgeTestSuite) chks(task *Task, wait *sync.WaitGroup) {
 // test cases
 //
 
-func (ts *BridgeTestSuite) TestSendTask() {
+func (ts *bridgeTestSuite) TestSendTask() {
 	ts.trans.Register(
 		"SendTask",
 		func() {},
@@ -124,7 +124,7 @@ func (ts *BridgeTestSuite) TestSendTask() {
 	}
 }
 
-func (ts *BridgeTestSuite) TestAddListener() {
+func (ts *bridgeTestSuite) TestAddListener() {
 	ts.trans.Register(
 		"AddListener",
 		func() {},
@@ -182,12 +182,12 @@ func (ts *BridgeTestSuite) TestAddListener() {
 	ts.False(ok)
 }
 
-func (ts *BridgeTestSuite) TestMultipleClose() {
+func (ts *bridgeTestSuite) TestMultipleClose() {
 	ts.Nil(ts.bg.Close())
 	ts.Nil(ts.bg.Close())
 }
 
-func (ts *BridgeTestSuite) TestReport() {
+func (ts *bridgeTestSuite) TestReport() {
 	ts.Nil(ts.trans.Register(
 		"Report",
 		func() {},
@@ -227,7 +227,7 @@ func (ts *BridgeTestSuite) TestReport() {
 	}
 }
 
-func (ts *BridgeTestSuite) TestPoll() {
+func (ts *bridgeTestSuite) TestPoll() {
 	ts.Nil(ts.trans.Register(
 		"Poll",
 		func() {},
@@ -295,7 +295,7 @@ func (ts *BridgeTestSuite) TestPoll() {
 	}
 }
 
-func (ts *BridgeTestSuite) TestExist() {
+func (ts *bridgeTestSuite) TestExist() {
 	ts.True(ts.bg.Exists(ObjT.Reporter))
 	ts.True(ts.bg.Exists(ObjT.Consumer))
 	ts.True(ts.bg.Exists(ObjT.Producer))
@@ -306,7 +306,7 @@ func (ts *BridgeTestSuite) TestExist() {
 	ts.False(ts.bg.Exists(ObjT.All))
 }
 
-func (ts *BridgeTestSuite) TestFinalReportWhenShutdown() {
+func (ts *bridgeTestSuite) TestFinalReportWhenShutdown() {
 	// when exiting, remaining polling should be closed,
 	// and a final report with
 
@@ -341,7 +341,7 @@ func (ts *BridgeTestSuite) TestFinalReportWhenShutdown() {
 	ts.Equal(ErrCode.Shutdown, o.Error().Code())
 }
 
-func (ts *BridgeTestSuite) TestDifferentReportsWithSameID() {
+func (ts *bridgeTestSuite) TestDifferentReportsWithSameID() {
 	// bridge should be ok when different reports have the same ID
 	var (
 		countOfTypes = 10
@@ -381,4 +381,22 @@ func (ts *BridgeTestSuite) TestDifferentReportsWithSameID() {
 	}
 	// wait for all chks routine
 	wait.Wait()
+}
+
+func (ts *bridgeTestSuite) TestAddNamedListener() {
+	var err error
+	defer func() {
+		ts.Nil(err)
+	}()
+
+	// register a task
+	err = ts.trans.Register("TestAddNamedListener", func() {})
+	if err != nil {
+		return
+	}
+
+	// add a named listener, should fail
+	tasks, err2 := ts.bg.AddNamedListener("TestAddNamedListener", make(chan *TaskReceipt, 10))
+	ts.Nil(tasks)
+	ts.NotNil(err2)
 }

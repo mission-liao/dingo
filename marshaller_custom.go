@@ -144,8 +144,7 @@ func (ms *CustomMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, er
 func (ms *CustomMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *Task, err error) {
 	// decode header
 	if h == nil {
-		h, err = DecodeHeader(b)
-		if err != nil {
+		if h, err = DecodeHeader(b); err != nil {
 			return
 		}
 	}
@@ -157,12 +156,16 @@ func (ms *CustomMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (tas
 		}
 	}()
 
-	bs, err := DecomposeBytes(h, b)
-	if err != nil {
+	var (
+		bs   [][]byte
+		args = []interface{}{}
+		o    *Option
+	)
+
+	if bs, err = DecomposeBytes(h, b); err != nil {
 		return
 	}
 
-	var args = []interface{}{}
 	// option would only occupy 1 slot
 	if len(bs) > 1 {
 		if ms.Codec == nil {
@@ -176,8 +179,9 @@ func (ms *CustomMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (tas
 	}
 
 	// decode option
-	var o *Option
-	err = json.Unmarshal(bs[len(bs)-1], &o)
+	if err = json.Unmarshal(bs[len(bs)-1], &o); err != nil {
+		return
+	}
 	task = &Task{
 		H: h,
 		P: &TaskPayload{
@@ -232,8 +236,7 @@ func (ms *CustomMarshaller) EncodeReport(fn interface{}, report *Report) (b []by
 func (ms *CustomMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (report *Report, err error) {
 	// decode header
 	if h == nil {
-		h, err = DecodeHeader(b)
-		if err != nil {
+		if h, err = DecodeHeader(b); err != nil {
 			return
 		}
 	}

@@ -30,6 +30,7 @@ func (ts *MarshallerTestSuite) TestTask() {
 	}
 
 	fn := func(float64, string, string) {}
+	ts.Nil(ts.m.Prepare("test", fn))
 
 	{
 		// encode
@@ -64,6 +65,7 @@ func (ts *MarshallerTestSuite) TestReport() {
 		return
 	}
 	fn := func() (a float64, b, c string) { return }
+	ts.Nil(ts.m.Prepare("test", fn))
 
 	{
 		report, err := task.composeReport(
