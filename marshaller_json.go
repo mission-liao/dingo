@@ -24,14 +24,16 @@ func (ms *JsonMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, err 
 	task.H.Reset()
 
 	// encode payload
-	bPayload, err := json.Marshal(task.P)
-	if err != nil {
+	var (
+		bHead, bPayload []byte
+	)
+
+	if bPayload, err = json.Marshal(task.P); err != nil {
 		return
 	}
 
 	// encode header
-	bHead, err := task.H.Flush(uint64(len(bPayload)))
-	if err != nil {
+	if bHead, err = task.H.Flush(uint64(len(bPayload))); err != nil {
 		return
 	}
 
@@ -42,8 +44,7 @@ func (ms *JsonMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, err 
 func (ms *JsonMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *Task, err error) {
 	// decode header
 	if h == nil {
-		h, err = DecodeHeader(b)
-		if err != nil {
+		if h, err = DecodeHeader(b); err != nil {
 			return
 		}
 	}
@@ -57,8 +58,7 @@ func (ms *JsonMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task 
 
 	// decode payload
 	var payload *TaskPayload
-	err = json.Unmarshal(b[h.Length():], &payload)
-	if err == nil {
+	if err = json.Unmarshal(b[h.Length():], &payload); err == nil {
 		task = &Task{
 			H: h,
 			P: payload,
@@ -76,15 +76,16 @@ func (ms *JsonMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte
 	// reset registry
 	report.H.Reset()
 
+	var (
+		bHead, bPayload []byte
+	)
 	// encode payload
-	bPayload, err := json.Marshal(report.P)
-	if err != nil {
+	if bPayload, err = json.Marshal(report.P); err != nil {
 		return
 	}
 
 	// encode header
-	bHead, err := report.H.Flush(uint64(len(bPayload)))
-	if err != nil {
+	if bHead, err = report.H.Flush(uint64(len(bPayload))); err != nil {
 		return
 	}
 
@@ -97,8 +98,7 @@ func (ms *JsonMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (rep
 
 	// decode header
 	if h == nil {
-		h, err = DecodeHeader(b)
-		if err != nil {
+		if h, err = DecodeHeader(b); err != nil {
 			return
 		}
 	}
@@ -111,8 +111,7 @@ func (ms *JsonMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (rep
 	}()
 
 	// decode payload
-	err = json.Unmarshal(b[h.Length():], &payloads)
-	if err == nil {
+	if err = json.Unmarshal(b[h.Length():], &payloads); err == nil {
 		report = &Report{
 			H: h,
 			P: payloads,

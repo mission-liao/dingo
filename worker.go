@@ -71,8 +71,7 @@ func (wrk *_workers) allocate(
 
 		if err != nil {
 			if eid != 0 {
-				_, err_ := wrk.eventMux.Unregister(eid)
-				if err_ != nil {
+				if _, err_ := wrk.eventMux.Unregister(eid); err_ != nil {
 					// TODO: log it
 				}
 			}
@@ -102,8 +101,7 @@ func (wrk *_workers) allocate(
 			reports:  make([]chan *Report, 0, 10),
 		}
 
-		eid, err = wrk.eventMux.Register(w.rs.Events(), 0)
-		if err != nil {
+		if eid, err = wrk.eventMux.Register(w.rs.Events(), 0); err != nil {
 			return
 		}
 
@@ -258,10 +256,8 @@ func (wrk *_workers) workerRoutine(
 			r    *Report
 			err_ error
 		)
-		r, err_ = task.composeReport(status, payload, err)
-		if err_ != nil {
-			r, err_ = task.composeReport(Status.Fail, nil, NewErr(0, err_))
-			if err_ != nil {
+		if r, err_ = task.composeReport(status, payload, err); err_ != nil {
+			if r, err_ = task.composeReport(Status.Fail, nil, NewErr(0, err_)); err_ != nil {
 				events <- NewEventFromError(ObjT.Worker, err_)
 				return
 			}
@@ -299,10 +295,8 @@ func (wrk *_workers) workerRoutine(
 		reported = rep(t, Status.Progress, nil, nil, reported)
 
 		// call the actuall function, where is the magic
-		ret, err = wrk.trans.Call(t)
-
-		// compose a report -- done / fail
-		if err != nil {
+		if ret, err = wrk.trans.Call(t); err != nil {
+			// compose a report -- done / fail
 			status = Status.Fail
 			events <- NewEventFromError(ObjT.Worker, err_)
 		} else {

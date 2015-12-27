@@ -68,8 +68,8 @@ func (bdg *remoteBridge) SendTask(t *Task) (err error) {
 		return
 	}
 
-	b, err := bdg.trans.EncodeTask(t)
-	if err != nil {
+	var b []byte
+	if b, err = bdg.trans.EncodeTask(t); err != nil {
 		return
 	}
 
@@ -86,8 +86,8 @@ func (bdg *remoteBridge) AddNamedListener(name string, receipts <-chan *TaskRece
 		return
 	}
 
-	ts, err := bdg.namedConsumer.AddListener(name, receipts)
-	if err != nil {
+	var ts <-chan []byte
+	if ts, err = bdg.namedConsumer.AddListener(name, receipts); err != nil {
 		return
 	}
 
@@ -106,8 +106,8 @@ func (bdg *remoteBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *Ta
 		return
 	}
 
-	ts, err := bdg.consumer.AddListener(rcpt)
-	if err != nil {
+	var ts <-chan []byte
+	if ts, err = bdg.consumer.AddListener(rcpt); err != nil {
 		return
 	}
 
@@ -122,13 +122,11 @@ func (bdg *remoteBridge) StopAllListeners() (err error) {
 	defer bdg.consumerLock.RUnlock()
 
 	if bdg.consumer != nil {
-		err = bdg.consumer.StopAllListeners()
-		if err != nil {
+		if err = bdg.consumer.StopAllListeners(); err != nil {
 			return
 		}
 	} else if bdg.namedConsumer != nil {
-		err = bdg.namedConsumer.StopAllListeners()
-		if err != nil {
+		if err = bdg.namedConsumer.StopAllListeners(); err != nil {
 			return
 		}
 	}
@@ -147,8 +145,7 @@ func (bdg *remoteBridge) Report(reports <-chan *Report) (err error) {
 	}
 
 	r := make(chan *ReportEnvelope, 10)
-	_, err = bdg.reporter.Report(r)
-	if err != nil {
+	if _, err = bdg.reporter.Report(r); err != nil {
 		return
 	}
 
@@ -157,14 +154,13 @@ func (bdg *remoteBridge) Report(reports <-chan *Report) (err error) {
 		// raise quit signal to receiver(s).
 		defer close(output)
 		out := func(r *Report) {
-			b, err := bdg.trans.EncodeReport(r)
-			if err != nil {
+			if b, err := bdg.trans.EncodeReport(r); err != nil {
 				events <- NewEventFromError(ObjT.Bridge, err)
-				return
-			}
-			output <- &ReportEnvelope{
-				ID:   r,
-				Body: b,
+			} else {
+				output <- &ReportEnvelope{
+					ID:   r,
+					Body: b,
+				}
 			}
 		}
 		for {
@@ -204,8 +200,8 @@ func (bdg *remoteBridge) Poll(t *Task) (reports <-chan *Report, err error) {
 		return
 	}
 
-	r, err := bdg.store.Poll(t)
-	if err != nil {
+	var r <-chan []byte
+	if r, err = bdg.store.Poll(t); err != nil {
 		return
 	}
 
@@ -220,17 +216,19 @@ func (bdg *remoteBridge) Poll(t *Task) (reports <-chan *Report, err error) {
 	) {
 		defer wait.Done()
 		defer func() {
-			err = bdg.store.Done(t)
-			if err != nil {
+			if err = bdg.store.Done(t); err != nil {
 				events <- NewEventFromError(ObjT.Store, err)
 			}
 		}()
 
-		var done bool
+		var (
+			r    *Report
+			err  error
+			done bool
+		)
 		defer func() {
 			if !done {
-				r, err := t.composeReport(Status.Fail, nil, NewErr(ErrCode.Shutdown, errors.New("dingo is shutdown")))
-				if err != nil {
+				if r, err := t.composeReport(Status.Fail, nil, NewErr(ErrCode.Shutdown, errors.New("dingo is shutdown"))); err != nil {
 					events <- NewEventFromError(ObjT.Store, err)
 				} else {
 					outputs <- r
@@ -240,15 +238,13 @@ func (bdg *remoteBridge) Poll(t *Task) (reports <-chan *Report, err error) {
 		}()
 
 		out := func(b []byte) bool {
-			r, err := bdg.trans.DecodeReport(b)
-			if err != nil {
+			if r, err = bdg.trans.DecodeReport(b); err != nil {
 				events <- NewEventFromError(ObjT.Store, err)
 				return done
 			}
 			// fix returns
 			if len(r.Return()) > 0 {
-				err := bdg.trans.Return(r)
-				if err != nil {
+				if err := bdg.trans.Return(r); err != nil {
 					events <- NewEventFromError(ObjT.Store, err)
 				}
 			}
@@ -444,13 +440,11 @@ func (bdg *remoteBridge) ConsumerHook(eventID int, payload interface{}) (err err
 	defer bdg.consumerLock.Unlock()
 
 	if bdg.consumer != nil {
-		err = bdg.consumer.ConsumerHook(eventID, payload)
-		if err != nil {
+		if err = bdg.consumer.ConsumerHook(eventID, payload); err != nil {
 			return
 		}
 	} else if bdg.namedConsumer != nil {
-		err = bdg.namedConsumer.ConsumerHook(eventID, payload)
-		if err != nil {
+		if err = bdg.namedConsumer.ConsumerHook(eventID, payload); err != nil {
 			return
 		}
 	}
@@ -474,12 +468,11 @@ func (bdg *remoteBridge) listenerRoutines(
 		wait.Done()
 	}()
 	out := func(b []byte) {
-		t, err := bdg.trans.DecodeTask(b)
-		if err != nil {
+		if t, err := bdg.trans.DecodeTask(b); err != nil {
 			events <- NewEventFromError(ObjT.Bridge, err)
-			return
+		} else {
+			output <- t
 		}
-		output <- t
 	}
 	for {
 		select {

@@ -119,8 +119,7 @@ func (rs *HetroRoutines) Stop(idx int) (err error) {
 		defer rs.ctrlsLock.Unlock()
 
 		var ok bool
-		c, ok = rs.ctrls[idx]
-		if !ok {
+		if c, ok = rs.ctrls[idx]; !ok {
 			err = fmt.Errorf("Index not found: %v", idx)
 			return
 		}

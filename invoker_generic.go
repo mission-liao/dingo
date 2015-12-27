@@ -20,8 +20,7 @@ type GenericInvoker struct{}
 func (vk *GenericInvoker) convert2slice(v, r reflect.Value, rt reflect.Type) (err error) {
 	r.Set(reflect.MakeSlice(rt, 0, v.Len()))
 	for i := 0; i < v.Len(); i++ {
-		converted, err_ := vk.convert(v.Index(i), rt.Elem())
-		if err_ != nil {
+		if converted, err_ := vk.convert(v.Index(i), rt.Elem()); err_ != nil {
 			err = err_
 			break
 		} else {
@@ -38,8 +37,7 @@ func (vk *GenericInvoker) convert2map(v, r reflect.Value, rt reflect.Type) (err 
 
 	keys := v.MapKeys()
 	for _, k := range keys {
-		converted, err_ := vk.convert(v.MapIndex(k), rt.Elem())
-		if err_ != nil {
+		if converted, err_ := vk.convert(v.MapIndex(k), rt.Elem()); err_ != nil {
 			// propagate error
 			err = err_
 			break
@@ -52,6 +50,11 @@ func (vk *GenericInvoker) convert2map(v, r reflect.Value, rt reflect.Type) (err 
 }
 
 func (vk *GenericInvoker) convert2struct(v, r reflect.Value, rt reflect.Type) (err error) {
+	var (
+		fv, mv reflect.Value
+		ft     reflect.StructField
+		key    string
+	)
 	kind := v.Kind()
 
 	if !(kind == reflect.Map || kind == reflect.Struct) {
@@ -59,14 +62,13 @@ func (vk *GenericInvoker) convert2struct(v, r reflect.Value, rt reflect.Type) (e
 		return
 	}
 	for i := 0; i < r.NumField(); i++ {
-		fv := r.Field(i)
-		if !fv.CanSet() {
+		if fv = r.Field(i); !fv.CanSet() {
 			continue
 		}
 
 		var converted reflect.Value
 
-		ft := rt.Field(i)
+		ft = rt.Field(i)
 		switch kind {
 		case reflect.Map:
 			if ft.Anonymous {
@@ -74,8 +76,7 @@ func (vk *GenericInvoker) convert2struct(v, r reflect.Value, rt reflect.Type) (e
 				break
 			}
 			// json tags
-			key := ft.Tag.Get("json")
-			if key != "" {
+			if key = ft.Tag.Get("json"); key != "" {
 				key = strings.Trim(key, "\"")
 				keys := strings.Split(key, ",")
 				key = keys[0]
@@ -86,8 +87,7 @@ func (vk *GenericInvoker) convert2struct(v, r reflect.Value, rt reflect.Type) (e
 			if key == "" {
 				key = ft.Name
 			}
-			mv := v.MapIndex(reflect.ValueOf(key))
-			if !mv.IsValid() {
+			if mv = v.MapIndex(reflect.ValueOf(key)); !mv.IsValid() {
 				err = fmt.Errorf("Invalid value returned from map by key: %v", ft)
 				break
 			}
@@ -108,14 +108,16 @@ func (vk *GenericInvoker) convert2struct(v, r reflect.Value, rt reflect.Type) (e
 }
 
 func (vk *GenericInvoker) convert(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	var err error
+	var (
+		err error
+		val interface{}
+	)
 
 	if v.IsValid() {
 		if v.Type().Kind() == reflect.Interface {
 			// type assertion
 			// by convert to interface{} and reflect it
-			val := v.Interface()
-			if val == nil {
+			if val = v.Interface(); val == nil {
 				if t.Kind() != reflect.Ptr {
 					err = errors.New("Can't pass nil for non-ptr parameter")
 				}
@@ -205,8 +207,7 @@ func (vk *GenericInvoker) Call(f interface{}, param []interface{}) ([]interface{
 	// convert param into []reflect.Value
 	var in = make([]reflect.Value, funcT.NumIn())
 	for i := 0; i < funcT.NumIn(); i++ {
-		in[i], err = vk.from(param[i], funcT.In(i))
-		if err != nil {
+		if in[i], err = vk.from(param[i], funcT.In(i)); err != nil {
 			return nil, err
 		}
 	}

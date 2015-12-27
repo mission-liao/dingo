@@ -143,27 +143,22 @@ func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 	}
 
 	// init mappers
-	v.mappers, err = newMappers(v.trans, v.b.(exHooks))
-	if err != nil {
+	if v.mappers, err = newMappers(v.trans, v.b.(exHooks)); err != nil {
 		return
 	}
-	err = v.attachObject(v.mappers, ObjT.Mapper)
-	if err != nil {
+	if err = v.attachObject(v.mappers, ObjT.Mapper); err != nil {
 		return
 	}
 	// 'local' mode
-	err = v.allocateMappers()
-	if err != nil {
+	if err = v.allocateMappers(); err != nil {
 		return
 	}
 
 	// init workers
-	v.workers, err = newWorkers(v.trans, v.b.(exHooks))
-	if err != nil {
+	if v.workers, err = newWorkers(v.trans, v.b.(exHooks)); err != nil {
 		return
 	}
-	err = v.attachObject(v.workers, ObjT.Worker)
-	if err != nil {
+	if err = v.attachObject(v.workers, ObjT.Worker); err != nil {
 		return
 	}
 
@@ -177,8 +172,7 @@ func (dg *App) attachObject(obj Object, types int) (err error) {
 		return
 	}
 
-	err = obj.Expect(types)
-	if err != nil {
+	if err = obj.Expect(types); err != nil {
 		return
 	}
 
@@ -196,18 +190,18 @@ func (dg *App) attachObject(obj Object, types int) (err error) {
 		}
 	}()
 
-	events, err := obj.Events()
-	if err != nil {
+	var events []<-chan *Event
+	if events, err = obj.Events(); err != nil {
 		return
 	}
 
 	for _, e := range events {
-		id, err_ := dg.eventMux.Register(e, 0)
-		if err_ != nil {
+		if id, err_ := dg.eventMux.Register(e, 0); err_ != nil {
 			err = err_
 			break
+		} else {
+			eids = append(eids, id)
 		}
-		eids = append(eids, id)
 	}
 	return
 }
@@ -220,8 +214,7 @@ func (dg *App) allocateMappers() (err error) {
 		)
 		for remain = dg.cfg.Mappers_; remain > 0; remain-- {
 			receipts := make(chan *TaskReceipt, 10)
-			tasks, err = dg.b.AddListener(receipts)
-			if err != nil {
+			if tasks, err = dg.b.AddListener(receipts); err != nil {
 				return
 			}
 
@@ -324,13 +317,11 @@ returns:
  - err: any error produced
 */
 func (dg *App) Register(name string, fn interface{}) (err error) {
-	err = dg.trans.Register(name, fn)
-	if err != nil {
+	if err = dg.trans.Register(name, fn); err != nil {
 		return
 	}
 
-	err = dg.b.ProducerHook(ProducerEvent.DeclareTask, name)
-	if err != nil {
+	if err = dg.b.ProducerHook(ProducerEvent.DeclareTask, name); err != nil {
 		return
 	}
 
@@ -357,8 +348,7 @@ func (dg *App) Allocate(name string, count, share int) (remain int, err error) {
 	remain = count
 
 	// check if this name register
-	_, err = dg.trans.GetOption(name)
-	if err != nil {
+	if _, err = dg.trans.GetOption(name); err != nil {
 		return
 	}
 
@@ -372,17 +362,14 @@ func (dg *App) Allocate(name string, count, share int) (remain int, err error) {
 
 	if dg.b.Exists(ObjT.NamedConsumer) {
 		receipts := make(chan *TaskReceipt, 10)
-		tasks, err = dg.b.AddNamedListener(name, receipts)
-		if err != nil {
+		if tasks, err = dg.b.AddNamedListener(name, receipts); err != nil {
 			return
 		}
-		reports, remain, err = dg.workers.allocate(name, tasks, receipts, count, share)
-		if err != nil {
+		if reports, remain, err = dg.workers.allocate(name, tasks, receipts, count, share); err != nil {
 			return
 		}
 	} else if dg.b.Exists(ObjT.Consumer) {
-		reports, remain, err = dg.mappers.allocateWorkers(name, count, share)
-		if err != nil {
+		if reports, remain, err = dg.mappers.allocateWorkers(name, count, share); err != nil {
 			return
 		}
 	} else {
@@ -392,8 +379,7 @@ func (dg *App) Allocate(name string, count, share int) (remain int, err error) {
 
 	for _, v := range reports {
 		// id of report channel is ignored
-		err = dg.b.Report(v)
-		if err != nil {
+		if err = dg.b.Report(v); err != nil {
 			return
 		}
 	}
@@ -490,44 +476,33 @@ func (dg *App) Use(obj Object, types int) (id int, used int, err error) {
 		reporter, _ = obj.(Reporter)
 	} else {
 		if types&ObjT.Producer == ObjT.Producer {
-			producer, ok = obj.(Producer)
-			if !ok {
+			if producer, ok = obj.(Producer); !ok {
 				err = errors.New("producer is not found")
 				return
 			}
 		}
 		if types&ObjT.Consumer == ObjT.Consumer {
-			namedConsumer, ok = obj.(NamedConsumer)
-			if !ok {
-				consumer, ok = obj.(Consumer)
-				if !ok {
+			if namedConsumer, ok = obj.(NamedConsumer); !ok {
+				if consumer, ok = obj.(Consumer); !ok {
 					err = errors.New("consumer is not found")
 					return
 				}
 			}
 		}
 		if types&ObjT.NamedConsumer == ObjT.NamedConsumer {
-			namedConsumer, ok = obj.(NamedConsumer)
-			if !ok {
+			if namedConsumer, ok = obj.(NamedConsumer); !ok {
 				err = errors.New("named consumer is not found")
 				return
 			}
 		}
-		if types&ObjT.NamedConsumer == ObjT.NamedConsumer {
-			namedConsumer, ok = obj.(NamedConsumer)
-			if !ok {
-			}
-		}
 		if types&ObjT.Store == ObjT.Store {
-			store, ok = obj.(Store)
-			if !ok {
+			if store, ok = obj.(Store); !ok {
 				err = errors.New("store is not found")
 				return
 			}
 		}
 		if types&ObjT.Reporter == ObjT.Reporter {
-			reporter, ok = obj.(Reporter)
-			if !ok {
+			if reporter, ok = obj.(Reporter); !ok {
 				err = errors.New("reporter is not found")
 				return
 			}
@@ -627,8 +602,7 @@ func (dg *App) Call(name string, opt *Option, args ...interface{}) (reports <-ch
 	defer dg.objsLock.RUnlock()
 
 	if opt == nil {
-		opt, err = dg.trans.GetOption(name)
-		if err != nil {
+		if opt, err = dg.trans.GetOption(name); err != nil {
 			return
 		}
 	}

@@ -12,7 +12,11 @@ import (
 type LazyInvoker struct{}
 
 func (vk *LazyInvoker) Call(f interface{}, param []interface{}) ([]interface{}, error) {
-	funcT := reflect.TypeOf(f)
+	var (
+		funcT = reflect.TypeOf(f)
+		v     reflect.Value
+		t     reflect.Type
+	)
 
 	// make sure parameter matched
 	if len(param) != funcT.NumIn() {
@@ -22,11 +26,10 @@ func (vk *LazyInvoker) Call(f interface{}, param []interface{}) ([]interface{}, 
 	// compose input parameter
 	var in = make([]reflect.Value, funcT.NumIn())
 	for i := 0; i < funcT.NumIn(); i++ {
-		v := reflect.ValueOf(param[i])
+		v = reflect.ValueOf(param[i])
 
 		// special handle for pointer
-		t := funcT.In(i)
-		if t.Kind() == reflect.Ptr {
+		if t = funcT.In(i); t.Kind() == reflect.Ptr {
 			in[i] = *vk.toPointer(t, v)
 		} else {
 			in[i] = v
@@ -49,17 +52,20 @@ func (vk *LazyInvoker) Call(f interface{}, param []interface{}) ([]interface{}, 
 }
 
 func (vk *LazyInvoker) Return(f interface{}, returns []interface{}) ([]interface{}, error) {
-	funcT := reflect.TypeOf(f)
+	var (
+		funcT = reflect.TypeOf(f)
+		t     reflect.Type
+		r     reflect.Value
+	)
 	if len(returns) != funcT.NumOut() {
 		return nil, fmt.Errorf("Parameter Count mismatch: %v %v", len(returns), funcT.NumOut())
 	}
 
 	for k, v := range returns {
-		t := funcT.Out(k)
+		t = funcT.Out(k)
 		// special handle for pointer
 		if t.Kind() == reflect.Ptr {
-			r := *vk.toPointer(t, reflect.ValueOf(v))
-			if r.CanInterface() {
+			if r = *vk.toPointer(t, reflect.ValueOf(v)); r.CanInterface() {
 				returns[k] = r.Interface()
 			} else {
 				return nil, fmt.Errorf("can't interface of %v from %d:%v", r, k, v)
@@ -79,8 +85,7 @@ func (vk *LazyInvoker) toPointer(t reflect.Type, v reflect.Value) *reflect.Value
 	rO := vO.Elem()
 	if v.IsValid() {
 		for t.Kind() == reflect.Ptr {
-			t = t.Elem()
-			if t.Kind() == reflect.Ptr {
+			if t = t.Elem(); t.Kind() == reflect.Ptr {
 				vO.Elem().Set(reflect.New(t))
 				vO = vO.Elem()
 			} else {

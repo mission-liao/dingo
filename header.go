@@ -129,6 +129,9 @@ func NewHeader(id, name string) *Header {
 }
 
 func DecodeHeader(b []byte) (h *Header, err error) {
+	var (
+		T, L, IL, C, R uint64
+	)
 	if b == nil {
 		err = errors.New("nil buffer")
 		return
@@ -139,8 +142,7 @@ func DecodeHeader(b []byte) (h *Header, err error) {
 	}
 
 	// type
-	T, err := binary.ReadUvarint(bytes.NewBuffer(b[:2]))
-	if err != nil {
+	if T, err = binary.ReadUvarint(bytes.NewBuffer(b[:2])); err != nil {
 		return
 	}
 	if T != 0 {
@@ -149,8 +151,7 @@ func DecodeHeader(b []byte) (h *Header, err error) {
 	}
 
 	// total length
-	L, err := binary.ReadUvarint(bytes.NewBuffer(b[2:10]))
-	if err != nil {
+	if L, err = binary.ReadUvarint(bytes.NewBuffer(b[2:10])); err != nil {
 		return
 	}
 	if L < 18 {
@@ -159,13 +160,14 @@ func DecodeHeader(b []byte) (h *Header, err error) {
 	}
 
 	// length of ID
-	IL, err := binary.ReadUvarint(bytes.NewBuffer(b[10:14]))
-	if err != nil {
+	if IL, err = binary.ReadUvarint(bytes.NewBuffer(b[10:14])); err != nil {
 		return
 	}
 
 	// count of registries
-	C, err := binary.ReadUvarint(bytes.NewBuffer(b[14:18]))
+	if C, err = binary.ReadUvarint(bytes.NewBuffer(b[14:18])); err != nil {
+		return
+	}
 	if (18 + C*8) > L {
 		err = fmt.Errorf("registries count is %v, when length is %v", C, L)
 		return
@@ -173,10 +175,8 @@ func DecodeHeader(b []byte) (h *Header, err error) {
 
 	// registries
 	Rs := []uint64{}
-	var R uint64
 	for i := uint64(0); i < C; i++ {
-		R, err = binary.ReadUvarint(bytes.NewBuffer(b[18+i*8 : 18+(i+1)*8]))
-		if err != nil {
+		if R, err = binary.ReadUvarint(bytes.NewBuffer(b[18+i*8 : 18+(i+1)*8])); err != nil {
 			return
 		}
 		Rs = append(Rs, R)
@@ -205,17 +205,17 @@ func ComposeBytes(h *Header, bs [][]byte) (b []byte, err error) {
 		h.Append(uint64(l))
 	}
 
-	bHead, err := h.Flush(uint64(length))
-	if err != nil {
+	var bHead []byte
+	if bHead, err = h.Flush(uint64(length)); err != nil {
 		return
-	}
+	} else {
+		w := bytes.NewBuffer(bHead)
+		for _, v := range bs {
+			w.Write(v)
+		}
 
-	w := bytes.NewBuffer(bHead)
-	for _, v := range bs {
-		w.Write(v)
+		b = w.Bytes()
 	}
-
-	b = w.Bytes()
 	return
 }
 

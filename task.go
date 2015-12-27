@@ -30,8 +30,8 @@ func composeTask(name string, opt *Option, args []interface{}) (t *Task, err err
 	if opt == nil {
 		opt = NewOption() // make sure it's the default option
 	}
-	id, err := (&uuidMaker{}).NewID()
-	if err != nil {
+	var id string
+	if id, err = (&uuidMaker{}).NewID(); err != nil {
 		return
 	}
 
@@ -50,8 +50,7 @@ func (t *Task) Name() string        { return t.H.N }
 func (t *Task) Option() *Option     { return t.P.O }
 func (t *Task) Args() []interface{} { return t.P.A }
 func (t *Task) almostEqual(other *Task) (same bool) {
-	same = t.H.I == other.H.I && t.H.N == other.H.N && reflect.DeepEqual(t.P.O, other.P.O)
-	if !same {
+	if same = t.H.I == other.H.I && t.H.N == other.H.N && reflect.DeepEqual(t.P.O, other.P.O); !same {
 		return
 	}
 

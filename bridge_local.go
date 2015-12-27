@@ -83,10 +83,13 @@ func (bdg *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *Tas
 		receipts <-chan *TaskReceipt,
 	) {
 		defer wait.Done()
+		var (
+			reply *TaskReceipt
+			ok    bool
+		)
 		out := func(t *Task) (done bool) {
 			output <- t
-			reply, ok := <-receipts
-			if !ok {
+			if reply, ok = <-receipts; !ok {
 				done = true
 				return
 			}

@@ -67,13 +67,11 @@ func (r *Report) Done() bool { return r.P.S == Status.Success || r.P.S == Status
 func (r *Report) OK() bool   { return r.P.S == Status.Success }
 func (r *Report) Fail() bool { return r.P.S == Status.Fail }
 func (r *Report) almostEqual(other *Report) (same bool) {
-	same = r.H.I == other.H.I &&
+	if same = r.H.I == other.H.I &&
 		r.H.N == other.H.N &&
 		r.P.S == other.P.S &&
 		reflect.DeepEqual(r.P.O, other.P.O) &&
-		reflect.DeepEqual(r.P.E, other.P.E)
-
-	if !same {
+		reflect.DeepEqual(r.P.E, other.P.E); !same {
 		return
 	}
 

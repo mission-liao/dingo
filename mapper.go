@@ -55,18 +55,17 @@ func (mp *_mappers) allocateWorkers(name string, count, share int) ([]<-chan *Re
 		return nil, count, fmt.Errorf("already registered: %v", name)
 	}
 	t := make(chan *Task, 10)
-	r, n, err := mp.workers.allocate(name, t, nil, count, share)
-	if err != nil {
+	if r, n, err := mp.workers.allocate(name, t, nil, count, share); err != nil {
+		return r, n, err
+	} else {
+		alln := make(map[string]chan *Task)
+		for k := range all {
+			alln[k] = all[k]
+		}
+		alln[name] = t
+		mp.to.Store(alln)
 		return r, n, err
 	}
-
-	alln := make(map[string]chan *Task)
-	for k := range all {
-		alln[k] = all[k]
-	}
-	alln[name] = t
-	mp.to.Store(alln)
-	return r, n, err
 }
 
 //
@@ -83,8 +82,7 @@ func (mp *_mappers) Expect(types int) (err error) {
 }
 
 func (mp *_mappers) Events() (ret []<-chan *Event, err error) {
-	ret, err = mp.workers.Events()
-	if err != nil {
+	if ret, err = mp.workers.Events(); err != nil {
 		return
 	}
 
@@ -114,8 +112,10 @@ func (mp *_mappers) Close() (err error) {
 // returns:
 // ...
 func newMappers(trans *fnMgr, hooks exHooks) (m *_mappers, err error) {
-	w, err := newWorkers(trans, hooks)
-	if err != nil {
+	var (
+		w *_workers
+	)
+	if w, err = newWorkers(trans, hooks); err != nil {
 		return
 	}
 
@@ -142,35 +142,35 @@ func (mp *_mappers) mapperRoutine(
 	defer wait.Done()
 	defer close(receipts)
 
+	var (
+		rpt *TaskReceipt
+	)
+
 	receive := func(t *Task) {
 		// find registered worker
-		err := mp.dispatch(t)
-
-		// compose a receipt
-		var rpt TaskReceipt
-		if err != nil {
+		if err := mp.dispatch(t); err != nil {
 			// send an error event
 			events <- NewEventFromError(ObjT.Mapper, err)
 
 			if err == errWorkerNotFound {
-				rpt = TaskReceipt{
+				rpt = &TaskReceipt{
 					ID:     t.ID(),
 					Status: ReceiptStatus.WorkerNotFound,
 				}
 			} else {
-				rpt = TaskReceipt{
+				rpt = &TaskReceipt{
 					ID:      t.ID(),
 					Status:  ReceiptStatus.NOK,
 					Payload: err,
 				}
 			}
 		} else {
-			rpt = TaskReceipt{
+			rpt = &TaskReceipt{
 				ID:     t.ID(),
 				Status: ReceiptStatus.OK,
 			}
 		}
-		receipts <- &rpt
+		receipts <- rpt
 	}
 
 	for {

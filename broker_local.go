@@ -39,6 +39,11 @@ func NewLocalBroker(cfg *Config, to chan []byte) (v *localBroker, err error) {
 
 func (brk *localBroker) consumerRoutine(quit <-chan int, wait *sync.WaitGroup, events chan<- *Event, input <-chan []byte, output chan<- []byte, receipts <-chan *TaskReceipt) {
 	defer wait.Done()
+	var (
+		h     *Header
+		reply *TaskReceipt
+		err   error
+	)
 
 	for {
 		select {
@@ -49,15 +54,13 @@ func (brk *localBroker) consumerRoutine(quit <-chan int, wait *sync.WaitGroup, e
 				goto clean
 			}
 
-			h, err := DecodeHeader(v)
-			if err != nil {
+			if h, err = DecodeHeader(v); err != nil {
 				events <- NewEventFromError(ObjT.Consumer, err)
 				break
 			}
 
 			output <- v
-			reply, ok := <-receipts
-			if !ok {
+			if reply, ok = <-receipts; !ok {
 				goto clean
 			}
 

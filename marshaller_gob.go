@@ -14,9 +14,11 @@ Note: this Marshaller can work with both GenericInvoker and LazyInvoker.
 type GobMarshaller struct{}
 
 func (ms *GobMarshaller) Prepare(name string, fn interface{}) (err error) {
+	var (
+		fT reflect.Type
+	)
 	// Gob needs to register type before encode/decode
-	fT := reflect.TypeOf(fn)
-	if fT.Kind() != reflect.Func {
+	if fT = reflect.TypeOf(fn); fT.Kind() != reflect.Func {
 		err = fmt.Errorf("fn is not a function but %v", fn)
 		return
 	}
@@ -33,15 +35,13 @@ func (ms *GobMarshaller) Prepare(name string, fn interface{}) (err error) {
 
 	for i := 0; i < fT.NumIn(); i++ {
 		// create a zero value of the type of parameters
-		err = reg(reflect.Zero(fT.In(i)))
-		if err != nil {
+		if err = reg(reflect.Zero(fT.In(i))); err != nil {
 			return
 		}
 	}
 
 	for i := 0; i < fT.NumOut(); i++ {
-		err = reg(reflect.Zero(fT.Out(i)))
-		if err != nil {
+		if err = reg(reflect.Zero(fT.Out(i))); err != nil {
 			return
 		}
 	}
@@ -59,15 +59,14 @@ func (ms *GobMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, err e
 	task.H.Reset()
 
 	// encode header
-	bHead, err := task.H.Flush(0)
-	if err != nil {
+	var bHead []byte
+	if bHead, err = task.H.Flush(0); err != nil {
 		return
 	}
 
 	// encode payload
 	var buff = bytes.NewBuffer(bHead)
-	err = gob.NewEncoder(buff).Encode(task.P)
-	if err == nil {
+	if err = gob.NewEncoder(buff).Encode(task.P); err == nil {
 		b = buff.Bytes()
 	}
 	return
@@ -76,8 +75,7 @@ func (ms *GobMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, err e
 func (ms *GobMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *Task, err error) {
 	// decode header
 	if h == nil {
-		h, err = DecodeHeader(b)
-		if err != nil {
+		if h, err = DecodeHeader(b); err != nil {
 			return
 		}
 	}
@@ -91,8 +89,7 @@ func (ms *GobMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (task *
 
 	// decode payload
 	var payload *TaskPayload
-	err = gob.NewDecoder(bytes.NewBuffer(b[h.Length():])).Decode(&payload)
-	if err == nil {
+	if err = gob.NewDecoder(bytes.NewBuffer(b[h.Length():])).Decode(&payload); err == nil {
 		task = &Task{
 			H: h,
 			P: payload,
@@ -111,15 +108,14 @@ func (ms *GobMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte,
 	report.H.Reset()
 
 	// encode header
-	bHead, err := report.H.Flush(0)
-	if err != nil {
+	var bHead []byte
+	if bHead, err = report.H.Flush(0); err != nil {
 		return
 	}
 
 	// encode payload
 	var buff = bytes.NewBuffer(bHead)
-	err = gob.NewEncoder(buff).Encode(report.P)
-	if err == nil {
+	if err = gob.NewEncoder(buff).Encode(report.P); err == nil {
 		b = buff.Bytes()
 	}
 	return
@@ -128,8 +124,7 @@ func (ms *GobMarshaller) EncodeReport(fn interface{}, report *Report) (b []byte,
 func (ms *GobMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (report *Report, err error) {
 	// decode header
 	if h == nil {
-		h, err = DecodeHeader(b)
-		if err != nil {
+		if h, err = DecodeHeader(b); err != nil {
 			return
 		}
 	}
@@ -143,8 +138,7 @@ func (ms *GobMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (repo
 
 	// decode payload
 	var payload *ReportPayload
-	err = gob.NewDecoder(bytes.NewBuffer(b[h.Length():])).Decode(&payload)
-	if err == nil {
+	if err = gob.NewDecoder(bytes.NewBuffer(b[h.Length():])).Decode(&payload); err == nil {
 		report = &Report{
 			H: h,
 			P: payload,

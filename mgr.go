@@ -129,8 +129,7 @@ func (mgr *fnMgr) Register(name string, fn interface{}) (err error) {
 	}
 
 	ms := mgr.ms.Load().(map[int]Marshaller)
-	err = ms[Encode.Default].Prepare(name, fn)
-	if err != nil {
+	if err = ms[Encode.Default].Prepare(name, fn); err != nil {
 		return
 	}
 
@@ -163,9 +162,13 @@ func (mgr *fnMgr) SetMarshaller(name string, msTask, msReport int) (err error) {
 	mgr.fn2optLock.Lock()
 	defer mgr.fn2optLock.Unlock()
 
+	var (
+		opt *fnOpt
+		ok  bool
+	)
+
 	fns := mgr.fn2opt.Load().(map[string]*fnOpt)
-	opt, ok := fns[name]
-	if !ok {
+	if opt, ok = fns[name]; !ok {
 		err = fmt.Errorf("name %v doesn't exists", name)
 		return
 	}
@@ -174,8 +177,7 @@ func (mgr *fnMgr) SetMarshaller(name string, msTask, msReport int) (err error) {
 	ms := mgr.ms.Load().(map[int]Marshaller)
 	chk := func(id int) (err error) {
 		if v, ok := ms[id]; ok {
-			err = v.Prepare(name, opt.fn)
-			if err != nil {
+			if err = v.Prepare(name, opt.fn); err != nil {
 				return
 			}
 		} else {
@@ -184,12 +186,10 @@ func (mgr *fnMgr) SetMarshaller(name string, msTask, msReport int) (err error) {
 		}
 		return
 	}
-	err = chk(msTask)
-	if err != nil {
+	if err = chk(msTask); err != nil {
 		return
 	}
-	err = chk(msReport)
-	if err != nil {
+	if err = chk(msReport); err != nil {
 		return
 	}
 
@@ -231,8 +231,7 @@ func (mgr *fnMgr) SetOption(name string, opt *Option) (err error) {
 func (mgr *fnMgr) SetIDMaker(name string, id int) (err error) {
 	// check existence of id
 	ims := mgr.ims.Load().(map[int]IDMaker)
-	_, ok := ims[id]
-	if !ok {
+	if _, ok := ims[id]; !ok {
 		err = fmt.Errorf("idMaker not found: %v %v", name, id)
 		return
 	}
@@ -268,15 +267,20 @@ func (mgr *fnMgr) GetOption(name string) (opt *Option, err error) {
 
 func (mgr *fnMgr) ComposeTask(name string, o *Option, args []interface{}) (t *Task, err error) {
 	fn := mgr.fn2opt.Load().(map[string]*fnOpt)
-	opt, ok := fn[name]
-	if !ok {
+
+	var (
+		opt *fnOpt
+		m   IDMaker
+		ok  bool
+		id  string
+	)
+	if opt, ok = fn[name]; !ok {
 		err = fmt.Errorf("idMaker option not found: %v %v", name, opt)
 		return
 	}
 
 	ims := mgr.ims.Load().(map[int]IDMaker)
-	m, ok := ims[opt.idMaker]
-	if !ok {
+	if m, ok = ims[opt.idMaker]; !ok {
 		err = fmt.Errorf("idMaker not found: %v %v", name, opt)
 		return
 	}
@@ -285,8 +289,7 @@ func (mgr *fnMgr) ComposeTask(name string, o *Option, args []interface{}) (t *Ta
 		o = NewOption()
 	}
 
-	id, err := m.NewID()
-	if err != nil {
+	if id, err = m.NewID(); err != nil {
 		return
 	}
 
@@ -301,16 +304,20 @@ func (mgr *fnMgr) ComposeTask(name string, o *Option, args []interface{}) (t *Ta
 }
 
 func (mgr *fnMgr) EncodeTask(task *Task) (b []byte, err error) {
+	var (
+		opt *fnOpt
+		m   Marshaller
+		ok  bool
+	)
+
 	fn := mgr.fn2opt.Load().(map[string]*fnOpt)
-	opt, ok := fn[task.Name()]
-	if !ok {
+	if opt, ok = fn[task.Name()]; !ok {
 		err = fmt.Errorf("marshaller option not found: %v", task)
 		return
 	}
 
 	ms := mgr.ms.Load().(map[int]Marshaller)
-	m, ok := ms[opt.mash.task]
-	if !ok {
+	if m, ok = ms[opt.mash.task]; !ok {
 		err = fmt.Errorf("marshaller not found: %v %v", task, opt)
 		return
 	}
@@ -320,23 +327,26 @@ func (mgr *fnMgr) EncodeTask(task *Task) (b []byte, err error) {
 }
 
 func (mgr *fnMgr) DecodeTask(b []byte) (task *Task, err error) {
-	h, err := DecodeHeader(b)
-	if err != nil {
+	var (
+		h   *Header
+		m   Marshaller
+		opt *fnOpt
+		ok  bool
+	)
+	if h, err = DecodeHeader(b); err != nil {
 		return
 	}
 
 	// looking for marshaller-option
 	fn := mgr.fn2opt.Load().(map[string]*fnOpt)
-	opt, ok := fn[h.Name()]
-	if !ok {
+	if opt, ok = fn[h.Name()]; !ok {
 		err = fmt.Errorf("marshaller option not found: %v", h)
 		return
 	}
 
 	// looking for marshaller
 	ms := mgr.ms.Load().(map[int]Marshaller)
-	m, ok := ms[opt.mash.task]
-	if !ok {
+	if m, ok = ms[opt.mash.task]; !ok {
 		err = fmt.Errorf("marshaller not found: %v", h)
 		return
 	}
@@ -346,18 +356,21 @@ func (mgr *fnMgr) DecodeTask(b []byte) (task *Task, err error) {
 }
 
 func (mgr *fnMgr) EncodeReport(report *Report) (b []byte, err error) {
+	var (
+		opt *fnOpt
+		m   Marshaller
+		ok  bool
+	)
 	// looking for marshaller-option
 	fn := mgr.fn2opt.Load().(map[string]*fnOpt)
-	opt, ok := fn[report.Name()]
-	if !ok {
+	if opt, ok = fn[report.Name()]; !ok {
 		err = fmt.Errorf("marshaller option not found: %v", report)
 		return
 	}
 
 	// looking for marshaller
 	ms := mgr.ms.Load().(map[int]Marshaller)
-	m, ok := ms[opt.mash.report]
-	if !ok {
+	if m, ok = ms[opt.mash.report]; !ok {
 		err = fmt.Errorf("marshaller not found: %v %v", report, opt)
 		return
 	}
@@ -367,23 +380,27 @@ func (mgr *fnMgr) EncodeReport(report *Report) (b []byte, err error) {
 }
 
 func (mgr *fnMgr) DecodeReport(b []byte) (report *Report, err error) {
-	h, err := DecodeHeader(b)
-	if err != nil {
+	var (
+		h   *Header
+		m   Marshaller
+		opt *fnOpt
+		ok  bool
+	)
+
+	if h, err = DecodeHeader(b); err != nil {
 		return
 	}
 
 	// looking for marshaller-option
 	fn := mgr.fn2opt.Load().(map[string]*fnOpt)
-	opt, ok := fn[h.Name()]
-	if !ok {
+	if opt, ok = fn[h.Name()]; !ok {
 		err = fmt.Errorf("marshaller option not found: %v", h)
 		return
 	}
 
 	// looking for marshaller
 	ms := mgr.ms.Load().(map[int]Marshaller)
-	m, ok := ms[opt.mash.report]
-	if !ok {
+	if m, ok = ms[opt.mash.report]; !ok {
 		err = fmt.Errorf("marshaller not found: %v", h)
 		return
 	}
@@ -393,18 +410,22 @@ func (mgr *fnMgr) DecodeReport(b []byte) (report *Report, err error) {
 }
 
 func (mgr *fnMgr) Call(t *Task) (ret []interface{}, err error) {
+	var (
+		opt *fnOpt
+		m   Marshaller
+		ok  bool
+	)
+
 	// looking for marshaller-option
 	fn := mgr.fn2opt.Load().(map[string]*fnOpt)
-	opt, ok := fn[t.Name()]
-	if !ok {
+	if opt, ok = fn[t.Name()]; !ok {
 		err = fmt.Errorf("marshaller option not found: %v", t)
 		return
 	}
 
 	// looking for the marshaller
 	ms := mgr.ms.Load().(map[int]Marshaller)
-	m, ok := ms[opt.mash.task]
-	if !ok {
+	if m, ok = ms[opt.mash.task]; !ok {
 		err = fmt.Errorf("marshaller not found: %v %v", t, opt)
 		return
 	}
@@ -414,25 +435,27 @@ func (mgr *fnMgr) Call(t *Task) (ret []interface{}, err error) {
 }
 
 func (mgr *fnMgr) Return(r *Report) (err error) {
+	var (
+		opt *fnOpt
+		m   Marshaller
+		ok  bool
+	)
 	// looking for marshaller-option
 	fn := mgr.fn2opt.Load().(map[string]*fnOpt)
-	opt, ok := fn[r.Name()]
-	if !ok {
+	if opt, ok = fn[r.Name()]; !ok {
 		err = fmt.Errorf("marshaller option not found: %v", r)
 		return
 	}
 
 	// looking for marshaller
 	ms := mgr.ms.Load().(map[int]Marshaller)
-	m, ok := ms[opt.mash.report]
-	if !ok {
+	if m, ok = ms[opt.mash.report]; !ok {
 		err = fmt.Errorf("marshaller not found: %v %v", r, opt)
 		return
 	}
 
 	var ret []interface{}
-	ret, err = m.(Invoker).Return(opt.fn, r.Return())
-	if err == nil {
+	if ret, err = m.(Invoker).Return(opt.fn, r.Return()); err == nil {
 		r.setReturn(ret)
 	}
 	return

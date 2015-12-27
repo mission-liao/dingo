@@ -127,14 +127,13 @@ func (ms *CustomMarshaller) EncodeTask(fn interface{}, task *Task) (b []byte, er
 			return
 		}
 
-		bs, err = ms.Codec.EncodeArgument(fn, args)
-		if err != nil {
+		if bs, err = ms.Codec.EncodeArgument(fn, args); err != nil {
 			return
 		}
 	}
 
-	bOpt, err := json.Marshal(task.P.O)
-	if err != nil {
+	var bOpt []byte
+	if bOpt, err = json.Marshal(task.P.O); err != nil {
 		return
 	}
 
@@ -171,8 +170,7 @@ func (ms *CustomMarshaller) DecodeTask(h *Header, fn interface{}, b []byte) (tas
 			return
 		}
 
-		args, err = ms.Codec.DecodeArgument(fn, bs[:len(bs)-1])
-		if err != nil {
+		if args, err = ms.Codec.DecodeArgument(fn, bs[:len(bs)-1]); err != nil {
 			return
 		}
 	}
@@ -206,24 +204,24 @@ func (ms *CustomMarshaller) EncodeReport(fn interface{}, report *Report) (b []by
 			return
 		}
 
-		bs, err = ms.Codec.EncodeReturn(fn, returns)
-		if err != nil {
+		if bs, err = ms.Codec.EncodeReturn(fn, returns); err != nil {
 			return
 		}
 	}
 
-	bStatus, err := json.Marshal(report.P.S)
-	if err != nil {
+	var (
+		bStatus, bErr, bOpt []byte
+	)
+
+	if bStatus, err = json.Marshal(report.P.S); err != nil {
 		return
 	}
 
-	bErr, err := json.Marshal(report.P.E)
-	if err != nil {
+	if bErr, err = json.Marshal(report.P.E); err != nil {
 		return
 	}
 
-	bOpt, err := json.Marshal(report.P.O)
-	if err != nil {
+	if bOpt, err = json.Marshal(report.P.O); err != nil {
 		return
 	}
 
@@ -247,8 +245,14 @@ func (ms *CustomMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (r
 		}
 	}()
 
-	bs, err := DecomposeBytes(h, b)
-	if err != nil {
+	var (
+		s  int16
+		e  *Error
+		o  *Option
+		bs [][]byte
+	)
+
+	if bs, err = DecomposeBytes(h, b); err != nil {
 		return
 	}
 
@@ -259,33 +263,23 @@ func (ms *CustomMarshaller) DecodeReport(h *Header, fn interface{}, b []byte) (r
 			return
 		}
 
-		returns, err = ms.Codec.DecodeReturn(fn, bs[:len(bs)-3])
-		if err != nil {
+		if returns, err = ms.Codec.DecodeReturn(fn, bs[:len(bs)-3]); err != nil {
 			return
 		}
 	}
 
-	var (
-		s int16
-		e *Error
-		o *Option
-	)
-
 	// decode status
-	err = json.Unmarshal(bs[len(bs)-3], &s)
-	if err != nil {
+	if err = json.Unmarshal(bs[len(bs)-3], &s); err != nil {
 		return
 	}
 
 	// decode err
-	err = json.Unmarshal(bs[len(bs)-2], &e)
-	if err != nil {
+	if err = json.Unmarshal(bs[len(bs)-2], &e); err != nil {
 		return
 	}
 
 	// decode option
-	err = json.Unmarshal(bs[len(bs)-1], &o)
-	if err != nil {
+	if err = json.Unmarshal(bs[len(bs)-1], &o); err != nil {
 		return
 	}
 
