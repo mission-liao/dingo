@@ -137,12 +137,12 @@ func (mx *mux) Unregister(id int) (ch interface{}, err error) {
 			err = fmt.Errorf("Id not found:%v", id)
 			return
 		}
-		delete(m, id)
 
 		nm := make(map[int]interface{})
 		for k := range m {
 			nm[k] = m[k]
 		}
+		delete(nm, id)
 		mx.cases.Store(nm)
 	}()
 
@@ -276,7 +276,7 @@ finished:
 		chosen, value, ok := reflect.Select(cond)
 		// note: when default case is triggered,
 		// 'ok' is always false, which is meaningless.
-		if !ok && chosen < len(cond)-1 {
+		if !ok && chosen < lenOfcases {
 			// remove that channel
 			del(chosen)
 			continue
@@ -289,6 +289,9 @@ finished:
 		default:
 			handlers = mx.handlers.Load().([]func(interface{}, int))
 			for _, v := range handlers {
+				if chosen >= len(keys) {
+					panic(fmt.Sprintf("chosen is larger than length of keys: %v %v", chosen, keys))
+				}
 				v(value.Interface(), keys[chosen])
 			}
 		}
