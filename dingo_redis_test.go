@@ -13,12 +13,12 @@ import (
 //
 
 type redisSingleAppTestSuite struct {
-	dingo.DingoSingleAppTestSuite
+	DingoSingleAppTestSuite
 }
 
 func TestDingoRedisSingleAppSuite(t *testing.T) {
 	suite.Run(t, &redisSingleAppTestSuite{
-		dingo.DingoSingleAppTestSuite{
+		DingoSingleAppTestSuite{
 			GenApp: func() (app *dingo.App, err error) {
 				app, err = dingo.NewApp("remote", nil)
 				if err != nil {
@@ -53,12 +53,12 @@ func TestDingoRedisSingleAppSuite(t *testing.T) {
 //
 
 type redisMultiAppTestSuite struct {
-	dingo.DingoMultiAppTestSuite
+	DingoMultiAppTestSuite
 }
 
 func TestDingoRedisMultiAppSuite(t *testing.T) {
 	suite.Run(t, &redisMultiAppTestSuite{
-		dingo.DingoMultiAppTestSuite{
+		DingoMultiAppTestSuite{
 			CountOfCallers: 3,
 			CountOfWorkers: 3,
 			GenCaller: func() (app *dingo.App, err error) {

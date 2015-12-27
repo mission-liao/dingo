@@ -18,11 +18,6 @@ import (
 type GenericInvoker struct{}
 
 func (vk *GenericInvoker) convert2slice(v, r reflect.Value, rt reflect.Type) (err error) {
-	if v.Kind() != reflect.Slice {
-		err = fmt.Errorf("Only Slice not %v convertible to slice", v.Kind().String())
-		return
-	}
-
 	r.Set(reflect.MakeSlice(rt, 0, v.Len()))
 	for i := 0; i < v.Len(); i++ {
 		converted, err_ := vk.convert(v.Index(i), rt.Elem())
@@ -38,11 +33,6 @@ func (vk *GenericInvoker) convert2slice(v, r reflect.Value, rt reflect.Type) (er
 }
 
 func (vk *GenericInvoker) convert2map(v, r reflect.Value, rt reflect.Type) (err error) {
-	if v.Kind() != reflect.Map {
-		err = fmt.Errorf("Only Map not %v convertible to map", v.Kind().String())
-		return
-	}
-
 	// init map
 	r.Set(reflect.MakeMap(rt))
 

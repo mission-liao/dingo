@@ -192,3 +192,54 @@ func DecodeHeader(b []byte) (h *Header, err error) {
 	}
 	return
 }
+
+/*ComposeBytes composes slice of byte arrays could be composed into one byte stream, along with header section.
+ */
+func ComposeBytes(h *Header, bs [][]byte) (b []byte, err error) {
+	h.Reset()
+
+	length := 0
+	for _, v := range bs {
+		l := len(v)
+		length += l
+		h.Append(uint64(l))
+	}
+
+	bHead, err := h.Flush(uint64(length))
+	if err != nil {
+		return
+	}
+
+	w := bytes.NewBuffer(bHead)
+	for _, v := range bs {
+		w.Write(v)
+	}
+
+	b = w.Bytes()
+	return
+}
+
+/*DecomposeBytes can be used to decompose byte streams composed by "ComposeByte" into [][]byte
+ */
+func DecomposeBytes(h *Header, b []byte) (bs [][]byte, err error) {
+	if h.Length() > uint64(len(b)) {
+		err = fmt.Errorf("buffer overrun, smaller than header: %d %d", h.Length(), len(b))
+		return
+	}
+	ps := h.Registry()
+	bs = make([][]byte, 0, len(ps))
+	b = b[h.Length():]
+
+	c := uint64(0)
+	for k, p := range ps {
+		if c+p > uint64(len(b)) {
+			err = fmt.Errorf("buffer overrun: %d, %d, %d, %d", k, c, p, len(b))
+			return
+		}
+
+		bs = append(bs, b[c:c+p])
+		c += p
+	}
+
+	return
+}

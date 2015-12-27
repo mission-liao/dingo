@@ -167,28 +167,27 @@ func (bdg *remoteBridge) Report(reports <-chan *Report) (err error) {
 				Body: b,
 			}
 		}
-	finished:
 		for {
 			select {
 			case _, _ = <-quit:
-				break finished
+				goto clean
 			case v, ok := <-input:
 				if !ok {
-					break finished
+					goto clean
 				}
 				out(v)
 			}
 		}
-
+	clean:
 		for {
 			select {
 			case v, ok := <-input:
 				if !ok {
-					return
+					break clean
 				}
 				out(v)
 			default:
-				return
+				break clean
 			}
 		}
 	}(bdg.reporters.New(), bdg.reporters.Wait(), bdg.events, reports, r)
@@ -258,32 +257,29 @@ func (bdg *remoteBridge) Poll(t *Task) (reports <-chan *Report, err error) {
 			done = r.Done()
 			return done
 		}
-
-	finished:
 		for {
 			select {
 			case _, _ = <-quit:
-				break finished
+				goto clean
 			case v, ok := <-inputs:
 				if !ok {
-					break finished
+					goto clean
 				}
 				if out(v) {
-					break finished
+					goto clean
 				}
 			}
 		}
-
-	cleared:
+	clean:
 		for {
 			select {
 			case v, ok := <-inputs:
 				if !ok {
-					break cleared
+					break clean
 				}
 				out(v)
 			default:
-				break cleared
+				break clean
 			}
 		}
 	}(bdg.storers.New(), bdg.storers.Wait(), bdg.storers.Events(), r, reports2)

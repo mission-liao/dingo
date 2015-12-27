@@ -271,6 +271,7 @@ cleanup:
 
 	// consuming things remaining in channels,
 	// until cleared.
+finished:
 	for {
 		chosen, value, ok := reflect.Select(cond)
 		// note: when default case is triggered,
@@ -284,7 +285,7 @@ cleanup:
 		switch chosen {
 		// default is triggered
 		case len(cond) - 1:
-			return
+			break finished
 		default:
 			handlers = mx.handlers.Load().([]func(interface{}, int))
 			for _, v := range handlers {

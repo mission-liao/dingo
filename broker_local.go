@@ -71,6 +71,7 @@ func (brk *localBroker) consumerRoutine(quit <-chan int, wait *sync.WaitGroup, e
 		}
 	}
 clean:
+	// TODO: clean up
 }
 
 //

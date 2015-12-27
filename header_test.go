@@ -122,3 +122,37 @@ func TestHeader(t *testing.T) {
 		ass.Equal(id, h.ID())
 	}
 }
+
+func TestDecomposeBytes(t *testing.T) {
+	ass := assert.New(t)
+
+	// buffer is smaller than header
+	{
+		id := "0"
+		name := "test"
+
+		h := dingo.NewHeader(id, name)
+		h.Append(100000)
+
+		bs, err := dingo.DecomposeBytes(h, make([]byte, 5))
+		ass.Nil(bs)
+		ass.NotNil(err)
+	}
+
+	// buffer is smaller than registry
+	{
+		id := "0"
+		name := "test"
+
+		h := dingo.NewHeader(id, name)
+		h.Append(100000)
+		b, err := h.Flush(0)
+		ass.Nil(err)
+
+		h, err = dingo.DecodeHeader(b)
+		ass.Nil(err)
+		bs, err := dingo.DecomposeBytes(h, b)
+		ass.Len(bs, 0)
+		ass.NotNil(err)
+	}
+}

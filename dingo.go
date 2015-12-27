@@ -173,6 +173,7 @@ func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
 
 func (dg *App) attachObject(obj Object, types int) (err error) {
 	if obj == nil {
+		err = errors.New("object to be attached is nil")
 		return
 	}
 
@@ -353,6 +354,8 @@ returns:
  - err: any error produced
 */
 func (dg *App) Allocate(name string, count, share int) (remain int, err error) {
+	remain = count
+
 	// check if this name register
 	_, err = dg.trans.GetOption(name)
 	if err != nil {
@@ -443,6 +446,11 @@ ObjT.Consumer|ObjT.Reporter, if reporting is not reuqired(make sure there is no 
 then only ObjT.Consumer is used.
 */
 func (dg *App) Use(obj Object, types int) (id int, used int, err error) {
+	if obj == nil {
+		err = errors.New("object to be attached is nil")
+		return
+	}
+
 	dg.objsLock.Lock()
 	defer dg.objsLock.Unlock()
 
@@ -496,6 +504,13 @@ func (dg *App) Use(obj Object, types int) (id int, used int, err error) {
 					err = errors.New("consumer is not found")
 					return
 				}
+			}
+		}
+		if types&ObjT.NamedConsumer == ObjT.NamedConsumer {
+			namedConsumer, ok = obj.(NamedConsumer)
+			if !ok {
+				err = errors.New("named consumer is not found")
+				return
 			}
 		}
 		if types&ObjT.NamedConsumer == ObjT.NamedConsumer {

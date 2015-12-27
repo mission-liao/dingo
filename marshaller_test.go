@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -143,4 +144,34 @@ func TestJsonSafeMarshallerSuite(t *testing.T) {
 			m: &CustomMarshaller{Codec: &JSONSafeCodec{}},
 		},
 	})
+}
+
+//
+// CustomMarshaller
+//
+
+func TestCustomMarshaller(t *testing.T) {
+	ass := assert.New(t)
+	fn := func(n int) (count int) { return }
+	task, err := composeTask("TestCustomMarshaller", nil, []interface{}{1})
+	ass.Nil(err)
+	if err != nil {
+		return
+	}
+
+	// nil Codec
+	i := &CustomMarshaller{}
+
+	bs, err := i.EncodeTask(fn, task)
+	ass.NotNil(err)
+	ass.Nil(bs)
+
+	report, err := task.composeReport(Status.Success, []interface{}{1}, nil)
+	ass.Nil(err)
+	if err != nil {
+		return
+	}
+	bs, err = i.EncodeReport(fn, report)
+	ass.NotNil(err)
+	ass.Nil(bs)
 }

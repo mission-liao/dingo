@@ -13,12 +13,12 @@ import (
 //
 
 type amqpSingleAppTestSuite struct {
-	dingo.DingoSingleAppTestSuite
+	DingoSingleAppTestSuite
 }
 
 func TestDingoAmqpSingleAppSuite(t *testing.T) {
 	suite.Run(t, &amqpSingleAppTestSuite{
-		dingo.DingoSingleAppTestSuite{
+		DingoSingleAppTestSuite{
 			GenApp: func() (app *dingo.App, err error) {
 				app, err = dingo.NewApp("remote", nil)
 				if err != nil {
@@ -53,12 +53,12 @@ func TestDingoAmqpSingleAppSuite(t *testing.T) {
 //
 
 type amqpMultiAppTestSuite struct {
-	dingo.DingoMultiAppTestSuite
+	DingoMultiAppTestSuite
 }
 
 func TestDingoAmqpMultiAppSuite(t *testing.T) {
 	suite.Run(t, &amqpMultiAppTestSuite{
-		dingo.DingoMultiAppTestSuite{
+		DingoMultiAppTestSuite{
 			CountOfCallers: 3,
 			CountOfWorkers: 3,
 			GenCaller: func() (app *dingo.App, err error) {

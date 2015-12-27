@@ -121,22 +121,17 @@ func (bdg *localBridge) AddListener(rcpt <-chan *TaskReceipt) (tasks <-chan *Tas
 			}
 		}
 	clean:
-		finished := false
 		for {
 			select {
 			case t, ok := <-input:
 				if !ok {
-					finished = true
-					break
+					break clean
 				}
 				if out(t) {
-					finished = true
+					break clean
 				}
 			default:
-				finished = true
-			}
-			if finished {
-				break
+				break clean
 			}
 		}
 		close(output)
@@ -260,13 +255,11 @@ func (bdg *localBridge) Report(reports <-chan *Report) (err error) {
 			}
 		}
 	clean:
-		finished := false
 		for {
 			select {
 			case v, ok := <-inputs:
 				if !ok {
-					finished = true
-					break
+					break clean
 				}
 
 				if !outF(v) {
@@ -276,11 +269,7 @@ func (bdg *localBridge) Report(reports <-chan *Report) (err error) {
 					)
 				}
 			default:
-				finished = true
-			}
-
-			if finished {
-				break
+				break clean
 			}
 		}
 

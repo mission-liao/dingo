@@ -332,20 +332,15 @@ func (wrk *_workers) workerRoutine(
 		}
 	}
 clean:
-	finished := false
 	for {
 		select {
 		case t, ok := <-tasks:
 			if !ok {
-				finished = true
-				break
+				break clean
 			}
 			call(t)
 		default:
-			finished = true
-		}
-		if finished {
-			break
+			break clean
 		}
 	}
 }

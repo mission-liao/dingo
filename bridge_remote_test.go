@@ -85,3 +85,92 @@ func (ts *remoteBridgeTestSuite) TestReturnFix() {
 		ts.Equal(float64(6), v)
 	}
 }
+
+func (ts *remoteBridgeTestSuite) TestSendTask() {
+	var (
+		bg  = newRemoteBridge(ts.trans)
+		err error
+	)
+	defer func() {
+		ts.Nil(err)
+	}()
+
+	// register a task
+	err = ts.trans.Register("TestSendTask", func() {})
+	if err != nil {
+		return
+	}
+
+	// compose a task
+	task, err := ts.trans.ComposeTask("TestSendTask", nil, nil)
+	if err != nil {
+		return
+	}
+
+	// send it, should fail
+	ts.NotNil(bg.SendTask(task))
+}
+
+func (ts *remoteBridgeTestSuite) TestAddListener() {
+	bg := newRemoteBridge(ts.trans)
+
+	// add a new listener, should fail
+	tasks, err := bg.AddListener(make(chan *TaskReceipt, 10))
+	ts.Nil(tasks)
+	ts.NotNil(err)
+}
+
+func (ts *remoteBridgeTestSuite) TestAddNamedListener() {
+	var (
+		bg  = newRemoteBridge(ts.trans)
+		err error
+	)
+	defer func() {
+		ts.Nil(err)
+	}()
+
+	// register a task
+	err = ts.trans.Register("TestAddNamedListener", func() {})
+	if err != nil {
+		return
+	}
+
+	// add a named listener, should fail
+	tasks, err2 := bg.AddNamedListener("TestAddNamedListener", make(chan *TaskReceipt, 10))
+	ts.Nil(tasks)
+	ts.NotNil(err2)
+}
+
+func (ts *remoteBridgeTestSuite) TestReport() {
+	bg := newRemoteBridge(ts.trans)
+
+	// add a report channel, should fail
+	ts.NotNil(bg.Report(make(chan *Report, 10)))
+}
+
+func (ts *remoteBridgeTestSuite) TestPoll() {
+	var (
+		bg  = newRemoteBridge(ts.trans)
+		err error
+	)
+	defer func() {
+		ts.Nil(err)
+	}()
+
+	// register a task
+	err = ts.trans.Register("TestPoll", func() {})
+	if err != nil {
+		return
+	}
+
+	// compose a task
+	task, err := ts.trans.ComposeTask("TestPoll", nil, nil)
+	if err != nil {
+		return
+	}
+
+	// poll it, should fail
+	reports, err2 := bg.Poll(task)
+	ts.Nil(reports)
+	ts.NotNil(err2)
+}

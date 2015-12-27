@@ -121,3 +121,16 @@ func (ts *mapperTestSuite) TestParellelMapping() {
 
 	ts.Len(rets, count)
 }
+
+func (ts *mapperTestSuite) TestWorkerNotFound() {
+	// make sure worker not found would be raised
+	ts.Nil(ts._trans.Register("WorkerNotFound", func() {}))
+
+	t, err := ts._trans.ComposeTask("WorkerNotFound", nil, nil)
+	ts.Nil(err)
+
+	ts._tasks <- t
+	r := <-ts._receipts
+	ts.Equal(t.ID(), r.ID)
+	ts.Equal(ReceiptStatus.WorkerNotFound, r.Status)
+}

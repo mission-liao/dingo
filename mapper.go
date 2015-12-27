@@ -173,32 +173,30 @@ func (mp *_mappers) mapperRoutine(
 		receipts <- &rpt
 	}
 
-finished:
 	for {
 		select {
 		case t, ok := <-tasks:
 			if !ok {
-				break finished
+				goto clean
 			}
 			receive(t)
 
 		case <-quit:
 			// clean up code below
-			break finished
+			goto clean
 		}
 	}
-
-done:
+clean:
 	// consuming remaining tasks in channel.
 	for {
 		select {
 		case t, ok := <-tasks:
 			if !ok {
-				break done
+				break clean
 			}
 			receive(t)
 		default:
-			break done
+			break clean
 		}
 	}
 	return

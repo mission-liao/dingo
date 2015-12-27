@@ -1,8 +1,10 @@
-package dingo
+package dingo_test
 
 import (
 	"fmt"
+	"sync"
 
+	"github.com/mission-liao/dingo"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -11,36 +13,67 @@ import (
 type DingoSingleAppTestSuite struct {
 	suite.Suite
 
-	GenApp   func() (*App, error)
-	App_     *App
-	EventMux *mux
+	GenApp        func() (*dingo.App, error)
+	App_          *dingo.App
+	eventRoutines *dingo.Routines
 }
 
-func (ts *DingoSingleAppTestSuite) SetupSuite()    {}
+func (ts *DingoSingleAppTestSuite) SetupSuite() {
+	ts.eventRoutines = dingo.NewRoutines()
+}
 func (ts *DingoSingleAppTestSuite) TearDownSuite() {}
-
 func (ts *DingoSingleAppTestSuite) SetupTest() {
 	var err error
+	defer func() {
+		ts.Nil(err)
+	}()
+
 	ts.App_, err = ts.GenApp()
-	ts.Nil(err)
 	if err != nil {
 		return
 	}
-	_, events, err := ts.App_.Listen(ObjT.All, EventLvl.Debug, 0)
-	ts.EventMux = newMux()
-	_, err = ts.EventMux.Register(events, 0)
-	ts.Nil(err)
-	ts.EventMux.Handle(func(val interface{}, _ int) {
-		ts.Nil(val)
-		ts.Nil(val.(*Event).Payload)
-	})
-	_, err = ts.EventMux.More(1)
-	ts.Nil(err)
+
+	_, events, err := ts.App_.Listen(dingo.ObjT.All, dingo.EventLvl.Debug, 0)
+	if err != nil {
+		return
+	}
+
+	go func(quit <-chan int, wait *sync.WaitGroup, events <-chan *dingo.Event) {
+		defer wait.Done()
+		chk := func(e *dingo.Event) {
+			if e.Level >= dingo.EventLvl.Warning {
+				ts.Nil(e)
+			}
+		}
+		for {
+			select {
+			case _, _ = <-quit:
+				goto clean
+			case e, ok := <-events:
+				if !ok {
+					goto clean
+				}
+				chk(e)
+			}
+		}
+	clean:
+		for {
+			select {
+			default:
+				break clean
+			case e, ok := <-events:
+				if !ok {
+					break clean
+				}
+				chk(e)
+			}
+		}
+	}(ts.eventRoutines.New(), ts.eventRoutines.Wait(), events)
 }
 
 func (ts *DingoSingleAppTestSuite) TearDownTest() {
 	ts.Nil(ts.App_.Close())
-	ts.EventMux.Close()
+	ts.eventRoutines.Close()
 }
 
 //
@@ -62,15 +95,15 @@ func (ts *DingoSingleAppTestSuite) TestBasic() {
 	ts.Equal(0, remain)
 
 	// call that function
-	reports, err := ts.App_.Call("TestBasic", NewOption().SetMonitorProgress(true), 5)
+	reports, err := ts.App_.Call("TestBasic", dingo.NewOption().SetMonitorProgress(true), 5)
 	ts.Nil(err)
 	ts.NotNil(reports)
 
 	// await for reports
 	status := []int16{
-		Status.Sent,
-		Status.Progress,
-		Status.Success,
+		dingo.Status.Sent,
+		dingo.Status.Progress,
+		dingo.Status.Success,
 	}
 	for {
 		done := false
@@ -112,57 +145,55 @@ type DingoMultiAppTestSuite struct {
 	suite.Suite
 
 	CountOfCallers, CountOfWorkers int
-	GenCaller                      func() (*App, error)
-	GenWorker                      func() (*App, error)
-	Callers, Workers               []*App
-	EventMux                       *mux
+	GenCaller                      func() (*dingo.App, error)
+	GenWorker                      func() (*dingo.App, error)
+	Callers, Workers               []*dingo.App
+	eventRoutines                  *dingo.Routines
 }
 
 func (ts *DingoMultiAppTestSuite) SetupSuite() {
 	ts.NotEqual(0, ts.CountOfCallers)
 	ts.NotEqual(0, ts.CountOfWorkers)
+	ts.eventRoutines = dingo.NewRoutines()
 }
 func (ts *DingoMultiAppTestSuite) TearDownSuite() {}
 
 func (ts *DingoMultiAppTestSuite) SetupTest() {
 	var err error
-	ts.EventMux = newMux()
-	ts.EventMux.Handle(func(val interface{}, _ int) {
-		ts.Nil(val)
-	})
-	_, err = ts.EventMux.More(1)
-	ts.Nil(err)
+	defer func() {
+		ts.Nil(err)
+	}()
 
 	// prepare callers
 	for i := 0; i < ts.CountOfCallers; i++ {
 		app, err := ts.GenCaller()
-		ts.Nil(err)
 		if err != nil {
 			return
 		}
 		ts.Callers = append(ts.Callers, app)
 
 		// listen to events
-		_, events, err := app.Listen(ObjT.All, EventLvl.Debug, 0)
-		ts.Nil(err)
+		_, events, err := app.Listen(dingo.ObjT.All, dingo.EventLvl.Debug, 0)
 		if err != nil {
 			return
 		}
-		_, err = ts.EventMux.Register(events, 0)
-		ts.Nil(err)
-		if err != nil {
-			return
-		}
+		ts.listenTo(events)
 	}
 
 	// prepare workers
 	for i := 0; i < ts.CountOfWorkers; i++ {
 		app, err := ts.GenWorker()
-		ts.Nil(err)
 		if err != nil {
 			return
 		}
 		ts.Workers = append(ts.Workers, app)
+
+		// listen to events
+		_, events, err := app.Listen(dingo.ObjT.All, dingo.EventLvl.Debug, 0)
+		if err != nil {
+			return
+		}
+		ts.listenTo(events)
 	}
 }
 
@@ -175,7 +206,41 @@ func (ts *DingoMultiAppTestSuite) TearDownTest() {
 		ts.Nil(v.Close())
 	}
 
-	ts.EventMux.Close()
+	ts.eventRoutines.Close()
+}
+
+func (ts *DingoMultiAppTestSuite) listenTo(events <-chan *dingo.Event) {
+	go func(quit <-chan int, wait *sync.WaitGroup, events <-chan *dingo.Event) {
+		defer wait.Done()
+		chk := func(e *dingo.Event) {
+			if e.Level >= dingo.EventLvl.Warning {
+				ts.Nil(e)
+			}
+		}
+		for {
+			select {
+			case _, _ = <-quit:
+				goto clean
+			case e, ok := <-events:
+				if !ok {
+					goto clean
+				}
+				chk(e)
+			}
+		}
+	clean:
+		for {
+			select {
+			default:
+				break clean
+			case e, ok := <-events:
+				if !ok {
+					break clean
+				}
+				chk(e)
+			}
+		}
+	}(ts.eventRoutines.New(), ts.eventRoutines.Wait(), events)
 }
 
 func (ts *DingoMultiAppTestSuite) register(name string, fn interface{}) {
@@ -187,7 +252,7 @@ func (ts *DingoMultiAppTestSuite) register(name string, fn interface{}) {
 	}
 }
 
-func (ts *DingoMultiAppTestSuite) setOption(name string, opt *Option) {
+func (ts *DingoMultiAppTestSuite) setOption(name string, opt *dingo.Option) {
 	for _, v := range ts.Callers {
 		ts.Nil(v.SetOption(name, opt))
 	}
@@ -213,13 +278,13 @@ func (ts *DingoMultiAppTestSuite) TestOrder() {
 
 	// register worker function
 	ts.register("TestOrder", work)
-	ts.setOption("TestOrder", NewOption().SetMonitorProgress(true))
+	ts.setOption("TestOrder", dingo.NewOption().SetMonitorProgress(true))
 	ts.allocate("TestOrder", 1, 1)
 
 	// sending tasks
-	reports := [][]<-chan *Report{}
+	reports := [][]<-chan *dingo.Report{}
 	for k, v := range ts.Callers {
-		rs := []<-chan *Report{}
+		rs := []<-chan *dingo.Report{}
 		for i := 0; i < countOfTasks; i++ {
 			rep, err := v.Call("TestOrder", nil, k, fmt.Sprintf("%d.%d", k, i))
 			ts.Nil(err)
@@ -237,18 +302,18 @@ func (ts *DingoMultiAppTestSuite) TestOrder() {
 		for i, v := range rs {
 			// sent
 			rep := <-v
-			ts.Equal(Status.Sent, rep.Status())
+			ts.Equal(dingo.Status.Sent, rep.Status())
 			name, id := rep.Name(), rep.ID()
 
 			// progress
 			rep = <-v
-			ts.Equal(Status.Progress, rep.Status())
+			ts.Equal(dingo.Status.Progress, rep.Status())
 			ts.Equal(name, rep.Name())
 			ts.Equal(id, rep.ID())
 
 			// success
 			rep = <-v
-			ts.Equal(Status.Success, rep.Status())
+			ts.Equal(dingo.Status.Success, rep.Status())
 			ts.Equal(name, rep.Name())
 			ts.Equal(id, rep.ID())
 

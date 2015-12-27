@@ -13,7 +13,7 @@ import (
 //
 
 type localSingleAppTestSuite struct {
-	dingo.DingoSingleAppTestSuite
+	DingoSingleAppTestSuite
 	wireBroker  chan []byte
 	wireBackend chan *dingo.ReportEnvelope
 }
@@ -380,7 +380,7 @@ finished:
 //
 
 type localMultiAppTestSuite struct {
-	dingo.DingoMultiAppTestSuite
+	DingoMultiAppTestSuite
 
 	wireBroker  chan []byte
 	wireBackend chan *dingo.ReportEnvelope
@@ -459,7 +459,7 @@ func (me *localMultiAppTestSuite) SetupTest() {
 
 func TestDingoLocalMultiAppSuite(t *testing.T) {
 	suite.Run(t, &localMultiAppTestSuite{
-		dingo.DingoMultiAppTestSuite{
+		DingoMultiAppTestSuite{
 			CountOfCallers: 1,
 			CountOfWorkers: 3,
 		},
@@ -473,15 +473,17 @@ func TestDingoLocalMultiAppSuite(t *testing.T) {
 //
 
 type localModeTestSuite struct {
-	dingo.DingoSingleAppTestSuite
+	DingoSingleAppTestSuite
 }
 
 func TestDingoLocalModeTestSuite(t *testing.T) {
 	suite.Run(t, &localModeTestSuite{
-		dingo.DingoSingleAppTestSuite{
+		DingoSingleAppTestSuite{
 			GenApp: func() (*dingo.App, error) {
 				return dingo.NewApp("local", nil)
 			},
 		},
 	})
 }
+
+// TODO: test listen, stoplisten
