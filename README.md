@@ -3,10 +3,21 @@
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/mission-liao/dingo) [![Build Status](https://travis-ci.org/mission-liao/dingo.svg)](https://travis-ci.org/mission-liao/dingo) [![Coverage Status](https://coveralls.io/repos/mission-liao/dingo/badge.svg?branch=master&service=github)](https://coveralls.io/github/mission-liao/dingo?branch=master)
 
 I initiated this project after [machinery](https://github.com/RichardKnop/machinery), which is a great library and tends to provide a replacement of [Celery](http://www.celeryproject.org/) in #golang. The reasons to create (yet) another task library are:
-- to make sending tasks as easy as possible
-- callers receive reports through a holy channel.
+- To make sending tasks as easy as possible
+- Await and receive reports through channels. (_channel_ is a natural way to represent asynchronous results)
 - I want to get familiar with those concepts of #golagn: **interface**, **routine**, **channel**, and a distributed task framework is a good topic for practice, :)
 
+One important concept I learned from [Celery](http://www.celeryproject.org/) and inherited in _Dingo_ is that __Caller__ and __Worker__ could share the same codebase.
+> When you send a task message in Celery, that message will not contain any source code, but only the name of the task you want to execute. This works similarly to how host names work on the internet: every worker maintains a mapping of task names to their actual functions, called the task registry.
+
+Below is a quicklink to go through this README:
+- [Demo](README.md#quick-demo)
+- [Features](README.md#features)
+- [Guide]() TBD
+- [Configuration]() TBD
+- [Troubleshooting](README.md#troubleshooting)
+
+##Quick Demo
 Here is a quick demo of this project in local mode as a background job pool:
 ```go
 package main
@@ -53,8 +64,10 @@ func main() {
 
 ##Features
 
-###Invoking Worker Functions with (almost) Arbitary Signatures
-These functions can be handled by dingo:
+###(Almost) ANY Function Can Be Your Dingo
+> Invoking Worker Functions with Arbitary Signatures
+
+These functions can be used as __worker functions__ by dingo:
 ```go
 type Person struct {
   ID int
@@ -79,8 +92,53 @@ Obviously, it's hard (not impossible) to handle all types in #golang, these are 
  
 And yes, return values of worker functions would also be __type corrected__.
 
-###A Distributed Task Framework with Local Mode
-You would prefer a small, local worker pool at early stage, and transfer to a distributed one when stepping in production. In dingo, there is nothing much to do for transfering (besides debugging, :( )
+###Throwing and Catching with Your Dingo
+> Two Way Binding with Worker Functions
+
+Besides sending arguments, return values from worker functions can be accessed. Every time you initiate a task, you will get a report channel.
+```go
+reports, err := app.Call("yourTask", nil, arg1, arg2 ...)
+
+// synchronous waiting
+r := <-reports
+
+// asynchronous waiting
+go func () {
+  r := <-reports
+}()
+
+// access the return values
+if r.OK() {
+  var ret []interface{} = r.Return()
+  ret[0].(int) // by type assertion
+}
+```
+Or using [dingo.Result](https://godoc.org/github.com/mission-liao/dingo#Result)
+```go
+result := dingo.NewResult(app.Call("yourTask", nil, arg1, arg2 ...))
+// synchronous waiting
+if err := result.Wait(0); err != nil {
+  var ret []interface{} = result.Last.Return()
+}
+// or polling with timeout
+for dingo.ResultError.Timeout == result.Wait(1 * time.Second) {
+  fmt.Println("waiting.....")
+}
+// or by handler
+result.OnOK(func(_1 retType1, _2 retType2 ...) {
+  // no more assertion is required
+})
+result.OnNOK(func(e1 *dingo.Error, e2 error) {
+  // any possible error goes here
+})
+// asynchronous waiting
+err = result.Then() // only error when you don't set any handler
+```
+
+###Dingo @Home, or Anywhere
+> A Distributed Task Framework with Local Mode
+
+You would prefer a small, local worker pool at early development stage, and transfer to a distributed one when stepping in production. In dingo, there is nothing much to do for transfering (besides debugging, :( )
 
 You've seen a demo for local mode, and it's easy to make it distributed by attaching corresponding components at caller-side and worker-side. A demo: [caller](https://godoc.org/github.com/mission-liao/dingo#example-App-Use-Caller) and [worker](https://godoc.org/github.com/mission-liao/dingo#ex-App-Use-Worker).
 
@@ -95,7 +153,9 @@ And at __Worker__ side, you need to:
  - attach __Consumer__ (or __NamedConsumer__), __Reporter__
  - allocate worker routines
 
-###Customizable
+###Personalize Your Dingo
+> Customizable
+
 Many core behaviors can be customized:
  - Generation of ID for new tasks: [IDMaker](https://godoc.org/github.com/mission-liao/dingo#IDMaker)
  - Parameter Marshalling: [Marshaller](https://godoc.org/github.com/mission-liao/dingo#Marshaller)
@@ -120,4 +180,13 @@ go func () {
   }
 }()
 ```
-Besides this, I would like to add more utility/mechanism to help troubleshooting, if anyone have any suggestion, please feel free to raise an issue for discussion.
+
+You can also turn on __Progress Reports__ for more detailed execution reports.
+```go
+reports, err := app.Call("YourTask", dingo.NewOption().SetMonitorProgress(true), arg1, arg2, ...)
+<-reports // the task is received by workers
+<-reports // the task is sent to worker functions
+<-reports // the final report for either success or failure
+```
+
+Besides these, I would like to add more utility/mechanism to help troubleshooting, if anyone have any suggestion, please feel free to raise an issue for discussion.
