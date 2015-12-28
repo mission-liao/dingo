@@ -43,38 +43,60 @@ func (brk *localBroker) consumerRoutine(quit <-chan int, wait *sync.WaitGroup, e
 		h     *Header
 		reply *TaskReceipt
 		err   error
+		ok    bool
+		v     []byte
 	)
+	out := func(v []byte) (done bool) {
+		if h, err = DecodeHeader(v); err != nil {
+			events <- NewEventFromError(ObjT.Consumer, err)
+			return
+		}
+
+		output <- v
+		if reply, ok = <-receipts; !ok {
+			// receipt channel is closed
+			done = true
+			return
+		}
+
+		if reply.ID != h.ID() {
+			events <- NewEventFromError(
+				ObjT.Consumer,
+				fmt.Errorf("expected: %v, received: %v", h, reply),
+			)
+			return
+		}
+
+		return
+	}
 
 	for {
 		select {
 		case _, _ = <-quit:
 			goto clean
-		case v, ok := <-input:
+		case v, ok = <-input:
 			if !ok {
 				goto clean
 			}
-
-			if h, err = DecodeHeader(v); err != nil {
-				events <- NewEventFromError(ObjT.Consumer, err)
-				break
-			}
-
-			output <- v
-			if reply, ok = <-receipts; !ok {
+			if out(v) {
 				goto clean
-			}
-
-			if reply.ID != h.ID() {
-				events <- NewEventFromError(
-					ObjT.Consumer,
-					fmt.Errorf("expected: %v, received: %v", h, reply),
-				)
-				break
 			}
 		}
 	}
 clean:
-	// TODO: clean up
+	for {
+		select {
+		default:
+			break clean
+		case v, ok = <-input:
+			if !ok {
+				break clean
+			}
+			if out(v) {
+				break clean
+			}
+		}
+	}
 }
 
 //

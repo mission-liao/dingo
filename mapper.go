@@ -181,7 +181,7 @@ func (mp *_mappers) mapperRoutine(
 			}
 			receive(t)
 
-		case <-quit:
+		case _, _ = <-quit:
 			// clean up code below
 			goto clean
 		}

@@ -27,7 +27,7 @@ func newLocalBridge(args ...interface{}) (b bridge) {
 		events:    make(chan *Event, 10),
 		listeners: NewRoutines(),
 		reporters: NewRoutines(),
-		broker:    make(chan *Task, 10),             // TODO: config
+		broker:    make(chan *Task, 100),            // TODO: config
 		pollers:   make(chan *localStorePoller, 10), // TODO: config
 		supported: ObjT.Reporter | ObjT.Store | ObjT.Producer | ObjT.Consumer,
 	}
@@ -50,7 +50,7 @@ func (bdg *localBridge) Close() (err error) {
 	bdg.reporters.Close()
 
 	close(bdg.broker)
-	bdg.broker = make(chan *Task, 10)
+	bdg.broker = make(chan *Task, 100) // TODO: config
 	return
 }
 

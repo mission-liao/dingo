@@ -63,6 +63,18 @@ func (bkd *localBackend) reporterRoutine(quit <-chan int, done chan<- int, event
 		}
 	}
 clean:
+	for {
+		select {
+		default:
+			break clean
+		case v, ok := <-reports:
+			if !ok {
+				break clean
+			}
+
+			bkd.to <- v
+		}
+	}
 }
 
 func (bkd *localBackend) storeRoutine(quit <-chan int, wait *sync.WaitGroup, events chan<- *Event) {

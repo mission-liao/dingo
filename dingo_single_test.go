@@ -183,7 +183,7 @@ func (ts *DingoSingleAppTestSuite) TestSameID() {
 		if err != nil {
 			return
 		}
-		_, err = ts.app.Allocate(name, 5, 5)
+		_, err = ts.app.Allocate(name, 5, 3)
 		if err != nil {
 			return
 		}
