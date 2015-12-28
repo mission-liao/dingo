@@ -17,7 +17,7 @@ Below is a quicklink to go through this README:
   - [Throwing and Catching with Your Dingo](README.md##throwing-and-catching-with-your-dingo)
   - [Dingo @Home, or Anywhere](README.md#dingo-home-or-anywhere)
   - [Personalize Your Dingo](README.md#personalize-your-dingo)
-- [Guide]() TBD
+- [Guide](docs/guide/README.md) 
 - [Configuration]() TBD
 - [Troubleshooting](README.md#troubleshooting)
 
