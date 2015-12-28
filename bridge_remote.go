@@ -216,7 +216,7 @@ func (bdg *remoteBridge) Poll(t *Task) (reports <-chan *Report, err error) {
 	) {
 		defer wait.Done()
 		defer func() {
-			if err = bdg.store.Done(t); err != nil {
+			if err := bdg.store.Done(t); err != nil {
 				events <- NewEventFromError(ObjT.Store, err)
 			}
 		}()
