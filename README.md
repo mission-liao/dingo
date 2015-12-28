@@ -18,7 +18,7 @@ Below is a quicklink to go through this README:
   - [Dingo @Home, or Anywhere](README.md#dingo-home-or-anywhere)
   - [Personalize Your Dingo](README.md#personalize-your-dingo)
 - [Guide](docs/guide/README.md) 
-- [Configuration]() TBD
+- [Benchmark](docs/benchmark.md)
 - [Troubleshooting](README.md#troubleshooting)
 
 ##Quick Demo

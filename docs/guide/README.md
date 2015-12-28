@@ -4,10 +4,11 @@ This section would let you dive into __Dingo__. Before reading, refer to this im
 
 ![Image Of Objects](https://docs.google.com/drawings/d/11NxJYozlGNYsPp1Xq3FOEjtg7kVHaYT_v466jH-6t7k/pub?w=544&h=404)
 
-- [Prepare A Background Worker Pool]() TBD
 - Step into Distributed
   - [Prepare A Caller]() TBD
   - [Prepare A Worker]() TBD
+- [Prepare A Background Worker Pool]() TBD
+- [Configuration]() TBD
 - [Execution Option]() TBD
 - [A Tour of Task]() TBD
 - [A Tour of Result]() TBD
@@ -16,6 +17,6 @@ This section would let you dive into __Dingo__. Before reading, refer to this im
   - Database Adaptor
     - [Backend]()
     - [Broker]()
-  - [Customize Function Invoker]()
-  - [Customize Argument Marshaller]()
-  - [Customize ID Maker]()
+  - [Function Invoker]()
+  - [Argument Marshaller]()
+  - [ID Maker]()
