@@ -13,6 +13,10 @@ One important concept I learned from [Celery](http://www.celeryproject.org/) and
 Below is a quicklink to go through this README:
 - [Demo](README.md#quick-demo)
 - [Features](README.md#features)
+  - [(Almost) ANY Function Can Be Your Dingo](README.md#almost-any-function-can-be-your-dingo)
+  - [Throwing and Catching with Your Dingo](README.md##throwing-and-catching-with-your-dingo)
+  - [Dingo @Home, or Anywhere](README.md#dingo-home-or-anywhere)
+  - [Personalize Your Dingo](README.md#personalize-your-dingo)
 - [Guide]() TBD
 - [Configuration]() TBD
 - [Troubleshooting](README.md#troubleshooting)
@@ -95,7 +99,7 @@ And yes, return values of worker functions would also be __type corrected__.
 ###Throwing and Catching with Your Dingo
 > Two Way Binding with Worker Functions
 
-Besides sending arguments, return values from worker functions can be accessed. Every time you initiate a task, you will get a report channel.
+Besides sending arguments, return values from worker functions can also be accessed. Every time you initiate a task, you will get a report channel.
 ```go
 reports, err := app.Call("yourTask", nil, arg1, arg2 ...)
 
@@ -134,6 +138,7 @@ result.OnNOK(func(e1 *dingo.Error, e2 error) {
 // asynchronous waiting
 err = result.Then() // only error when you don't set any handler
 ```
+or using the fancy golang channel helper: [channels](https://github.com/eapache/channels)
 
 ###Dingo @Home, or Anywhere
 > A Distributed Task Framework with Local Mode
