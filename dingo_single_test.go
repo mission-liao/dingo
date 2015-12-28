@@ -157,13 +157,14 @@ func (ts *DingoSingleAppTestSuite) TestSameID() {
 		countOfTasks       = 5
 		results            = make([][]*dingo.Result, countOfConcurrency)
 		wait               sync.WaitGroup
-		fn                 = func(n int, msg string) (int, string) {
-			return n + 1000, "the msg: " + msg
-		}
 	)
 	defer func() {
 		ts.Nil(err)
 	}()
+	fn := func(n int, msg string) (int, string) {
+		ts.T().Logf("receiving: %v %v", n, msg)
+		return n + 1000, "the msg: " + msg
+	}
 
 	for i := 0; i < countOfConcurrency; i++ {
 		name := fmt.Sprintf("TestSameID.%d", i)
@@ -191,11 +192,13 @@ func (ts *DingoSingleAppTestSuite) TestSameID() {
 
 	// send tasks in parellel
 	wait.Add(countOfConcurrency)
+	ts.T().Logf("sending tasks...\n")
 	{
 		for i := 0; i < countOfConcurrency; i++ {
 			go func(idx int, name string) {
 				defer wait.Done()
 				for j := 0; j < countOfTasks; j++ {
+					ts.T().Logf("sending:%v:%v\n", idx, j)
 					results[idx] = append(
 						results[idx],
 						dingo.NewResult(
@@ -208,6 +211,7 @@ func (ts *DingoSingleAppTestSuite) TestSameID() {
 		}
 	}
 	wait.Wait()
+	ts.T().Logf("sending tasks...done\n")
 
 	// receiving reports
 	received := 0
@@ -217,6 +221,7 @@ func (ts *DingoSingleAppTestSuite) TestSameID() {
 	for i, v := range results {
 		for j, r := range v {
 			err = r.Wait(0)
+			ts.T().Logf("receiving: %v:%v\n", i, j)
 			if err != nil {
 				return
 			}
