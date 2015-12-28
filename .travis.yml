@@ -21,6 +21,6 @@ env:
     - AMQP_URL=amqp://guest:guest@127.0.0.1:5672/ GOMAXPROCS=2
 
 script:
-    - go test -v -covermode=count -coverprofile=coverage.out
+    - go test -v -covermode=count -coverprofile=coverage.out -race
     - $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN
 
