@@ -394,3 +394,94 @@ func (ts *resultTestSuite) TestOnOK() {
 		res.OnOK(func(name string, count int) {})
 	})
 }
+
+func (ts *resultTestSuite) TestChecker() {
+	var (
+		err    error
+		report *Report
+	)
+	defer func() {
+		ts.Nil(err)
+	}()
+	err = ts.trans.Register("TestChecker", func() {})
+	if err != nil {
+		return
+	}
+
+	task, err := ts.trans.ComposeTask("TestChecker", nil, nil)
+	if err != nil {
+		return
+	}
+
+	// OK
+	{
+		reports := make(chan *Report, 10)
+		result := NewResult(reports, nil)
+		ts.False(result.OK())
+		ts.False(result.NOK())
+
+		// a Sent report
+		report, err = task.composeReport(Status.Sent, nil, nil)
+		if err != nil {
+			return
+		}
+		reports <- report
+		err2 := result.Wait(20 * time.Millisecond)
+		ts.Equal(ResultError.Timeout, err2)
+		ts.False(result.OK())
+		ts.False(result.NOK())
+
+		// a Success report
+		report, err = task.composeReport(Status.Success, nil, nil)
+		if err != nil {
+			return
+		}
+		reports <- report
+		err = result.Wait(0)
+		if err != nil {
+			return
+		}
+		ts.True(result.OK())
+		ts.False(result.NOK())
+	}
+
+	// NOK, error
+	{
+		reports := make(chan *Report, 10)
+		result := NewResult(reports, errors.New("test error"))
+		ts.False(result.OK())
+		ts.True(result.NOK())
+	}
+
+	// NOK, Error
+	{
+		reports := make(chan *Report, 10)
+		result := NewResult(reports, nil)
+		ts.False(result.OK())
+		ts.False(result.NOK())
+
+		// a Sent report
+		report, err = task.composeReport(Status.Sent, nil, nil)
+		if err != nil {
+			return
+		}
+		reports <- report
+		err2 := result.Wait(20 * time.Millisecond)
+		ts.Equal(ResultError.Timeout, err2)
+		ts.False(result.OK())
+		ts.False(result.NOK())
+
+		// a Success report
+		report, err = task.composeReport(Status.Fail, nil, NewErr(0, errors.New("test error")))
+		if err != nil {
+			return
+		}
+		reports <- report
+		err = result.Wait(0)
+		if err != nil {
+			return
+		}
+		ts.False(result.OK())
+		ts.True(result.NOK())
+	}
+}

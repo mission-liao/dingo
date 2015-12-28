@@ -162,7 +162,6 @@ func (ts *DingoSingleAppTestSuite) TestSameID() {
 		ts.Nil(err)
 	}()
 	fn := func(n int, msg string) (int, string) {
-		fmt.Printf("receiving: %v %v\n", n, msg)
 		return n + 1000, "the msg: " + msg
 	}
 
@@ -192,13 +191,11 @@ func (ts *DingoSingleAppTestSuite) TestSameID() {
 
 	// send tasks in parellel
 	wait.Add(countOfConcurrency)
-	fmt.Printf("sending tasks...\n")
 	{
 		for i := 0; i < countOfConcurrency; i++ {
 			go func(idx int, name string) {
 				defer wait.Done()
 				for j := 0; j < countOfTasks; j++ {
-					fmt.Printf("sending:%v:%v\n", idx, j)
 					results[idx] = append(
 						results[idx],
 						dingo.NewResult(
@@ -211,7 +208,6 @@ func (ts *DingoSingleAppTestSuite) TestSameID() {
 		}
 	}
 	wait.Wait()
-	fmt.Printf("sending tasks...done\n")
 
 	// receiving reports
 	received := 0
@@ -221,7 +217,6 @@ func (ts *DingoSingleAppTestSuite) TestSameID() {
 	for i, v := range results {
 		for j, r := range v {
 			err = r.Wait(0)
-			fmt.Printf("receiving: %v:%v\n", i, j)
 			if err != nil {
 				return
 			}

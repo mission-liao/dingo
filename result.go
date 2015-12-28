@@ -217,3 +217,16 @@ func (rt *Result) OnNOK(efn func(*Error, error)) {
 		rt.efn = efn
 	}
 }
+
+/*OK is used to check the status is OK or not
+ */
+func (rt *Result) OK() bool {
+	return rt.Last != nil && rt.Last.OK()
+}
+
+/*NOK is used to check the status is NOK or not.
+note: !NOK != OK
+*/
+func (rt *Result) NOK() bool {
+	return rt.err != nil || (rt.Last != nil && rt.Last.Fail())
+}
