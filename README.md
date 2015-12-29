@@ -11,15 +11,16 @@ One important concept I learned from [Celery](http://www.celeryproject.org/) and
 > When you send a task message in Celery, that message will not contain any source code, but only the name of the task you want to execute. This works similarly to how host names work on the internet: every worker maintains a mapping of task names to their actual functions, called the task registry.
 
 Below is a quicklink to go through this README:
-- [Demo](README.md#quick-demo)
+- [Quick Demo](README.md#quick-demo)
 - [Features](README.md#features)
-  - [(Almost) ANY Function Can Be Your Dingo](README.md#almost-any-function-can-be-your-dingo)
-  - [Throwing and Catching with Your Dingo](README.md##throwing-and-catching-with-your-dingo)
-  - [Dingo @Home, or Anywhere](README.md#dingo-home-or-anywhere)
-  - [Personalize Your Dingo](README.md#personalize-your-dingo)
+  - [Invoking Worker Functions with Arbitary Signatures](README.md#invoking-worker-functions-with-arbitary-signatures)
+  - [Two Way Binding with Worker Functions](README.md##two-way-binding-with-worker-functions)
+  - [A Distributed Task Framework with Local Mode](README.md#a-distributed-task-framework-with-local-mode)
+  - [Customizable](README.md#customizable)
+  - Supported Database Adaptor: [AMQP](amqp/README.md), [Redis](redis/README.md)
+  - Supporter Golang Version: 1.4, 1.5
 - [Guide](docs/guide/README.md) 
 - [Benchmark](docs/benchmark.md)
-- [Troubleshooting](README.md#troubleshooting)
 
 ##Quick Demo
 Here is a quick demo of this project in local mode as a background job pool:
@@ -49,7 +50,7 @@ func main() {
 	_, err = app.Allocate("add", 2, 1)
 
 	// wrap the report channel with dingo.Result
-	result := dingo.NewResult(app.Call("add", dingo.NewOption(), 2, 3))
+	result := dingo.NewResult(app.Call("add", dingo.DefaultOption(), 2, 3))
 	err = result.Wait(0)
 	if err != nil {
 		return
@@ -68,8 +69,8 @@ func main() {
 
 ##Features
 
-###(Almost) ANY Function Can Be Your Dingo
-> Invoking Worker Functions with Arbitary Signatures
+###Invoking Worker Functions with Arbitary Signatures
+> (Almost) ANY Function Can Be Your Dingo
 
 These functions can be used as __worker functions__ by dingo:
 ```go
@@ -83,7 +84,9 @@ func DeleteEmployees(names []string) (count int) { ... } // slice, OK
 func DoNothing () { ... } // OK
 ```
 
-The most compatible exchange format is []byte, to marshall in/out your parameters to []byte, we rely these builtin encoders:
+Idealy, you don't have to rewrite your function to fit any specific signature, it's piece of cake to make a function distributed by adapting __Dingo__.
+
+Here is to explain why some types can't be supported by __Dingo__. The most compatible exchange format is []byte, to marshall in/out your parameters to []byte, we rely these builtin encoders:
  - encoding/json
  - encoding/gob
 
@@ -94,10 +97,8 @@ Obviously, it's hard (not impossible) to handle all types in #golang, these are 
  - chan: haven't tried yet
  - private field in struct: they are ignore by json/gob, but it's still possible to support them by providing customized marshaller and invoker. (please search 'ExampleCustomMarshaller' for details)
  
-And yes, return values of worker functions would also be __type corrected__.
-
-###Throwing and Catching with Your Dingo
-> Two Way Binding with Worker Functions
+###Two Way Binding with Worker Functions
+> Throwing and Catching with Your Dingo
 
 Besides sending arguments, return values from worker functions can also be accessed. Every time you initiate a task, you will get a report channel.
 ```go
@@ -117,38 +118,12 @@ if r.OK() {
   ret[0].(int) // by type assertion
 }
 ```
-Or using [dingo.Result](https://godoc.org/github.com/mission-liao/dingo#Result)
-```go
-result := dingo.NewResult(app.Call("yourTask", nil, arg1, arg2 ...))
-// synchronous waiting
-if err := result.Wait(0); err != nil {
-  var ret []interface{} = result.Last.Return()
-}
-// or polling with timeout
-for dingo.ResultError.Timeout == result.Wait(1 * time.Second) {
-  fmt.Println("waiting.....")
-}
-if result.OK() {
-    var ret []interface{} = result.Last.Return()
-    ...
-} else if result.NOK() {
-} else {
-    // if you reach here, fire me a bug
-}
-// or by handler
-result.OnOK(func(_1 retType1, _2 retType2 ...) {
-  // no more assertion is required
-})
-result.OnNOK(func(e1 *dingo.Error, e2 error) {
-  // any possible error goes here
-})
-// asynchronous waiting
-err = result.Then() // only error when you don't set any handler
-```
-or using the fancy golang channel helper: [channels](https://github.com/eapache/channels)
+Or using:
+ - [dingo.Result](https://godoc.org/github.com/mission-liao/dingo#Result)
+ - the fancy golang channel helper: [channels](https://github.com/eapache/channels)
 
-###Dingo @Home, or Anywhere
-> A Distributed Task Framework with Local Mode
+###A Distributed Task Framework with Local Mode
+> Dingo @Home, or Anywhere
 
 You would prefer a small, local worker pool at early development stage, and transfer to a distributed one when stepping in production. In dingo, there is nothing much to do for transfering (besides debugging, :( )
 
@@ -165,8 +140,8 @@ And at __Worker__ side, you need to:
  - attach __Consumer__ (or __NamedConsumer__), __Reporter__
  - allocate worker routines
 
-###Personalize Your Dingo
-> Customizable
+###Customizable
+> Personalize Your Dingo
 
 Many core behaviors can be customized:
  - Generation of ID for new tasks: [IDMaker](https://godoc.org/github.com/mission-liao/dingo#IDMaker)
@@ -175,30 +150,3 @@ Many core behaviors can be customized:
  - Task Publishing/Consuming: [Producer](https://godoc.org/github.com/mission-liao/dingo#Producer)/[Consumer](https://godoc.org/github.com/mission-liao/dingo#Consumer)/[NamedConsumer](https://godoc.org/github.com/mission-liao/dingo#NamedConsumer)
  - Report Publishing/Consuming: [Reporter](https://godoc.org/github.com/mission-liao/dingo#Reporter)/[Store](https://godoc.org/github.com/mission-liao/dingo#Store)
 
-##Troubleshooting
-Most APIs in this library are executed asynchronously in separated go-routines. Therefore, we can't report a failure by returning an error. Instead, an event channel could be subscribed for failure events.
-```go
-// subscribe a event channel
-_, events, err := app.Listen(dingo.ObjT.All, dingo.EventLvl.Debug, 0)
-// initiate a go routine to log events
-go func () {
-  for {
-    select e, ok := <-events:
-      if !ok {
-        // dingo is closed
-      }
-      // log it
-      fmt.Printf("%v\n", e)
-  }
-}()
-```
-
-You can also turn on __Progress Reports__ for more detailed execution reports.
-```go
-reports, err := app.Call("YourTask", dingo.NewOption().SetMonitorProgress(true), arg1, arg2, ...)
-<-reports // the task is received by workers
-<-reports // the task is sent to worker functions
-<-reports // the final report for either success or failure
-```
-
-Besides these, I would like to add more utility/mechanism to help troubleshooting, if anyone have any suggestion, please feel free to raise an issue for discussion.

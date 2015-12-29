@@ -5,7 +5,7 @@ Below is a flow when you initiate a task and receive reports in __Dingo__.
 
 ![Image Of Flow](https://docs.google.com/drawings/d/1Ga6j9gNo-dU7OMe8FLNmwYkRLH_OupWs_10SFJ3igXQ/pub?w=795&h=362)
 
-The key to scaling is independence. Divide a big procedure into smaller ones, and make each one of them isolated from each other. For a function in #golang, we can devide it into three parts:
+The key to scaling dividing a big procedure into smaller ones, and making each one of them isolated from each other. For a function in #golang, we can devide it into three parts:
 ```go
 //         passing arguments      receiving return values
 //                |                          |
@@ -46,4 +46,4 @@ After execution:
    - dispatch it to the right channel.
 
 ###Example
-There are runnable examples on GoDoc([Caller](https://godoc.org/github.com/mission-liao/dingo#example-App-Use-Caller) and [Worker](https://godoc.org/github.com/mission-liao/dingo#example-App-Use-Worker)) based on AMQP adaptor.
+There are runnable examples on GoDoc([Caller](https://godoc.org/github.com/mission-liao/dingo#example-App-Use-Caller) and [Worker](https://godoc.org/github.com/mission-liao/dingo#example-App-Use-Worker)) based on our AMQP adaptor.
