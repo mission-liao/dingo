@@ -1,6 +1,6 @@
 ##Redis
 
-Builtin supports using __Redis__ as both brokers and backends:
+Builtin supports using __Redis__ as both brokers and backends, we implement [__NamedBroker__](https://godoc.org/github.com/mission-liao/dingo#NamedBroker) and [Backend](https://godoc.org/github.com/mission-liao/dingo#Backend) in this component:
 ```go
 import dgredis // package name is prefixed 'dg' to avoid confliction with "redigo/redis" pacakge
 

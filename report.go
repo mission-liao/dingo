@@ -50,22 +50,46 @@ var Status = struct {
 	0, 1, 2, 3, 4, 5,
 }
 
-func (r *Report) ID() string    { return r.H.I }
-func (r *Report) Name() string  { return r.H.N }
+/*ID refers to identifier of this report, and all reports belongs to one task share the same ID.
+ */
+func (r *Report) ID() string { return r.H.I }
+
+/*
+Name refers to the name of this task that the report belongs to.
+*/
+func (r *Report) Name() string { return r.H.N }
+
+/*Status refers to current execution status of this task
+ */
 func (r *Report) Status() int16 { return r.P.S }
 
-func (r *Report) Error() *Error               { return r.P.E }
-func (r *Report) Option() *Option             { return r.P.O }
-func (r *Report) Return() []interface{}       { return r.P.R }
-func (r *Report) setReturn(ret []interface{}) { r.P.R = ret }
+/*Error refers to possible error raised during execution, which is packed into
+transportable form.
+*/
+func (r *Report) Error() *Error { return r.P.E }
 
-//
-// checker
-//
+/*Option refers to execution options of the report, inherits from the tasks that it belongs to.
+ */
+func (r *Report) Option() *Option { return r.P.O }
 
+/*Return refers to the return values of worker function.
+ */
+func (r *Report) Return() []interface{} { return r.P.R }
+
+/*Done means the task is finished, and no more reports would be sent. Either Error() or Return() would
+have values to check.
+*/
 func (r *Report) Done() bool { return r.P.S == Status.Success || r.P.S == Status.Fail }
-func (r *Report) OK() bool   { return r.P.S == Status.Success }
+
+/*OK means the task is done and succeeded, Return() would have values to check.
+ */
+func (r *Report) OK() bool { return r.P.S == Status.Success }
+
+/*Fail means the task is done and failed, Error() would have values to check.
+ */
 func (r *Report) Fail() bool { return r.P.S == Status.Fail }
+
+func (r *Report) setReturn(ret []interface{}) { r.P.R = ret }
 func (r *Report) almostEqual(other *Report) (same bool) {
 	if same = r.H.I == other.H.I &&
 		r.H.N == other.H.N &&
