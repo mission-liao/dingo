@@ -25,6 +25,9 @@ type backend struct {
 }
 
 func NewBackend(cfg *RedisConfig) (v *backend, err error) {
+	if cfg == nil {
+		cfg = DefaultRedisConfig()
+	}
 	v = &backend{
 		reporters: dingo.NewHetroRoutines(),
 		rids:      make(map[string]map[string]int),

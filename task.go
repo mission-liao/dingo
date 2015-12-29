@@ -28,7 +28,7 @@ type Task struct {
 
 func composeTask(name string, opt *Option, args []interface{}) (t *Task, err error) {
 	if opt == nil {
-		opt = NewOption() // make sure it's the default option
+		opt = DefaultOption() // make sure it's the default option
 	}
 	var id string
 	if id, err = (&uuidMaker{}).NewID(); err != nil {

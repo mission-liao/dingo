@@ -75,7 +75,7 @@ func (me *localSingleAppTestSuite) TestIgnoreReport() {
 	// initiate a task with an option(IgnoreReport == true)
 	reports, err := me.app.Call(
 		"TestIgnoreReport",
-		dingo.NewOption().SetIgnoreReport(true).SetMonitorProgress(true),
+		dingo.DefaultOption().IgnoreReport(true).MonitorProgress(true),
 	)
 	me.Nil(err)
 	me.Nil(reports)
@@ -210,7 +210,7 @@ func (me *localSingleAppTestSuite) TestMyMarshaller() {
 
 	reports, err := me.app.Call(
 		"TestMyMarshaller",
-		dingo.NewOption(),
+		dingo.DefaultOption(),
 		12345, "mission",
 	)
 	me.Nil(err)
@@ -278,7 +278,7 @@ func (me *localSingleAppTestSuite) TestCustomMarshaller() {
 
 	// initiate a task with an option(IgnoreReport == true)
 	reports, err := me.app.Call(
-		"TestCustomMarshaller", dingo.NewOption().SetMonitorProgress(true), 12345, "mission",
+		"TestCustomMarshaller", dingo.DefaultOption().MonitorProgress(true), 12345, "mission",
 	)
 	me.Nil(err)
 
@@ -353,7 +353,7 @@ func (me *localSingleAppTestSuite) TestCustomMarshallerWithMinimalFunc() {
 
 	// initiate a task with an option(IgnoreReport == true)
 	reports, err := me.app.Call(
-		"TestCustomMarshallerWithMinimalFunc", dingo.NewOption().SetMonitorProgress(true),
+		"TestCustomMarshallerWithMinimalFunc", dingo.DefaultOption().MonitorProgress(true),
 	)
 	me.Nil(err)
 

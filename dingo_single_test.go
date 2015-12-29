@@ -96,7 +96,7 @@ func (ts *DingoSingleAppTestSuite) TestBasic() {
 	ts.Equal(0, remain)
 
 	// call that function
-	reports, err := ts.app.Call("TestBasic", dingo.NewOption().SetMonitorProgress(true), 5)
+	reports, err := ts.app.Call("TestBasic", dingo.DefaultOption().MonitorProgress(true), 5)
 	ts.Nil(err)
 	ts.NotNil(reports)
 
@@ -179,7 +179,7 @@ func (ts *DingoSingleAppTestSuite) TestSameID() {
 		if err != nil {
 			return
 		}
-		err = ts.app.SetOption(name, dingo.NewOption().SetMonitorProgress(true))
+		err = ts.app.SetOption(name, dingo.DefaultOption().MonitorProgress(true))
 		if err != nil {
 			return
 		}

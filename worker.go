@@ -248,7 +248,7 @@ func (wrk *_workers) workerRoutine(
 	defer wait.Done()
 	rep := func(task *Task, status int16, payload []interface{}, err error, alreadySent bool) (sent bool) {
 		sent = alreadySent
-		if task.Option().IgnoreReport() {
+		if task.Option().GetIgnoreReport() {
 			return
 		}
 
@@ -263,7 +263,7 @@ func (wrk *_workers) workerRoutine(
 			}
 		}
 
-		if r.Done() || r.Option().MonitorProgress() {
+		if r.Done() || r.Option().GetMonitorProgress() {
 			if !sent {
 				sent = true
 				wrk.hooks.ReporterHook(ReporterEvent.BeforeReport, task)

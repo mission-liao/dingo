@@ -12,6 +12,7 @@ import (
 // Marshaller
 //
 
+// TODO: make this private
 type MarshallerTestSuite struct {
 	suite.Suite
 
@@ -20,7 +21,7 @@ type MarshallerTestSuite struct {
 
 func (ts *MarshallerTestSuite) TestTask() {
 	task, err := composeTask(
-		"test", NewOption().SetIgnoreReport(true).SetMonitorProgress(true),
+		"test", DefaultOption().IgnoreReport(true).MonitorProgress(true),
 		[]interface{}{float64(1.5), "user", "password"},
 	)
 	ts.NotNil(task)
@@ -46,7 +47,7 @@ func (ts *MarshallerTestSuite) TestTask() {
 			ts.NotNil(t)
 			if t != nil {
 				ts.True(t.almostEqual(task))
-				ts.True(t.Option().IgnoreReport())
+				ts.True(t.Option().GetIgnoreReport())
 			}
 		}
 	}
@@ -59,7 +60,7 @@ func (ts *MarshallerTestSuite) TestTask() {
 }
 
 func (ts *MarshallerTestSuite) TestReport() {
-	task, err := composeTask("test", NewOption().SetIgnoreReport(true).SetMonitorProgress(true), nil)
+	task, err := composeTask("test", DefaultOption().IgnoreReport(true).MonitorProgress(true), nil)
 	ts.Nil(err)
 	if err != nil {
 		return
@@ -88,7 +89,7 @@ func (ts *MarshallerTestSuite) TestReport() {
 			ts.NotNil(r)
 			if r != nil {
 				ts.Equal(report, r)
-				ts.True(r.Option().IgnoreReport())
+				ts.True(r.Option().GetIgnoreReport())
 			}
 		}
 	}

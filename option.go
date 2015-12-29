@@ -7,18 +7,18 @@ type Option struct {
 	MP bool
 }
 
-func (opt *Option) IgnoreReport() bool    { return opt.IR }
-func (opt *Option) MonitorProgress() bool { return opt.MP }
+func (opt *Option) GetIgnoreReport() bool    { return opt.IR }
+func (opt *Option) GetMonitorProgress() bool { return opt.MP }
 
-func (opt *Option) SetIgnoreReport(ignore bool) *Option {
+func (opt *Option) IgnoreReport(ignore bool) *Option {
 	opt.IR = ignore
 	return opt
 }
-func (opt *Option) SetMonitorProgress(only bool) *Option {
+func (opt *Option) MonitorProgress(only bool) *Option {
 	opt.MP = only
 	return opt
 }
 
-func NewOption() *Option {
+func DefaultOption() *Option {
 	return &Option{}
 }

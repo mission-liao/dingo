@@ -22,6 +22,9 @@ type broker struct {
 }
 
 func NewBroker(cfg *RedisConfig) (v *broker, err error) {
+	if cfg == nil {
+		cfg = DefaultRedisConfig()
+	}
 	v = &broker{
 		listeners: dingo.NewRoutines(),
 		cfg:       *cfg,

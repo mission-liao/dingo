@@ -23,6 +23,9 @@ type broker struct {
 }
 
 func NewBroker(cfg *AmqpConfig) (v *broker, err error) {
+	if cfg == nil {
+		cfg = DefaultAmqpConfig()
+	}
 	v = &broker{
 		consumers: dingo.NewRoutines(),
 		cfg:       *cfg,

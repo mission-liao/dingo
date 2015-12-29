@@ -90,7 +90,7 @@ func (ts *mapperTestSuite) TestParellelMapping() {
 		// compose corresponding task
 		t, err := ts._trans.ComposeTask(
 			"ParellelMapping",
-			NewOption().SetMonitorProgress(true),
+			DefaultOption().MonitorProgress(true),
 			[]interface{}{i},
 		)
 		ts.Nil(err)

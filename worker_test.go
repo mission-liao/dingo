@@ -89,7 +89,7 @@ func (ts *workerTestSuite) TestPanic() {
 	ts.Len(reports, 1)
 
 	// an option with MonitorProgress == false
-	task, err := ts._trans.ComposeTask("TestPanic", NewOption(), nil)
+	task, err := ts._trans.ComposeTask("TestPanic", DefaultOption(), nil)
 	ts.NotNil(task)
 	ts.Nil(err)
 	if task != nil {
@@ -113,7 +113,7 @@ func (ts *workerTestSuite) TestIgnoreReport() {
 	ts.Len(reports, 1)
 
 	// an option with IgnoreReport == true
-	task, err := ts._trans.ComposeTask("TestIgnoreReport", NewOption().SetIgnoreReport(true), nil)
+	task, err := ts._trans.ComposeTask("TestIgnoreReport", DefaultOption().IgnoreReport(true), nil)
 	ts.NotNil(task)
 	ts.Nil(err)
 
@@ -139,7 +139,7 @@ func (ts *workerTestSuite) TestMonitorProgress() {
 	ts.Len(reports, 1)
 
 	// an option with MonitorProgress == false
-	task, err := ts._trans.ComposeTask("TestOnlyResult", NewOption(), nil)
+	task, err := ts._trans.ComposeTask("TestOnlyResult", DefaultOption(), nil)
 	ts.NotNil(task)
 	ts.Nil(err)
 

@@ -27,6 +27,9 @@ type backend struct {
 }
 
 func NewBackend(cfg *AmqpConfig) (v *backend, err error) {
+	if cfg == nil {
+		cfg = DefaultAmqpConfig()
+	}
 	v = &backend{
 		reporters: dingo.NewHetroRoutines(),
 		rids:      make(map[string]map[string]int),

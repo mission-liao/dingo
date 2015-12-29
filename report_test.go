@@ -16,7 +16,7 @@ func TestReportMarshal(t *testing.T) {
 		P: &dingo.ReportPayload{
 			S: 101,
 			E: &dingo.Error{102, "test error"},
-			O: dingo.NewOption().SetIgnoreReport(true).SetMonitorProgress(true),
+			O: dingo.DefaultOption().IgnoreReport(true).MonitorProgress(true),
 			R: nil,
 		},
 	})
@@ -30,7 +30,7 @@ func TestReportMarshal(t *testing.T) {
 		ass.Equal("test_id", r.ID())
 		ass.Equal(int32(102), r.Error().Code())
 		ass.Equal("test error", r.Error().Msg())
-		ass.Equal(true, r.Option().IgnoreReport())
-		ass.Equal(true, r.Option().MonitorProgress())
+		ass.Equal(true, r.Option().GetIgnoreReport())
+		ass.Equal(true, r.Option().GetMonitorProgress())
 	}
 }

@@ -617,7 +617,7 @@ func (dg *App) Call(name string, opt *Option, args ...interface{}) (reports <-ch
 	//
 	// if we poll after calling, we may lose some report if
 	// the task finished very quickly.
-	if !opt.IgnoreReport() {
+	if !opt.GetIgnoreReport() {
 		reports, err = dg.b.Poll(t)
 		if err != nil {
 			return

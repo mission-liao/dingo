@@ -148,7 +148,7 @@ func (mgr *fnMgr) Register(name string, fn interface{}) (err error) {
 	}
 	nfns[name] = &fnOpt{
 		fn:  fn,
-		opt: NewOption(),
+		opt: DefaultOption(),
 		mash: struct {
 			task, report int
 		}{Encode.Default, Encode.Default},
@@ -286,7 +286,7 @@ func (mgr *fnMgr) ComposeTask(name string, o *Option, args []interface{}) (t *Ta
 	}
 
 	if o == nil {
-		o = NewOption()
+		o = DefaultOption()
 	}
 
 	if id, err = m.NewID(); err != nil {

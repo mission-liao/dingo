@@ -148,7 +148,7 @@ func (ts *DingoMultiAppTestSuite) TestOrder() {
 
 	// register worker function
 	ts.register("TestOrder", work)
-	ts.setOption("TestOrder", dingo.NewOption().SetMonitorProgress(true))
+	ts.setOption("TestOrder", dingo.DefaultOption().MonitorProgress(true))
 	ts.allocate("TestOrder", 1, 1)
 
 	// sending tasks

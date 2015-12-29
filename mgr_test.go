@@ -94,7 +94,7 @@ func TestMgrOption(t *testing.T) {
 	trans := newFnMgr()
 
 	// name doesn't register
-	ass.NotNil(trans.SetOption("TestMgrOption", NewOption()))
+	ass.NotNil(trans.SetOption("TestMgrOption", DefaultOption()))
 
 	// get won't work
 	opt, err := trans.GetOption("TestMgrOption")
@@ -105,7 +105,7 @@ func TestMgrOption(t *testing.T) {
 	ass.Nil(trans.Register("TestMgrOption", func() {}))
 
 	// ok
-	ass.Nil(trans.SetOption("TestMgrOption", NewOption()))
+	ass.Nil(trans.SetOption("TestMgrOption", DefaultOption()))
 
 	// ok to get
 	opt, err = trans.GetOption("TestMgrOption")
