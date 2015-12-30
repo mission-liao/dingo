@@ -152,8 +152,8 @@ func (bdg *localBridge) StopAllListeners() (err error) {
 }
 
 func (bdg *localBridge) Report(reports <-chan *Report) (err error) {
-	bdg.objLock.RLock()
-	defer bdg.objLock.RUnlock()
+	bdg.objLock.Lock()
+	defer bdg.objLock.Unlock()
 
 	go func(
 		quit <-chan int,
@@ -171,19 +171,24 @@ func (bdg *localBridge) Report(reports <-chan *Report) (err error) {
 			// map (name, id) to slice of unsent reports.
 			unSent = make(map[string]map[string][]*Report)
 
-			id, name string
-			poller   *localStorePoller
+			id, name  string
+			p         *localStorePoller
+			ok        bool
+			v         *Report
+			id2poller map[string]*localStorePoller
+			id2Unst   map[string][]*Report
+			unst      []*Report
 		)
 
 		defer wait.Done()
 		outF := func(r *Report) (found bool) {
 			id, name = r.ID(), r.Name()
-			if ids, ok := watched[name]; ok {
-				if poller, found = ids[id]; found {
-					poller.reports <- r
+			if id2poller, ok = watched[name]; ok {
+				if p, found = id2poller[id]; found {
+					p.reports <- r
 					if r.Done() {
-						delete(ids, id)
-						close(poller.reports)
+						delete(id2poller, id)
+						close(p.reports)
 					}
 				}
 			}
@@ -195,34 +200,25 @@ func (bdg *localBridge) Report(reports <-chan *Report) (err error) {
 			select {
 			case _, _ = <-quit:
 				goto clean
-			case p, ok := <-pollers:
+			case p, ok = <-pollers:
 				if !ok {
 					goto clean
 				}
 				id, name = p.task.ID(), p.task.Name()
-				if ids, ok := watched[name]; ok {
-					if _, ok := ids[id]; ok {
-						events <- NewEventFromError(
-							ObjT.Store,
-							fmt.Errorf("duplicated polling found: %v %v", name, id),
-						)
-						break
-					}
-				}
 
 				// those reports would only be settle down when some
 				// reports coming in.
-				if ids, ok := unSent[name]; ok {
-					if unst, ok := ids[id]; ok {
-						if w, ok := watched[name]; ok {
-							w[id] = p
+				if id2Unst, ok = unSent[name]; ok {
+					if unst, ok = id2Unst[id]; ok {
+						if id2poller, ok = watched[name]; ok {
+							id2poller[id] = p
 						} else {
 							watched[name] = map[string]*localStorePoller{id: p}
 						}
-						for _, u := range unst {
-							outF(u)
+						for _, v = range unst {
+							outF(v)
 						}
-						delete(ids, id)
+						delete(id2Unst, id)
 						break
 					}
 				}
@@ -232,9 +228,9 @@ func (bdg *localBridge) Report(reports <-chan *Report) (err error) {
 				pollers <- p
 
 				// avoid busy looping
-				<-time.After(3 * time.Millisecond) // TODO: config it
+				<-time.After(1 * time.Nanosecond) // TODO: config it
 
-			case v, ok := <-inputs:
+			case v, ok = <-inputs:
 				if !ok {
 					goto clean
 				}
@@ -245,11 +241,11 @@ func (bdg *localBridge) Report(reports <-chan *Report) (err error) {
 
 				id, name = v.ID(), v.Name()
 				// store it in un-sent array
-				if rs, ok := unSent[name]; ok {
-					if unSentReports, ok := rs[id]; ok {
-						rs[id] = append(unSentReports, v)
+				if id2Unst, ok = unSent[name]; ok {
+					if unst, ok = id2Unst[id]; ok {
+						id2Unst[id] = append(unst, v)
 					} else {
-						rs[id] = []*Report{v}
+						id2Unst[id] = []*Report{v}
 					}
 				} else {
 					unSent[name] = map[string][]*Report{id: []*Report{v}}
@@ -259,7 +255,7 @@ func (bdg *localBridge) Report(reports <-chan *Report) (err error) {
 	clean:
 		for {
 			select {
-			case v, ok := <-inputs:
+			case v, ok = <-inputs:
 				if !ok {
 					break clean
 				}
