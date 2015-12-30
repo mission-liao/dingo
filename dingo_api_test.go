@@ -274,6 +274,11 @@ func TestDingoEventOrigin(t *testing.T) {
 	chk(chAll, dingo.ObjT.Bridge)
 	chk(chBridge, dingo.ObjT.Bridge)
 
+	// send a mapper | bridge event
+	obj.events <- dingo.NewEvent(dingo.ObjT.Bridge|dingo.ObjT.Mapper, dingo.EventLvl.Error, 0, "bridge")
+	chk(chAll, dingo.ObjT.Bridge|dingo.ObjT.Mapper)
+	chk(chBridge, dingo.ObjT.Bridge|dingo.ObjT.Mapper)
+
 	err = app.StopListen(idBridge)
 	if err != nil {
 		return
