@@ -11,8 +11,9 @@ __Backend__ is the interface defined to interact with data stores(ex: Redis) whi
 __Worker__ relies on this interface to send reports to data stores(ex: Redis). Instead of being synchronous, __Worker__ and this interface work in parellel by providing an output channel of __[]byte__. Two things to note:
  - __Dingo__ would make sure that all reports from one task would be sent through the same channel.
  - __Dingo__ would acquire mulitple report channels by calling this method multiple times.
+ - __Dingo__ each report channel would only receive one kind(name) of reports.
 ```go
-Report(reports <-chan *ReportEnvelope) (id int, err error)
+Report(name string, reports <-chan *ReportEnvelope) (id int, err error)
 ```
 The evenlope contains two parts:
  - meta info(ID, name of reports) of this byte stream, so you can rely on it to send this byte stream to correct table.

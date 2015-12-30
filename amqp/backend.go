@@ -163,7 +163,7 @@ func (me *backend) ReporterHook(eventID int, payload interface{}) (err error) {
 	return
 }
 
-func (me *backend) Report(reports <-chan *dingo.ReportEnvelope) (id int, err error) {
+func (me *backend) Report(name string, reports <-chan *dingo.ReportEnvelope) (id int, err error) {
 	quit, done, id := me.reporters.New(0)
 	go me._reporter_routine_(quit, done, me.reporters.Events(), reports)
 	return

@@ -380,7 +380,7 @@ func (dg *App) Allocate(name string, count, share int) (remain int, err error) {
 
 	for _, v := range reports {
 		// id of report channel is ignored
-		if err = dg.b.Report(v); err != nil {
+		if err = dg.b.Report(name, v); err != nil {
 			return
 		}
 	}

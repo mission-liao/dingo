@@ -36,13 +36,15 @@ type Reporter interface {
 	// - err: errors
 	ReporterHook(eventID int, payload interface{}) (err error)
 
-	// attach a report channel to backend.
+	// attach a report channel to backend. what dingo can promise is:
+	// - all reports belongs to the same task(name, id) would be sent through the same channel
 	//
 	// parameters:
+	// - name: all reports sent through this channel would be this name
 	// - reports: a input channel to receive reports from dingo.
 	// returns:
 	// - err: errors
-	Report(reports <-chan *ReportEnvelope) (id int, err error)
+	Report(name string, reports <-chan *ReportEnvelope) (id int, err error)
 }
 
 /*StoreEvent are those IDs of events that might be sent to StoreHook

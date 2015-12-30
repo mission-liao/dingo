@@ -69,7 +69,7 @@ func (ts *remoteBridgeTestSuite) TestReturnFix() {
 
 	// attach a reporting channel
 	reports := make(chan *Report, 10)
-	ts.Nil(ts.bg.Report(reports))
+	ts.Nil(ts.bg.Report("ReturnFix", reports))
 
 	// poll the task
 	outputs, err := ts.bg.Poll(t)
@@ -124,7 +124,7 @@ func (ts *remoteBridgeTestSuite) TestReport() {
 	bg := newRemoteBridge(ts.trans)
 
 	// add a report channel, should fail
-	ts.NotNil(bg.Report(make(chan *Report, 10)))
+	ts.NotNil(bg.Report("TestReport", make(chan *Report, 10)))
 }
 
 func (ts *remoteBridgeTestSuite) TestPoll() {

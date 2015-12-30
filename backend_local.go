@@ -175,7 +175,7 @@ func (bkd *localBackend) ReporterHook(eventID int, payload interface{}) (err err
 	return
 }
 
-func (bkd *localBackend) Report(reports <-chan *ReportEnvelope) (id int, err error) {
+func (bkd *localBackend) Report(name string, reports <-chan *ReportEnvelope) (id int, err error) {
 	quit, done, id := bkd.reporters.New(0)
 	go bkd.reporterRoutine(quit, done, bkd.reporters.Events(), reports)
 

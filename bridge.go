@@ -33,7 +33,7 @@ type bridge interface {
 	//
 	// proxy for Reporter
 	//
-	Report(reports <-chan *Report) (err error)
+	Report(name string, reports <-chan *Report) (err error)
 
 	//
 	// proxy for Store

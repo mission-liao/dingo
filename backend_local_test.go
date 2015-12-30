@@ -20,7 +20,7 @@ func TestLocalReporter(t *testing.T) {
 
 	// test case for Report/Unbind
 	reports := make(chan *dingo.ReportEnvelope, 10)
-	_, err = reporter.Report(reports)
+	_, err = reporter.Report("TestLocalReporter", reports)
 	ass.Nil(err)
 
 	// teardown

@@ -195,7 +195,7 @@ func (ts *bridgeTestSuite) TestReport() {
 
 	// attach reporter channel
 	reports := make(chan *Report, 10)
-	ts.Nil(ts.bg.Report(reports))
+	ts.Nil(ts.bg.Report("Report", reports))
 
 	// a sample task
 	t, err := ts.trans.ComposeTask("Report", nil, nil)
@@ -238,7 +238,7 @@ func (ts *bridgeTestSuite) TestPoll() {
 	rs := []chan *Report{}
 	for i := 0; i < count; i++ {
 		rs = append(rs, make(chan *Report, 10))
-		ts.Nil(ts.bg.Report(rs[len(rs)-1]))
+		ts.Nil(ts.bg.Report("Poll", rs[len(rs)-1]))
 	}
 
 	// multiple tasks
@@ -318,7 +318,7 @@ func (ts *bridgeTestSuite) TestFinalReportWhenShutdown() {
 
 	// a report channel
 	reports := make(chan *Report, 1)
-	ts.Nil(ts.bg.Report(reports))
+	ts.Nil(ts.bg.Report("FinalReportWhenShutdown", reports))
 
 	// a sample task
 	task, err := ts.trans.ComposeTask("FinalReportWhenShutdown", nil, nil)
@@ -347,22 +347,40 @@ func (ts *bridgeTestSuite) TestDifferentReportsWithSameID() {
 		countOfTypes = 10
 		countOfTasks = 10
 		tasks        []*Task
+		t            *Task
 		wait         sync.WaitGroup
+		err          error
 	)
-
-	reports := make(chan *Report, 10)
-	ts.Nil(ts.bg.Report(reports))
+	defer func() {
+		ts.Nil(err)
+	}()
 
 	// register idMaker, task
 	for i := 0; i < countOfTypes; i++ {
 		name := fmt.Sprintf("DifferentReportsWithSameID.%d", i)
-		ts.Nil(ts.trans.AddIDMaker(100+i, &testSeqID{}))
-		ts.Nil(ts.trans.Register(name, func() {}))
-		ts.Nil(ts.trans.SetIDMaker(name, 100+i))
+		err = ts.trans.AddIDMaker(100+i, &testSeqID{})
+		if err != nil {
+			return
+		}
+		err = ts.trans.Register(name, func() {})
+		if err != nil {
+			return
+		}
+		err = ts.trans.SetIDMaker(name, 100+i)
+		if err != nil {
+			return
+		}
 
+		reports := make(chan *Report, 10)
+		err = ts.bg.Report(name, reports)
+		if err != nil {
+			return
+		}
 		for j := 0; j < countOfTasks; j++ {
-			t, err := ts.trans.ComposeTask(name, nil, nil)
-			ts.Nil(err)
+			t, err = ts.trans.ComposeTask(name, nil, nil)
+			if err != nil {
+				return
+			}
 			if t != nil {
 				wait.Add(1)
 				go ts.gen(reports, t, &wait)

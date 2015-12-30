@@ -135,7 +135,7 @@ func (bdg *remoteBridge) StopAllListeners() (err error) {
 	return
 }
 
-func (bdg *remoteBridge) Report(reports <-chan *Report) (err error) {
+func (bdg *remoteBridge) Report(name string, reports <-chan *Report) (err error) {
 	bdg.reporterLock.RLock()
 	defer bdg.reporterLock.RUnlock()
 
@@ -145,7 +145,7 @@ func (bdg *remoteBridge) Report(reports <-chan *Report) (err error) {
 	}
 
 	r := make(chan *ReportEnvelope, 10)
-	if _, err = bdg.reporter.Report(r); err != nil {
+	if _, err = bdg.reporter.Report(name, r); err != nil {
 		return
 	}
 

@@ -32,7 +32,11 @@ func TestAmqp127_0_0_1(t *testing.T) {
 
 	ch, err := conn.Channel()
 	ass.Nil(err)
-	defer conn.ReleaseChannel(ch)
+	if err != nil {
+		conn.ReleaseChannel(ch)
+	} else {
+		conn.ReleaseChannel(nil)
+	}
 
 	ass.Nil(conn.Close())
 }
