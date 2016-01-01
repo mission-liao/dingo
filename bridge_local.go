@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 )
 
 type localStorePoller struct {
@@ -17,8 +16,7 @@ type localBridge struct {
 	supported int
 	broker    chan *Task
 	listeners *Routines
-	reporters *Routines
-	pollers   chan *localStorePoller
+	reporters map[string]*chainRoutines
 	events    chan *Event
 }
 
@@ -26,9 +24,8 @@ func newLocalBridge(args ...interface{}) (b bridge) {
 	v := &localBridge{
 		events:    make(chan *Event, 10),
 		listeners: NewRoutines(),
-		reporters: NewRoutines(),
-		broker:    make(chan *Task, 100),             // TODO: config
-		pollers:   make(chan *localStorePoller, 100), // TODO: config
+		reporters: make(map[string]*chainRoutines),
+		broker:    make(chan *Task, 100), // TODO: config
 		supported: ObjT.Reporter | ObjT.Store | ObjT.Producer | ObjT.Consumer,
 	}
 	b = v
@@ -47,10 +44,14 @@ func (bdg *localBridge) Close() (err error) {
 	defer bdg.objLock.Unlock()
 
 	bdg.listeners.Close()
-	bdg.reporters.Close()
+	for _, v := range bdg.reporters {
+		v.Close()
+	}
 
 	close(bdg.broker)
 	bdg.broker = make(chan *Task, 100) // TODO: config
+	close(bdg.events)
+	bdg.events = make(chan *Event, 100) // TODO: config
 	return
 }
 
@@ -151,168 +152,138 @@ func (bdg *localBridge) StopAllListeners() (err error) {
 	return
 }
 
+type localReporterNode struct {
+	watched map[string]*localStorePoller // map id to poller
+	unSent  map[string][]*Report         // map id to unsent reports
+	name    string
+	events  chan<- *Event
+}
+
+func (t *localReporterNode) HandleInput(v interface{}) {
+	r := v.(*Report)
+	id := r.ID()
+
+	if p, ok := t.watched[id]; ok {
+		p.reports <- r
+		if r.Done() {
+			delete(t.watched, id)
+			close(p.reports)
+		}
+	} else {
+		if rs, ok := t.unSent[id]; ok {
+			t.unSent[id] = append(rs, r)
+		} else {
+			t.unSent[id] = []*Report{r}
+		}
+	}
+}
+func (t *localReporterNode) HandleLink(v interface{}) (ok bool) {
+	var (
+		p    = v.(*localStorePoller)
+		unst []*Report
+	)
+	id := p.task.ID()
+
+	if unst, ok = t.unSent[id]; ok {
+		t.watched[id] = p
+		for _, r := range unst {
+			p.reports <- r
+			if r.Done() {
+				delete(t.watched, id)
+				close(p.reports)
+			}
+		}
+	}
+	return
+}
+
+func (t *localReporterNode) Done() {
+cleanWatched:
+	for k, v := range t.watched {
+		select {
+		case t.events <- NewEventFromError(
+			ObjT.Store,
+			fmt.Errorf("unclosed reports channel: %v:%v", t.name, k),
+		):
+		default:
+			break cleanWatched
+		}
+
+		// send a 'Shutdown' report
+		r, err := v.task.composeReport(Status.Fail, nil, NewErr(ErrCode.Shutdown, errors.New("dingo is shutdown")))
+		if err != nil {
+			t.events <- NewEventFromError(ObjT.Store, err)
+		} else {
+			v.reports <- r
+		}
+
+		// remember to send t close signal
+		close(v.reports)
+	}
+cleanUnSent:
+	for _, v := range t.unSent {
+		for _, r := range v {
+			select {
+			case t.events <- NewEventFromError(
+				ObjT.Store,
+				fmt.Errorf("unsent report: %v:%v", t.name, r),
+			):
+			default:
+				break cleanUnSent
+			}
+		}
+	}
+}
+
 func (bdg *localBridge) Report(name string, reports <-chan *Report) (err error) {
 	bdg.objLock.Lock()
 	defer bdg.objLock.Unlock()
 
-	go func(
-		quit <-chan int,
-		wait *sync.WaitGroup,
-		events chan<- *Event,
-		inputs <-chan *Report,
-		pollers chan *localStorePoller,
-	) {
-		// each time Report is called, a dedicated 'watch', 'unSent' is allocated,
-		// they are natually thread-safe (used in one go routine only)
-		var (
-			// map (name, id) to poller
-			watched = make(map[string]map[string]*localStorePoller)
+	var (
+		chain *chainRoutines
+		ok    bool
+	)
 
-			// map (name, id) to slice of unsent reports.
-			unSent = make(map[string]map[string][]*Report)
-
-			id, name  string
-			p         *localStorePoller
-			ok        bool
-			v         *Report
-			id2poller map[string]*localStorePoller
-			id2Unst   map[string][]*Report
-			unst      []*Report
-		)
-
-		defer wait.Done()
-		outF := func(r *Report) (found bool) {
-			id, name = r.ID(), r.Name()
-			if id2poller, ok = watched[name]; ok {
-				if p, found = id2poller[id]; found {
-					p.reports <- r
-					if r.Done() {
-						delete(id2poller, id)
-						close(p.reports)
-					}
-				}
+	if chain, ok = bdg.reporters[name]; !ok {
+		chain = newChainRoutines(func(v interface{}) {
+			poller := v.(*localStorePoller)
+			// send a 'Shutdown' report
+			r, err := poller.task.composeReport(Status.Fail, nil, NewErr(ErrCode.Shutdown, errors.New("dingo is shutdown")))
+			if err != nil {
+				bdg.events <- NewEventFromError(ObjT.Store, err)
+			} else {
+				poller.reports <- r
 			}
+		}, bdg.events)
+		bdg.reporters[name] = chain
+	}
 
-			return
-		}
-
-		for {
-			select {
-			case _, _ = <-quit:
-				goto clean
-			case p, ok = <-pollers:
-				if !ok {
-					goto clean
-				}
-				id, name = p.task.ID(), p.task.Name()
-
-				// those reports would only be settle down when some
-				// reports coming in.
-				if id2Unst, ok = unSent[name]; ok {
-					if unst, ok = id2Unst[id]; ok {
-						if id2poller, ok = watched[name]; ok {
-							id2poller[id] = p
-						} else {
-							watched[name] = map[string]*localStorePoller{id: p}
-						}
-						for _, v = range unst {
-							outF(v)
-						}
-						delete(id2Unst, id)
-						break
-					}
-				}
-
-				// if the other ends forgets to send any report', this poller might be
-				// traveled in pollers channelf forever.
-				pollers <- p
-
-				// avoid busy looping
-				<-time.After(1 * time.Nanosecond) // TODO: config it
-
-			case v, ok = <-inputs:
-				if !ok {
-					goto clean
-				}
-
-				if outF(v) {
-					break
-				}
-
-				id, name = v.ID(), v.Name()
-				// store it in un-sent array
-				if id2Unst, ok = unSent[name]; ok {
-					if unst, ok = id2Unst[id]; ok {
-						id2Unst[id] = append(unst, v)
-					} else {
-						id2Unst[id] = []*Report{v}
-					}
-				} else {
-					unSent[name] = map[string][]*Report{id: []*Report{v}}
-				}
-			}
-		}
-	clean:
-		for {
-			select {
-			case v, ok = <-inputs:
-				if !ok {
-					break clean
-				}
-
-				if !outF(v) {
-					events <- NewEventFromError(
-						ObjT.Store,
-						fmt.Errorf("droping report: %v", v),
-					)
-				}
-			default:
-				break clean
-			}
-		}
-
-		for k, v := range watched {
-			for kk, vv := range v {
-				events <- NewEventFromError(
-					ObjT.Store,
-					fmt.Errorf("unclosed reports channel: %v:%v", k, kk),
-				)
-
-				// send a 'Shutdown' report
-				r, err := vv.task.composeReport(Status.Fail, nil, NewErr(ErrCode.Shutdown, errors.New("dingo is shutdown")))
-				if err != nil {
-					events <- NewEventFromError(ObjT.Store, err)
-				} else {
-					vv.reports <- r
-				}
-
-				// remember to send t close signal
-				close(vv.reports)
-			}
-		}
-		for _, v := range unSent {
-			for _, vv := range v {
-				for _, r := range vv {
-					events <- NewEventFromError(
-						ObjT.Store,
-						fmt.Errorf("unsent report: %v", r),
-					)
-				}
-			}
-		}
-	}(bdg.reporters.New(), bdg.reporters.Wait(), bdg.events, reports, bdg.pollers)
+	err = chain.Add(reports, &localReporterNode{
+		watched: make(map[string]*localStorePoller),
+		unSent:  make(map[string][]*Report),
+		name:    name,
+		events:  bdg.events,
+	})
 
 	return
 }
 
 func (bdg *localBridge) Poll(t *Task) (reports <-chan *Report, err error) {
 	reports2 := make(chan *Report, Status.Count)
-	bdg.pollers <- &localStorePoller{
-		task:    t,
-		reports: reports2,
+	reports = reports2
+
+	bdg.objLock.Lock()
+	defer bdg.objLock.Unlock()
+
+	if chain, ok := bdg.reporters[t.Name()]; ok {
+		chain.Send(&localStorePoller{
+			task:    t,
+			reports: reports2,
+		})
+	} else {
+		err = fmt.Errorf("reporterNode found in local mode: %v", t.Name())
 	}
 
-	reports = reports2
 	return
 }
 
