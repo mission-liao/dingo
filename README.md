@@ -14,6 +14,7 @@ Below is a quicklink to go through this README:
 - [Quick Demo](README.md#quick-demo)
 - [Features](README.md#features)
   - [Invoking Worker Functions with Arbitary Signatures](README.md#invoking-worker-functions-with-arbitary-signatures)
+  - [Stateful Worker Functions](README.md#stateful-worker-functions)
   - [Two Way Binding with Worker Functions](README.md##two-way-binding-with-worker-functions)
   - [A Distributed Task Framework with Local Mode](README.md#a-distributed-task-framework-with-local-mode)
   - [Customizable](README.md#customizable)
@@ -98,10 +99,14 @@ Obviously, it's hard (not impossible) to handle all types in #golang, these are 
  - __chan__: haven't tried yet
  - __private field in struct__: they are ignore by json/gob, but it's still possible to support them by providing customized marshaller and invoker. (please search 'ExampleCustomMarshaller' for details)
 
+###Stateful Worker Functions
+> Dingo remembers things
+
 Wanna create a worker function with __states__? Two ways to did this in __Dingo__:
  - The [reflect](https://golang.org/pkg/reflect/) package allow us to invoke a method of struct, so you can create an App to hold every global and provide its method as worker functions.
  - create a closure to enclose states or globals
-Refer to [Stateful Workers](docs/guide/stateful_worker.md) for more details.
+
+Refer to [Stateful Worker Functions](docs/guide/stateful_worker_function.md) for more details.
  
 ###Two Way Binding with Worker Functions
 > Throwing and Catching with Your Dingo

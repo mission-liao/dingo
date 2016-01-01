@@ -7,7 +7,7 @@ This section would let you dive into __Dingo__. Before reading, refer to this im
 - [Step into Distributed: Caller and Worker](role.md)
 - [Prepare A Background Worker Pool](background.md)
 - [Configuration](config.md)
-- [Stateful Worker Functions](stateful_worker.md)
+- [Stateful Worker Functions](stateful_worker_function.md)
 - [Execution Option](option.md)
 - [Report](report.md)
 - [Troubleshooting](troubleshooting.md)

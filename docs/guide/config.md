@@ -1,5 +1,5 @@
 ##Configuration
-> [Next: Stateful Workers](stateful_worker.md)
+> [Next: Stateful Worker Functions](stateful_worker_function.md)
 
 There is nothing much to config when initiating __Dingo__:
 ```go
