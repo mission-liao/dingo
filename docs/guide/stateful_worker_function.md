@@ -1,4 +1,4 @@
-##Stateful Workers
+##Stateful Workers Functions
 > [Next: Execution Option](option.md)
 
 Two ways to provide a stateful workers for recording or enclosing globals:
@@ -33,7 +33,7 @@ app.Register("NewUser", genNewUser( /* provide the db connection here */ ))
 
 ###Method
 Or you can define a struct to hold everything you need:
-```
+```go
 //
 // at worker side
 //
@@ -44,11 +44,13 @@ func (me *MyState) NewUser(name, mail string) {
     // access db connection via 'me.db'
 }
 
-// register it to dingo
+// create a new instance, register its method to dingo as worker function.
 app.Register("NewUser", &MyState{db: your_db_conn}.NewUser)
 
 //
-// at caller side, as long as the signature is the same
+// at caller side,
+// you don't have to provide another instance, just make sure
+// the signature is the same
 //
 app.Register("NewUser", func(string, string){})
 ```
