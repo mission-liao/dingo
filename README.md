@@ -55,6 +55,7 @@ func main() {
 	if err != nil {
 		return
 	}
+    // set callback like promise in javascript
 	result.OnOK(func(sum int) {
 		fmt.Printf("result is: %v\n", sum)
 	})
@@ -84,18 +85,18 @@ func DeleteEmployees(names []string) (count int) { ... } // slice, OK
 func DoNothing () { ... } // OK
 ```
 
-Idealy, you don't have to rewrite your function to fit any specific signature, it's piece of cake to make a function distributed by adapting __Dingo__.
+Idealy, you don't have to rewrite your function to fit any specific signature, it's piece of cake to adapt a function to __Dingo__.
 
-Here is to explain why some types can't be supported by __Dingo__. The most compatible exchange format is []byte, to marshall in/out your parameters to []byte, we rely these builtin encoders:
+Below is to explain why some types can't be supported by __Dingo__: The most compatible exchange format is []byte, to marshall in/out your parameters to []byte, we rely these builtin encoders:
  - encoding/json
  - encoding/gob
 
 Type info are deduced from the signatures of worker functions you register. With those type info, parameters are unmarshalled from []byte to cloeset type. A __type correction__ procedure would be applied on those parameters before invoking.
 
-Obviously, it's hard (not impossible) to handle all types in #golang, these are unsupported by dingo as far as I know:
- - interface: unmarshalling requires concrete types. (so __error__ can be marshalled, but can't be un-marshalled)
- - chan: haven't tried yet
- - private field in struct: they are ignore by json/gob, but it's still possible to support them by providing customized marshaller and invoker. (please search 'ExampleCustomMarshaller' for details)
+Obviously, it's hard (not impossible) to handle all types in #golang, these are unsupported by __Dingo__ as far as I know:
+ - __interface__: unmarshalling requires concrete types. (so __error__ can be marshalled, but can't be un-marshalled)
+ - __chan__: haven't tried yet
+ - __private field in struct__: they are ignore by json/gob, but it's still possible to support them by providing customized marshaller and invoker. (please search 'ExampleCustomMarshaller' for details)
  
 ###Two Way Binding with Worker Functions
 > Throwing and Catching with Your Dingo
@@ -120,7 +121,6 @@ if r.OK() {
 ```
 Or using:
  - [dingo.Result](https://godoc.org/github.com/mission-liao/dingo#Result)
- - the fancy golang channel helper: [channels](https://github.com/eapache/channels)
 
 ###A Distributed Task Framework with Local Mode
 > Dingo @Home, or Anywhere

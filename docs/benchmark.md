@@ -5,6 +5,7 @@ All these benchmarks are done in a single node (my notebook) with these profiles
 Mem: 8G
 CPU: 2.66 GHz Intel Core 2 Duo
 ```
+The main idea is to test the speed of task delivery, therefore the worker function just returns what inputs.
 
 ###Local Mode
 ```bash
