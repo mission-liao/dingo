@@ -27,6 +27,8 @@ var ObjT = struct {
 	Bridge int
 	// this object provides dingo.NamedConsumer interface
 	NamedConsumer int
+	// from chained routines
+	ChainRoutine int
 	/*
 		all object types, when used in dingo.App.Listen, it means
 		listen to events from all possible origins.
@@ -42,6 +44,7 @@ var ObjT = struct {
 	(1 << 5),
 	(1 << 6),
 	(1 << 7),
+	(1 << 8),
 	int(^uint(0) >> 1), // Max int
 }
 
