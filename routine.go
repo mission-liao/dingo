@@ -255,6 +255,11 @@ func (rt *chainRoutines) headRoutine(wait *sync.WaitGroup) {
 	)
 	defer wait.Done()
 
+	// lots of data race conition in this function,
+	// possible conditions 'should' already be considered and taken care.
+	//
+	// if anything goes wrong, beware of a performance downgrade when adding lock.
+
 	for {
 		select {
 		case <-time.After(1 * time.Millisecond):

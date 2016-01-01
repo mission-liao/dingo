@@ -97,6 +97,11 @@ Obviously, it's hard (not impossible) to handle all types in #golang, these are 
  - __interface__: unmarshalling requires concrete types. (so __error__ can be marshalled, but can't be un-marshalled)
  - __chan__: haven't tried yet
  - __private field in struct__: they are ignore by json/gob, but it's still possible to support them by providing customized marshaller and invoker. (please search 'ExampleCustomMarshaller' for details)
+
+Wanna create a worker function with __states__? Two ways to did this in __Dingo__:
+ - The [reflect](https://golang.org/pkg/reflect/) package allow us to invoke a method of struct, so you can create an App to hold every global and provide its method as worker functions.
+ - create a closure to enclose states or globals
+Refer to [Stateful Workers](docs/guide/stateful_worker.md) for more details.
  
 ###Two Way Binding with Worker Functions
 > Throwing and Catching with Your Dingo

@@ -1,5 +1,5 @@
 ##Configuration
-> [Next: Option](option.md)
+> [Next: Stateful Workers](stateful_worker.md)
 
 There is nothing much to config when initiating __Dingo__:
 ```go

@@ -12,6 +12,10 @@ type TestStruct struct {
 	Count int
 }
 
+func (s *TestStruct) Append(msg string) string {
+	return s.Name + ":" + msg
+}
+
 //
 // embed struct
 //
@@ -426,6 +430,68 @@ func (s *InvokerTestSuite) TestSlice() {
 		}
 
 		s.Equal(v, called)
+	}
+}
+
+func (s *InvokerTestSuite) TestMethod() {
+	// one way to make worker function with state
+	//
+	var (
+		ts  = &TestStruct{Name: "TestMethod"}
+		msg = "it's worked"
+	)
+
+	param, err := s.convert(ts.Append, msg)
+	s.Nil(err)
+	s.NotNil(param)
+	if param != nil {
+		ret, err := s.ivk.Call(ts.Append, param)
+		s.Nil(err)
+		s.Len(ret, 1)
+		composed, ok := ret[0].(string)
+		s.True(ok)
+		if ok {
+			s.Equal(composed, "TestMethod:it's worked")
+		}
+	}
+}
+
+func (s *InvokerTestSuite) TestClosure() {
+	gen := func() func(string) (string, int) {
+		name := "TestClosure"
+		count := 0
+
+		return func(msg string) (string, int) {
+			count++
+			return name + ":" + msg, count
+		}
+	}
+	chk := func(ret []interface{}, err error, c int) {
+		s.Nil(err)
+		s.Len(ret, 2)
+		composed, ok := ret[0].(string)
+		s.True(ok)
+		if ok {
+			s.Equal(composed, "TestClosure:it's worked")
+		}
+		count, ok := ret[1].(int)
+		s.True(ok)
+		if ok {
+			s.Equal(c, count)
+		}
+	}
+	fn := gen()
+
+	param, err := s.convert(fn, "it's worked")
+	s.Nil(err)
+	s.NotNil(param)
+	if param != nil {
+		ret, err := s.ivk.Call(fn, param)
+		chk(ret, err, 1)
+		ret, err = s.ivk.Call(fn, param)
+		chk(ret, err, 2)
+		ret, err = s.ivk.Call(fn, param)
+		chk(ret, err, 3)
 	}
 }
 
