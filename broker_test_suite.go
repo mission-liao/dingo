@@ -57,7 +57,7 @@ func (ts *BrokerTestSuite) SetupTest() {
 	}
 
 	ts.ConsumerNames = []string{}
-	ts.Trans = newFnMgr()
+	ts.Trans = newFnMgr("")
 }
 
 func (ts *BrokerTestSuite) TearDownTest() {

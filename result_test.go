@@ -16,7 +16,7 @@ type resultTestSuite struct {
 
 func TestResultSuite(t *testing.T) {
 	suite.Run(t, &resultTestSuite{
-		trans: newFnMgr(),
+		trans: newFnMgr(""),
 	})
 }
 

@@ -35,7 +35,7 @@ type BackendTestSuite struct {
 }
 
 func (ts *BackendTestSuite) SetupSuite() {
-	ts.Trans = newFnMgr()
+	ts.Trans = newFnMgr("")
 	ts.NotNil(ts.Gen)
 }
 

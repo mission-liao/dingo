@@ -18,7 +18,7 @@ type workerTestSuite struct {
 
 func TestWorkerSuite(t *testing.T) {
 	suite.Run(t, &workerTestSuite{
-		_trans: newFnMgr(),
+		_trans: newFnMgr(""),
 		_hooks: newLocalBridge().(exHooks),
 	})
 }

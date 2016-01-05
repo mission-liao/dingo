@@ -28,7 +28,7 @@ type fnMgr struct {
 	fn2opt     atomic.Value
 }
 
-func newFnMgr() (c *fnMgr) {
+func newFnMgr(mode string) (c *fnMgr) {
 	c = &fnMgr{}
 
 	// init for marshaller's'
@@ -66,7 +66,13 @@ func newFnMgr() (c *fnMgr) {
 	defer c.imsLock.Unlock()
 
 	ims[ID.UUID] = &uuidMaker{}
-	ims[ID.Default] = ims[ID.UUID]
+	ims[ID.SEQ] = &SeqIDMaker{}
+	switch mode {
+	case "local":
+		ims[ID.Default] = ims[ID.SEQ]
+	default:
+		ims[ID.Default] = ims[ID.UUID]
+	}
 	c.ims.Store(ims)
 
 	// init map from name of function to options

@@ -100,21 +100,21 @@ type App struct {
 	workers      *_workers
 }
 
-/*NewApp whose "nameOfBridge" refers to different modes of dingo:
+/*NewApp whose "mode" refers to different modes of dingo:
   - "local": an App works in local mode, which is similar to other background worker framework.
   - "remote": an App works in remote(distributed) mode, brokers(ex. AMQP...) and backends(ex. redis..., if required) would be needed to work.
 */
-func NewApp(nameOfBridge string, cfg *Config) (app *App, err error) {
+func NewApp(mode string, cfg *Config) (app *App, err error) {
 	if cfg == nil {
 		cfg = DefaultConfig()
 	}
 	v := &App{
 		objs:     make(map[int]*_object),
 		eventMux: newMux(),
-		trans:    newFnMgr(),
+		trans:    newFnMgr(mode),
 		cfg:      *cfg,
 	}
-	v.b = newBridge(nameOfBridge, v.trans)
+	v.b = newBridge(mode, v.trans)
 
 	// refer to 'ReadMostly' example in sync/atomic
 	v.eventOut.Store(make(map[int]*_eventListener))

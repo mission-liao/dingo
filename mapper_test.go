@@ -20,7 +20,7 @@ type mapperTestSuite struct {
 
 func TestMapperSuite(t *testing.T) {
 	suite.Run(t, &mapperTestSuite{
-		_trans:          newFnMgr(),
+		_trans:          newFnMgr(""),
 		_hooks:          newLocalBridge().(exHooks),
 		_tasks:          make(chan *Task, 5),
 		_countOfMappers: 3,

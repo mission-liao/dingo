@@ -19,7 +19,7 @@ type bridgeTestSuite struct {
 
 func (ts *bridgeTestSuite) SetupSuite() {
 	ts.eventMux = newMux()
-	ts.trans = newFnMgr()
+	ts.trans = newFnMgr("")
 }
 
 func (ts *bridgeTestSuite) TearDownSuite() {

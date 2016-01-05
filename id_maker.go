@@ -13,8 +13,10 @@ var ID = struct {
 	Default int
 	// an ID maker implemented via uuid4
 	UUID int
+	// an ID maker implemented by atomic.AddInt64
+	SEQ int
 }{
-	0, 1,
+	0, 1, 2,
 }
 
 /*IDMaker is an object that can generate a series of identiy, typed as string.
