@@ -3,7 +3,6 @@ package dingo_test
 import (
 	"fmt"
 	"sync"
-	"sync/atomic"
 
 	"github.com/mission-liao/dingo"
 	"github.com/stretchr/testify/suite"
@@ -140,15 +139,6 @@ func (ts *DingoSingleAppTestSuite) TestBasic() {
 	}
 }
 
-type testIDMaker struct {
-	cur int32
-}
-
-func (idm *testIDMaker) NewID() (string, error) {
-	v := atomic.AddInt32(&idm.cur, 1)
-	return fmt.Sprintf("%d", v), nil
-}
-
 func (ts *DingoSingleAppTestSuite) TestSameID() {
 	// tasks of different name have the same IDs
 	var (
@@ -171,7 +161,7 @@ func (ts *DingoSingleAppTestSuite) TestSameID() {
 		if err != nil {
 			return
 		}
-		err = ts.app.AddIDMaker(100+i, &testIDMaker{})
+		err = ts.app.AddIDMaker(100+i, &dingo.SeqIDMaker{})
 		if err != nil {
 			return
 		}

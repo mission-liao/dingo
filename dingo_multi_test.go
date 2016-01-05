@@ -220,7 +220,7 @@ func (ts *DingoMultiAppTestSuite) TestSameID() {
 		ts.register(name, fn)
 		ts.allocate(name, 2, 2)
 
-		err = v.AddIDMaker(101, &testIDMaker{})
+		err = v.AddIDMaker(101, &dingo.SeqIDMaker{})
 		if err != nil {
 			return
 		}

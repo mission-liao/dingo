@@ -1,8 +1,6 @@
 package dingo_test
 
 import (
-	"fmt"
-	"sync/atomic"
 	"testing"
 
 	"github.com/mission-liao/dingo"
@@ -20,14 +18,6 @@ func BenchmarkRaw(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		msg, count = testWork(count, msg)
 	}
-}
-
-type testSeqID struct {
-	i int32
-}
-
-func (me *testSeqID) NewID() (string, error) {
-	return fmt.Sprintf("%d", atomic.AddInt32(&me.i, 1)), nil
 }
 
 func BenchmarkLocal(b *testing.B) {
@@ -74,7 +64,7 @@ func BenchmarkLocal(b *testing.B) {
 	}
 
 	// setup for idmaker
-	err = app.AddIDMaker(101, &testSeqID{})
+	err = app.AddIDMaker(101, &dingo.SeqIDMaker{})
 	if err != nil {
 		return
 	}

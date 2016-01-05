@@ -358,7 +358,7 @@ func (ts *bridgeTestSuite) TestDifferentReportsWithSameID() {
 	// register idMaker, task
 	for i := 0; i < countOfTypes; i++ {
 		name := fmt.Sprintf("DifferentReportsWithSameID.%d", i)
-		err = ts.trans.AddIDMaker(100+i, &testSeqID{})
+		err = ts.trans.AddIDMaker(100+i, &SeqIDMaker{})
 		if err != nil {
 			return
 		}

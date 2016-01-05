@@ -276,6 +276,10 @@ func (bdg *localBridge) Poll(t *Task) (reports <-chan *Report, err error) {
 	defer bdg.objLock.Unlock()
 
 	if chain, ok := bdg.reporters[t.Name()]; ok {
+		// a 'localReporterNode' is composed of a reporting channel and task, then sent to
+		// the linked channel, every reporter routine belongs to that task would check it,
+		// and once a reporter with the same 'ID' found, the 'localReporterNode' would settle
+		// down, and its reporting channel would be used to deliver reports.
 		chain.Send(&localStorePoller{
 			task:    t,
 			reports: reports2,

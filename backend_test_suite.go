@@ -228,15 +228,6 @@ func (ts *BackendTestSuite) TestOrder() {
 	ts.Tasks = append(ts.Tasks, tasks...)
 }
 
-type testSeqID struct {
-	cur int
-}
-
-func (ts *testSeqID) NewID() (string, error) {
-	ts.cur++
-	return fmt.Sprintf("%d", ts.cur), nil
-}
-
 func (ts *BackendTestSuite) TestSameID() {
 	// different type of tasks, with the same id,
 	// backend(s) should not get mass.
@@ -256,7 +247,7 @@ func (ts *BackendTestSuite) TestSameID() {
 	// register idMaker, task
 	for i := 0; i < countOfTypes; i++ {
 		name := fmt.Sprintf("SameID.%d", i)
-		err = ts.Trans.AddIDMaker(100+i, &testSeqID{})
+		err = ts.Trans.AddIDMaker(100+i, &SeqIDMaker{})
 		if err != nil {
 			return
 		}

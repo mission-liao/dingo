@@ -7,7 +7,7 @@ I initiated this project after [machinery](https://github.com/RichardKnop/machin
 - Await and receive reports through channels. (_channel_ is a natural way to represent asynchronous results)
 - I want to get familiar with those concepts of #golang: **interface**, **routine**, **channel**, and a distributed task framework is a good topic for practice, :)
 
-One important concept I learned from [Celery](http://www.celeryproject.org/) and inherited in _Dingo_ is that __Caller__ and __Worker__ could share the same codebase.
+One important concept I learned from [Celery](http://www.celeryproject.org/) and inherited in __Dingo__ is that __Caller__ and __Worker__ could share the same codebase.
 > When you send a task message in Celery, that message will not contain any source code, but only the name of the task you want to execute. This works similarly to how host names work on the internet: every worker maintains a mapping of task names to their actual functions, called the task registry.
 
 Below is a quicklink to go through this README:
