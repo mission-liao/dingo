@@ -19,7 +19,7 @@ Below is a quicklink to go through this README:
   - [A Distributed Task Framework with Local Mode](README.md#a-distributed-task-framework-with-local-mode)
   - [Customizable](README.md#customizable)
   - Supported Database Adaptor: [AMQP](amqp/README.md), [Redis](redis/README.md)
-  - Supported Golang Version: 1.4, 1.5
+  - Supported Golang Version: 1.4, 1.5, 1.6
 - [Guide](docs/guide/README.md) 
 - [Benchmark](docs/benchmark.md)
 
