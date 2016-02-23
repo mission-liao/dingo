@@ -19,7 +19,7 @@ Below is a quicklink to go through this README:
   - [A Distributed Task Framework with Local Mode](README.md#a-distributed-task-framework-with-local-mode)
   - [Customizable](README.md#customizable)
   - Supported Database Adaptor: [AMQP](amqp/README.md), [Redis](redis/README.md)
-  - Supporter Golang Version: 1.4, 1.5
+  - Supported Golang Version: 1.4, 1.5
 - [Guide](docs/guide/README.md) 
 - [Benchmark](docs/benchmark.md)
 
@@ -100,10 +100,10 @@ Obviously, it's hard (not impossible) to handle all types in #golang, these are 
  - __private field in struct__: they are ignore by json/gob, but it's still possible to support them by providing customized marshaller and invoker. (please search 'ExampleCustomMarshaller' for details)
 
 ###Stateful Worker Functions
-> Dingo remembers things
+> Dingo Remembers things
 
 Wanna create a worker function with __states__? Two ways to did this in __Dingo__:
- - The [reflect](https://golang.org/pkg/reflect/) package allow us to invoke a method of struct, so you can create an App to hold every global and provide its method as worker functions.
+ - The [reflect](https://golang.org/pkg/reflect/) package allow us to invoke a method of struct, so you can initiate an instance of your struct to hold every global and provide its method as worker functions.
  - create a closure to enclose states or globals
 
 Refer to [Stateful Worker Functions](docs/guide/stateful_worker_function.md) for more details.
@@ -160,3 +160,17 @@ Many core behaviors can be customized:
  - Task Publishing/Consuming: [Producer](https://godoc.org/github.com/mission-liao/dingo#Producer)/[Consumer](https://godoc.org/github.com/mission-liao/dingo#Consumer)/[NamedConsumer](https://godoc.org/github.com/mission-liao/dingo#NamedConsumer)
  - Report Publishing/Consuming: [Reporter](https://godoc.org/github.com/mission-liao/dingo#Reporter)/[Store](https://godoc.org/github.com/mission-liao/dingo#Store)
 
+###Development Environment Setup
+
+There is no dependency manager in this project, you need to install them by yourself.
+```bash
+go get github.com/streadway/amqp
+go get github.com/garyburd/redigo/redis
+go get github.com/stretchr/testify
+go get github.com/satori/go.uuid
+```
+
+Install [Redis](http://redis.io/download) and [Rabbitmq](https://www.rabbitmq.com/download.html), then unittest @ the root folder of dingo
+```bash
+go test -v ./...
+```
