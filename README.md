@@ -23,7 +23,7 @@ Below is a quicklink to go through this README:
 - [Guide](docs/guide/README.md) 
 - [Benchmark](docs/benchmark.md)
 
-##Quick Demo
+## Quick Demo
 Here is a quick demo of this project in local mode as a background job pool:
 ```go
 package main
@@ -69,9 +69,9 @@ func main() {
 }
 ```
 
-##Features
+## Features
 
-###Invoking Worker Functions with Arbitary Signatures
+### Invoking Worker Functions with Arbitary Signatures
 > (Almost) ANY Function Can Be Your Dingo
 
 These functions can be used as __worker functions__ by dingo:
@@ -99,7 +99,7 @@ Obviously, it's hard (not impossible) to handle all types in #golang, these are 
  - __chan__: haven't tried yet
  - __private field in struct__: they are ignore by json/gob, but it's still possible to support them by providing customized marshaller and invoker. (please search 'ExampleCustomMarshaller' for details)
 
-###Stateful Worker Functions
+### Stateful Worker Functions
 > Dingo Remembers things
 
 Wanna create a worker function with __states__? Two ways to did this in __Dingo__:
@@ -108,7 +108,7 @@ Wanna create a worker function with __states__? Two ways to did this in __Dingo_
 
 Refer to [Stateful Worker Functions](docs/guide/stateful_worker_function.md) for more details.
  
-###Two Way Binding with Worker Functions
+### Two Way Binding with Worker Functions
 > Throwing and Catching with Your Dingo
 
 Besides sending arguments, return values from worker functions can also be accessed. Every time you initiate a task, you will get a report channel.
@@ -132,7 +132,7 @@ if r.OK() {
 Or using:
  - [dingo.Result](https://godoc.org/github.com/mission-liao/dingo#Result)
 
-###A Distributed Task Framework with Local Mode
+### A Distributed Task Framework with Local Mode
 > Dingo @Home, or Anywhere
 
 You would prefer a small, local worker pool at early development stage, and transfer to a distributed one when stepping in production. In dingo, there is nothing much to do for transfering (besides debugging, :( )
@@ -150,7 +150,7 @@ And at __Worker__ side, you need to:
  - attach __Consumer__ (or __NamedConsumer__), __Reporter__
  - allocate worker routines
 
-###Customizable
+### Customizable
 > Personalize Your Dingo
 
 Many core behaviors can be customized:
@@ -160,7 +160,7 @@ Many core behaviors can be customized:
  - Task Publishing/Consuming: [Producer](https://godoc.org/github.com/mission-liao/dingo#Producer)/[Consumer](https://godoc.org/github.com/mission-liao/dingo#Consumer)/[NamedConsumer](https://godoc.org/github.com/mission-liao/dingo#NamedConsumer)
  - Report Publishing/Consuming: [Reporter](https://godoc.org/github.com/mission-liao/dingo#Reporter)/[Store](https://godoc.org/github.com/mission-liao/dingo#Store)
 
-###Development Environment Setup
+### Development Environment Setup
 
 There is no dependency manager in this project, you need to install them by yourself.
 ```bash
