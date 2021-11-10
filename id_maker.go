@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 var ID = struct {
@@ -31,7 +31,10 @@ type IDMaker interface {
 type uuidMaker struct{}
 
 func (*uuidMaker) NewID() (string, error) {
-	return uuid.NewV4().String(), nil
+	var u, _ = uuid.NewV4()
+	var usuid = u.String()
+
+	return usuid, nil
 }
 
 /*SeqIDMaker is an implementation of IDMaker suited for local mode.
